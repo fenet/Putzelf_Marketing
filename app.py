@@ -992,16 +992,30 @@ SCHEDULE_TEMPLATE = """
               See who is on which site this week, when they are free, and assign new shifts.
             </p>
           </div>
-          <div class="d-flex align-items-center gap-2 flex-wrap">
-            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-light">Admin panel</a>
-            {% if reportlab_available %}
-              <a href="{{ url_for('schedule_pdf') }}" class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">
-                Download PDF
-              </a>
-            {% else %}
-              <span class="small-note">Install <code>reportlab</code> to enable PDF export.</span>
-            {% endif %}
-          </div>
+          <form method="get" action="{{ url_for('schedule_dashboard') }}" class="d-flex align-items-end gap-2 flex-wrap">
+            <div>
+              <label class="form-label small-note text-uppercase mb-1" for="filter_employee_id">Focus on employee</label>
+              <select class="form-select form-select-sm" id="filter_employee_id" name="employee_id" onchange="this.form.submit()">
+                <option value="">All employees</option>
+                {% for emp in employees %}
+                  <option value="{{ emp.id }}" {% if selected_employee_id == emp.id %}selected{% endif %}>{{ emp.name }}{% if emp.role %} — {{ emp.role }}{% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-light">Admin panel</a>
+              {% if reportlab_available %}
+                <a href="{{ pdf_url }}" class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">
+                  Download PDF
+                </a>
+              {% else %}
+                <span class="small-note">Install <code>reportlab</code> to enable PDF export.</span>
+              {% endif %}
+              {% if selected_employee %}
+                <span class="small-note">Showing {{ selected_employee.name }} only</span>
+              {% endif %}
+            </div>
+          </form>
         </div>
       </header>
       <main class="content-shell">
@@ -1040,8 +1054,8 @@ SCHEDULE_TEMPLATE = """
                   <input type="time" class="form-control form-control-sm" id="start_time" name="start_time" required>
                 </div>
                 <div class="col-6 mb-2">
-                  <label class="form-label small-note text-uppercase" for="end_time">End</label>
-                  <input type="time" class="form-control form-control-sm" id="end_time" name="end_time" required>
+                  <label class="form-label small-note text-uppercase" for="duration_hours">Duration (hours)</label>
+                  <input type="number" step="0.25" min="0.25" max="24" class="form-control form-control-sm" id="duration_hours" name="duration_hours" placeholder="e.g. 8" required>
                 </div>
               </div>
               <button type="submit" class="btn btn-sm btn-primary mt-2" style="background-color:#0f766e; border-color:#0f766e;">
@@ -1069,7 +1083,7 @@ SCHEDULE_TEMPLATE = """
                   </tr>
                 </thead>
                 <tbody>
-                  {% for emp in employees %}
+              {% for emp in visible_employees %}
                     <tr>
                       <th scope="row">
                         {{ emp.name }}<br>
@@ -1639,12 +1653,18 @@ def schedule_dashboard():
             site_id = request.form.get("site_id")
             day_str = request.form.get("day")
             start_str = request.form.get("start_time")
-            end_str = request.form.get("end_time")
-            if emp_id and site_id and day_str and start_str and end_str:
+            duration_hours_str = request.form.get("duration_hours")
+            if emp_id and site_id and day_str and start_str and duration_hours_str:
                 day_val = datetime.strptime(day_str, "%Y-%m-%d").date()
                 start_val = datetime.strptime(start_str, "%H:%M").time()
-                end_val = datetime.strptime(end_str, "%H:%M").time()
-                if end_val > start_val:
+                try:
+                    duration_hours = float(duration_hours_str)
+                except (TypeError, ValueError):
+                    duration_hours = 0
+                if duration_hours > 0 and duration_hours <= 24:
+                    duration_delta = timedelta(hours=duration_hours)
+                    end_dt = datetime.combine(day_val, start_val) + duration_delta
+                    end_val = end_dt.time()
                     shift = Shift(
                         employee_id=int(emp_id),
                         site_id=int(site_id),
@@ -1656,16 +1676,34 @@ def schedule_dashboard():
                     db.commit()
             return redirect(url_for("schedule_dashboard"))
 
+        selected_employee_id = request.args.get("employee_id", type=int)
+
         week_days = _get_week_days()
         employees, sites, matrix = _load_schedule_context(db, week_days)
+
+        selected_employee = None
+        visible_employees = employees
+        if selected_employee_id:
+            selected_employee = next((e for e in employees if e.id == selected_employee_id), None)
+            if selected_employee:
+                visible_employees = [selected_employee]
+
+        pdf_params = {"week": week_days[0].isoformat()}
+        if selected_employee_id:
+            pdf_params["employee_id"] = selected_employee_id
+        pdf_url = url_for("schedule_pdf", **pdf_params)
 
         schedule_html = render_template_string(
             SCHEDULE_TEMPLATE,
             employees=employees,
+            visible_employees=visible_employees,
             sites=sites,
             week_days=week_days,
             cells=matrix,
             reportlab_available=REPORTLAB_AVAILABLE,
+            selected_employee_id=selected_employee_id,
+            selected_employee=selected_employee,
+            pdf_url=pdf_url,
         )
         return schedule_html
     finally:
@@ -1736,6 +1774,7 @@ def schedule_pdf():
         return jsonify({"error": "reportlab not installed"}), 503
 
     week_param = request.args.get("week")
+    employee_id = request.args.get("employee_id", type=int)
     ref_date = None
     if week_param:
         try:
@@ -1747,6 +1786,10 @@ def schedule_pdf():
     db = SessionLocal()
     try:
         employees, _, matrix = _load_schedule_context(db, week_days)
+        if employee_id:
+            employees = [e for e in employees if e.id == employee_id]
+            if not employees:
+                return jsonify({"error": "Employee not found"}), 404
         pdf_buffer = _generate_schedule_pdf(week_days, employees, matrix)
     finally:
         db.close()
