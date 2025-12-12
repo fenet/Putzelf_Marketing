@@ -991,6 +991,9 @@ SCHEDULE_TEMPLATE = """
             <p class="topbar-subtitle mb-0">
               See who is on which site this week, when they are free, and assign new shifts.
             </p>
+            <p class="small-note mb-1">
+              Showing {{ week_days[0].strftime('%d.%m.%Y') }} – {{ week_days[-1].strftime('%d.%m.%Y') }} ({{ weeks }} week{% if weeks > 1 %}s{% endif %})
+            </p>
           </div>
           <form method="get" action="{{ url_for('schedule_dashboard') }}" class="d-flex align-items-end gap-2 flex-wrap">
             <div>
@@ -999,6 +1002,14 @@ SCHEDULE_TEMPLATE = """
                 <option value="">All employees</option>
                 {% for emp in employees %}
                   <option value="{{ emp.id }}" {% if selected_employee_id == emp.id %}selected{% endif %}>{{ emp.name }}{% if emp.role %} — {{ emp.role }}{% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="form-label small-note text-uppercase mb-1" for="weeks">Range (weeks)</label>
+              <select class="form-select form-select-sm" id="weeks" name="weeks" onchange="this.form.submit()">
+                {% for n in [1,2,4,8,12] %}
+                  <option value="{{ n }}" {% if weeks == n %}selected{% endif %}>{{ n }} week{% if n>1 %}s{% endif %}</option>
                 {% endfor %}
               </select>
             </div>
@@ -1068,7 +1079,7 @@ SCHEDULE_TEMPLATE = """
             </p>
           </div>
           <div class="col-12 col-lg-8">
-            <h2 class="h6 mb-2">This week</h2>
+            <h2 class="h6 mb-2">Schedule overview</h2>
             <div class="table-responsive" style="max-height:480px;">
               <table class="table table-dark table-bordered table-sm align-middle schedule-table">
                 <thead>
@@ -1520,12 +1531,17 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
     return rows
 
 
-def _get_week_days(start: date | None = None):
-    """Return list of 7 dates for the week starting Monday containing 'start' (or today)."""
+def _get_day_range(start: date | None = None, weeks: int = 1):
+    """
+    Return list of dates covering the given number of weeks (starting Monday of the reference week).
+    Clamped to max 12 weeks to keep the grid manageable.
+    """
+    weeks = max(1, min(int(weeks or 1), 12))
     if start is None:
         start = date.today()
     monday = start - timedelta(days=start.weekday())
-    return [monday + timedelta(days=i) for i in range(7)]
+    total_days = weeks * 7
+    return [monday + timedelta(days=i) for i in range(total_days)]
 
 
 def _load_schedule_context(db, week_days):
@@ -1617,7 +1633,13 @@ def _generate_schedule_pdf(week_days, employees, matrix):
                 row.append(Paragraph(bullet, cell_style))
         data.append(row)
 
-    table = Table(data, repeatRows=1, hAlign="LEFT", colWidths=[1.9 * inch] + [1.2 * inch] * 7)
+    len_days = max(len(week_days), 1)
+    employee_col_width = 1.8 * inch
+    remaining_width = max(doc.width - employee_col_width, 0.0)
+    per_day_width = remaining_width / len_days if len_days else 1.0 * inch
+    col_widths = [employee_col_width] + [per_day_width] * len_days
+
+    table = Table(data, repeatRows=1, hAlign="LEFT", colWidths=col_widths)
     table.setStyle(
         TableStyle(
             [
@@ -1677,8 +1699,10 @@ def schedule_dashboard():
             return redirect(url_for("schedule_dashboard"))
 
         selected_employee_id = request.args.get("employee_id", type=int)
+        weeks = request.args.get("weeks", default=1, type=int) or 1
+        weeks = max(1, min(weeks, 12))
 
-        week_days = _get_week_days()
+        week_days = _get_day_range(weeks=weeks)
         employees, sites, matrix = _load_schedule_context(db, week_days)
 
         selected_employee = None
@@ -1689,6 +1713,7 @@ def schedule_dashboard():
                 visible_employees = [selected_employee]
 
         pdf_params = {"week": week_days[0].isoformat()}
+        pdf_params["weeks"] = weeks
         if selected_employee_id:
             pdf_params["employee_id"] = selected_employee_id
         pdf_url = url_for("schedule_pdf", **pdf_params)
@@ -1699,6 +1724,7 @@ def schedule_dashboard():
             visible_employees=visible_employees,
             sites=sites,
             week_days=week_days,
+            weeks=weeks,
             cells=matrix,
             reportlab_available=REPORTLAB_AVAILABLE,
             selected_employee_id=selected_employee_id,
@@ -1775,13 +1801,15 @@ def schedule_pdf():
 
     week_param = request.args.get("week")
     employee_id = request.args.get("employee_id", type=int)
+    weeks = request.args.get("weeks", default=1, type=int) or 1
+    weeks = max(1, min(weeks, 12))
     ref_date = None
     if week_param:
         try:
             ref_date = datetime.strptime(week_param, "%Y-%m-%d").date()
         except ValueError:
             ref_date = None
-    week_days = _get_week_days(ref_date)
+    week_days = _get_day_range(ref_date, weeks=weeks)
 
     db = SessionLocal()
     try:
