@@ -18,6 +18,7 @@ from flask import (
     jsonify,
     redirect,
     url_for,
+    session,
 )
 from sqlalchemy import create_engine, Column, Integer, String, Date, Time, ForeignKey
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker, scoped_session
@@ -48,6 +49,10 @@ except Exception:  # pragma: no cover - optional dependency
 
 app = Flask(__name__)
 app.logger.setLevel(logging.DEBUG)
+app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY", "dev-secret-key-change-me")
+
+AUTH_USERNAME = os.getenv("APP_USERNAME", "admin")
+AUTH_PASSWORD = os.getenv("APP_PASSWORD", "Putzelf%12_34")
 
 openai_client = None
 if OpenAI is not None and os.getenv("OPENAI_API_KEY"):
@@ -56,6 +61,18 @@ if OpenAI is not None and os.getenv("OPENAI_API_KEY"):
         app.logger.info("OpenAI client initialized for GPT integration.")
     except Exception as e:  # pragma: no cover - defensive
         app.logger.warning("Failed to initialize OpenAI client: %s", e)
+
+
+# --- simple auth gate ---
+PUBLIC_ENDPOINTS = {"login", "static"}
+
+
+@app.before_request
+def enforce_login():
+    if request.endpoint in PUBLIC_ENDPOINTS or request.endpoint is None:
+        return
+    if not session.get("auth"):
+        return redirect(url_for("login", next=request.path))
 
 
 # --- simple SQLite scheduling backend (employees / sites / shifts) ---
@@ -217,6 +234,103 @@ def find_labelled_phones(text: str):
 
 
 # Modern HTML interface with dashboard-style layout inspired by modern B2B tools
+LOGIN_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — Login</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%);
+      color: #e5e7eb;
+    }
+    .login-card {
+      width: min(440px, 95vw);
+      background: radial-gradient(circle at top left,#020617 0%, #020617 40%, #020617 100%);
+      border: 1px solid rgba(51, 65, 85, 0.9);
+      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.95);
+      border-radius: 16px;
+      padding: 1.5rem;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .brand-logo {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: radial-gradient(circle at 10% 0, #22c55e 0%, #0ea5e9 45%, #1d4ed8 100%);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .brand-logo img { max-width: 78%; max-height: 78%; object-fit: contain; }
+    .brand-title { font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; font-size: 0.95rem; }
+    .brand-sub { font-size: 0.82rem; color: #9ca3af; }
+    .small-note { font-size:0.85rem; color:#9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-logo">
+        <img src="/static/logo.png" alt="Putzelf Marketing">
+      </div>
+      <div>
+        <div class="brand-title">Putzelf Marketing</div>
+        <div class="brand-sub">Secure access</div>
+      </div>
+    </div>
+    <h1 class="h5 text-light mb-3">Sign in</h1>
+    <form method="post" class="needs-validation" novalidate>
+      <input type="hidden" name="next" value="{{ request.args.get('next','') }}">
+      <div class="mb-3">
+        <label class="form-label small-note text-uppercase" for="username">Username</label>
+        <input class="form-control form-control-sm" id="username" name="username" required autofocus>
+      </div>
+      <div class="mb-3">
+        <label class="form-label small-note text-uppercase" for="password">Password</label>
+        <input type="password" class="form-control form-control-sm" id="password" name="password" required>
+      </div>
+      {% if error %}
+        <div class="alert alert-danger py-2" role="alert">{{ error }}</div>
+      {% endif %}
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">Login</button>
+        <span class="small-note">Use your admin credentials.</span>
+      </div>
+    </form>
+  </div>
+  <script>
+    (function () {
+      'use strict';
+      const forms = document.querySelectorAll('.needs-validation');
+      Array.from(forms).forEach(form => {
+        form.addEventListener('submit', event => {
+          if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          form.classList.add('was-validated');
+        }, false);
+      });
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+"""
+
 HTML_TEMPLATE = """
 <!doctype html>
 <html lang="en">
@@ -237,6 +351,7 @@ HTML_TEMPLATE = """
       display: grid;
       grid-template-columns: 260px minmax(0, 1fr);
       background: transparent;
+      transition: grid-template-columns 0.2s ease;
     }
     .sidebar {
       background: radial-gradient(circle at top,#020617 0%, #020617 45%, #020617 100%);
@@ -246,6 +361,8 @@ HTML_TEMPLATE = """
       flex-direction: column;
       padding: 1.5rem 1.25rem;
       gap: 1.5rem;
+      width: 260px;
+      transition: width 0.2s ease, padding 0.2s ease;
     }
     .sidebar-brand {
       display: flex;
@@ -354,6 +471,16 @@ HTML_TEMPLATE = """
       font-size: 0.85rem;
       max-width: 460px;
     }
+    .sidebar-collapsed .app-shell { grid-template-columns: 72px minmax(0, 1fr); }
+    .sidebar-collapsed .sidebar { width: 72px; padding: 1.1rem 0.6rem; }
+    .sidebar-collapsed .nav-text,
+    .sidebar-collapsed .sidebar-title,
+    .sidebar-collapsed .sidebar-sub,
+    .sidebar-collapsed .sidebar-section-title,
+    .sidebar-collapsed .sidebar-footer { display: none; }
+    .sidebar-collapsed .nav-pill { justify-content: center; padding: 0.45rem; }
+    .sidebar-collapsed .nav-pill-icon { margin: 0 auto; }
+    .sidebar-collapsed .sidebar-logo { margin: 0 auto; }
     .topbar-chip {
       font-size: 0.72rem;
       padding: 0.2rem 0.55rem;
@@ -489,26 +616,26 @@ HTML_TEMPLATE = """
         <div class="sidebar-section-title">Workspace</div>
         <a href="#" class="nav-pill active">
           <span class="nav-pill-icon">◎</span>
-          <span>Dashboard</span>
+          <span class="nav-text">Dashboard</span>
         </a>
         <a href="#" class="nav-pill">
           <span class="nav-pill-icon">↗</span>
-          <span>Crawl history <span class="small-note">(coming soon)</span></span>
+          <span class="nav-text">Crawl history <span class="small-note">(coming soon)</span></span>
         </a>
         <a href="#" class="nav-pill">
           <span class="nav-pill-icon">✉</span>
-          <span>Sequences <span class="small-note">(coming soon)</span></span>
+          <span class="nav-text">Sequences <span class="small-note">(coming soon)</span></span>
         </a>
       </div>
       <div>
         <div class="sidebar-section-title">People</div>
         <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">
           <span class="nav-pill-icon">👤</span>
-          <span>Employee schedule</span>
+          <span class="nav-text">Employee schedule</span>
         </a>
         <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">
           <span class="nav-pill-icon">⚙</span>
-          <span>Manage employees &amp; sites</span>
+          <span class="nav-text">Manage employees &amp; sites</span>
         </a>
       </div>
       <div class="sidebar-footer">
@@ -529,9 +656,11 @@ HTML_TEMPLATE = """
           </p>
         </div>
         <div class="topbar-user">
+          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-light">☰</button>
           <div class="text-end user-meta">
             <span>Prospecting workspace</span>
             <span>{{ 'GPT connected' if gpt_enabled else 'GPT not configured' }}</span>
+            <span><a href="{{ url_for('logout') }}" class="link-light small-note text-decoration-none">Logout</a></span>
           </div>
           <div class="user-avatar">PM</div>
         </div>
@@ -664,6 +793,22 @@ HTML_TEMPLATE = """
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
     (function () {
+      const KEY = 'pm-sidebar-collapsed';
+      const body = document.body;
+      const btn = document.getElementById('sidebar-toggle');
+      const setState = (val) => {
+        body.classList.toggle('sidebar-collapsed', val);
+        try { localStorage.setItem(KEY, val ? '1' : '0'); } catch (e) {}
+      };
+      const initial = (() => {
+        try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+      })();
+      setState(initial);
+      if (btn) {
+        btn.addEventListener('click', () => setState(!body.classList.contains('sidebar-collapsed')));
+      }
+    })();
+    (function () {
       'use strict'
       const form = document.getElementById('crawl-form');
       form.addEventListener('submit', async function (event) {
@@ -786,6 +931,7 @@ SCHEDULE_TEMPLATE = """
       min-height: 100vh;
       display: grid;
       grid-template-columns: 260px minmax(0, 1fr);
+      transition: grid-template-columns 0.2s ease;
     }
     .sidebar {
       background: radial-gradient(circle at top,#020617 0%, #020617 45%, #020617 100%);
@@ -795,6 +941,8 @@ SCHEDULE_TEMPLATE = """
       flex-direction: column;
       padding: 1.5rem 1.25rem;
       gap: 1.5rem;
+      width: 260px;
+      transition: width 0.2s ease, padding 0.2s ease;
     }
     .sidebar-brand {
       display: flex;
@@ -834,6 +982,7 @@ SCHEDULE_TEMPLATE = """
       color: #6b7280;
       margin-bottom: 0.4rem;
     }
+    .nav-text { display: inline; }
     .nav-pill {
       border-radius: 0.75rem;
       padding: 0.45rem 0.75rem;
@@ -939,6 +1088,16 @@ SCHEDULE_TEMPLATE = """
       color: #6b7280;
       font-size: 0.75rem;
     }
+    .sidebar-collapsed .app-shell { grid-template-columns: 72px minmax(0, 1fr); }
+    .sidebar-collapsed .sidebar { width: 72px; padding: 1.1rem 0.6rem; }
+    .sidebar-collapsed .nav-text,
+    .sidebar-collapsed .sidebar-title,
+    .sidebar-collapsed .sidebar-sub,
+    .sidebar-collapsed .sidebar-section-title,
+    .sidebar-collapsed .sidebar-footer { display: none; }
+    .sidebar-collapsed .nav-pill { justify-content: center; padding: 0.45rem; }
+    .sidebar-collapsed .nav-pill-icon { margin: 0 auto; }
+    .sidebar-collapsed .sidebar-logo { margin: 0 auto; }
     @media (max-width: 992px) {
       .app-shell { grid-template-columns: minmax(0, 1fr); }
       .sidebar { display: none; }
@@ -963,18 +1122,18 @@ SCHEDULE_TEMPLATE = """
         <div class="sidebar-section-title">Workspace</div>
         <a href="{{ url_for('index') }}" class="nav-pill">
           <span class="nav-pill-icon">◎</span>
-          <span>Dashboard</span>
+          <span class="nav-text">Dashboard</span>
         </a>
       </div>
       <div>
         <div class="sidebar-section-title">People</div>
         <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill active">
           <span class="nav-pill-icon">👤</span>
-          <span>Employee schedule</span>
+          <span class="nav-text">Employee schedule</span>
         </a>
         <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">
           <span class="nav-pill-icon">⚙</span>
-          <span>Manage employees &amp; sites</span>
+          <span class="nav-text">Manage employees &amp; sites</span>
         </a>
       </div>
       <div class="sidebar-footer">
@@ -1014,6 +1173,7 @@ SCHEDULE_TEMPLATE = """
               </select>
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
+              <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-light">☰</button>
               <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-light">Admin panel</a>
               {% if reportlab_available %}
                 <a href="{{ pdf_url }}" class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">
@@ -1025,6 +1185,7 @@ SCHEDULE_TEMPLATE = """
               {% if selected_employee %}
                 <span class="small-note">Showing {{ selected_employee.name }} only</span>
               {% endif %}
+              <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Logout</a>
             </div>
           </form>
         </div>
@@ -1124,6 +1285,22 @@ SCHEDULE_TEMPLATE = """
   </div>
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+    (function () {
+      const KEY = 'pm-sidebar-collapsed';
+      const body = document.body;
+      const btn = document.getElementById('sidebar-toggle');
+      const setState = (val) => {
+        body.classList.toggle('sidebar-collapsed', val);
+        try { localStorage.setItem(KEY, val ? '1' : '0'); } catch (e) {}
+      };
+      const initial = (() => {
+        try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+      })();
+      setState(initial);
+      if (btn) {
+        btn.addEventListener('click', () => setState(!body.classList.contains('sidebar-collapsed')));
+      }
+    })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
@@ -1142,15 +1319,22 @@ ADMIN_TEMPLATE = """
  
     <style>
     body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%); color:#e5e7eb; }
-    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); }
-    .sidebar { background: radial-gradient(circle at top,#020617 0%, #020617 45%, #020617 100%); border-right:1px solid rgba(148,163,184,0.3); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition: grid-template-columns 0.2s ease; }
+    .sidebar { background: radial-gradient(circle at top,#020617 0%, #020617 45%, #020617 100%); border-right:1px solid rgba(148,163,184,0.3); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; }
     .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#e5e7eb; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
     .nav-pill.active, .nav-pill:hover { background:rgba(15,118,110,0.2); border-color:rgba(45,212,191,0.4); color:#ecfeff; }
+    .nav-text { display: inline; }
     .main-shell { padding:1.5rem; }
     .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.9); background:radial-gradient(circle at top left,#020617 0%, #020617 35%, #020617 100%); padding:1rem; }
     .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#94a3b8; }
     .badge-soft { border-radius:999px; border:1px solid rgba(148,163,184,0.6); color:#9ca3af; padding:0.15rem 0.6rem; font-size:0.75rem; }
     .little-card { border-radius:0.7rem; border:1px solid rgba(51,65,85,0.9); background:rgba(15,23,42,0.8); }
+    .sidebar-collapsed .app-shell { grid-template-columns: 72px minmax(0,1fr); }
+    .sidebar-collapsed .sidebar { width: 72px; padding: 1.1rem 0.6rem; }
+    .sidebar-collapsed .nav-text,
+    .sidebar-collapsed .sidebar-footer { display: none; }
+    .sidebar-collapsed .nav-pill { justify-content: center; padding: 0.45rem; }
+    .sidebar-collapsed .sidebar { align-items: center; }
     @media(max-width:992px){ .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{ display:none;} }
   </style>
 </head>
@@ -1158,9 +1342,9 @@ ADMIN_TEMPLATE = """
   <div class="app-shell">
     <aside class="sidebar">
       <div class="sidebar-section-title text-uppercase">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill active">⚙ <span>Admin</span></a>
-      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span>Dashboard</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">👤 <span>Schedule</span></a>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill active">⚙ <span class="nav-text">Admin</span></a>
+      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Dashboard</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">👤 <span class="nav-text">Schedule</span></a>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
     <main class="main-shell text-light">
@@ -1171,8 +1355,10 @@ ADMIN_TEMPLATE = """
           <p class="text-secondary mb-0">Entries here feed into the weekly schedule and shift assignments.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
+          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-light">☰</button>
           <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-light">View schedule</a>
           <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-light">Crawler</a>
+          <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary text-light border-light">Logout</a>
         </div>
       </div>
       <div class="row g-3">
@@ -1275,7 +1461,25 @@ ADMIN_TEMPLATE = """
       </div>
     </main>
   </div>
-  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    (function () {
+      const KEY = 'pm-sidebar-collapsed';
+      const body = document.body;
+      const btn = document.getElementById('sidebar-toggle');
+      const setState = (val) => {
+        body.classList.toggle('sidebar-collapsed', val);
+        try { localStorage.setItem(KEY, val ? '1' : '0'); } catch (e) {}
+      };
+      const initial = (() => {
+        try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+      })();
+      setState(initial);
+      if (btn) {
+        btn.addEventListener('click', () => setState(!body.classList.contains('sidebar-collapsed')));
+      }
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
@@ -1664,6 +1868,31 @@ def _generate_schedule_pdf(week_days, employees, matrix):
     doc.build(elements)
     buf.seek(0)
     return buf
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("auth"):
+        return redirect(request.args.get("next") or url_for("index"))
+
+    error = None
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip()
+        password = request.form.get("password") or ""
+        dest = request.form.get("next") or request.args.get("next")
+        if username == AUTH_USERNAME and password == AUTH_PASSWORD:
+            session["auth"] = True
+            session["user"] = username
+            return redirect(dest or url_for("index"))
+        error = "Invalid credentials"
+
+    return render_template_string(LOGIN_TEMPLATE, error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 @app.route("/schedule", methods=["GET", "POST"])
