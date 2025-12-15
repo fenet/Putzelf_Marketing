@@ -20,7 +20,7 @@ from flask import (
     url_for,
     session,
 )
-from sqlalchemy import create_engine, Column, Integer, String, Date, Time, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Date, Time, ForeignKey, or_, func, DateTime
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker, scoped_session
 
 try:
@@ -122,6 +122,25 @@ class Shift(Base):
         return f"<Shift {self.id} emp={self.employee_id} site={self.site_id} {self.day}>"
 
 
+LEAD_STAGES = ["New Leads", "Qualified Leads", "Contacted", "Converted"]
+
+
+class Lead(Base):
+    __tablename__ = "leads"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    email = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    source = Column(String, nullable=True)
+    notes = Column(String, nullable=True)
+    stage = Column(String, nullable=False, default="New Leads")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    def __repr__(self) -> str:  # pragma: no cover - debug
+        return f"<Lead {self.id} {self.name!r} {self.stage}>"
+
+
 DB_URL = os.getenv("SCHEDULE_DB_URL", "sqlite:///schedule.db")
 engine = create_engine(DB_URL, future=True)
 SessionLocal = scoped_session(sessionmaker(bind=engine, autoflush=False, autocommit=False))
@@ -146,6 +165,13 @@ def init_db():
                 Site(name="Site C – Warehouse", address="Linz, Industrial Way 7"),
             ]
             db.add_all(demo_sites)
+        if db.query(Lead).count() == 0:
+            demo_leads = [
+                Lead(name="Alice Bauer", email="alice@example.com", stage="New Leads", source="Web form"),
+                Lead(name="Bob Mayer", email="bob@example.com", stage="Qualified Leads", source="Import"),
+                Lead(name="Carla Novak", email="carla@example.com", stage="Contacted", source="Manual"),
+            ]
+            db.add_all(demo_leads)
         db.commit()
     except Exception:
         db.rollback()
@@ -323,6 +349,281 @@ LOGIN_TEMPLATE = """
           }
           form.classList.add('was-validated');
         }, false);
+      });
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+"""
+
+LEADS_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — LeadTracker</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root { --bs-primary: #0f766e; }
+    body { min-height: 100vh; background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%); color:#e5e7eb; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition: grid-template-columns 0.2s ease; }
+    .sidebar { background: radial-gradient(circle at top,#020617 0%, #020617 45%, #020617 100%); border-right:1px solid rgba(148,163,184,0.3); color:#e5e7eb; display:flex; flex-direction:column; padding:1.5rem 1.25rem; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; }
+    .sidebar-brand { display:flex; align-items:center; gap:0.75rem; }
+    .sidebar-logo { height:40px; width:40px; border-radius:12px; background:radial-gradient(circle at 10% 0, #22c55e 0%, #0ea5e9 45%, #1d4ed8 100%); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .sidebar-logo img { max-width:80%; max-height:80%; object-fit:contain; }
+    .sidebar-title { font-weight:600; letter-spacing:0.03em; font-size:0.95rem; text-transform:uppercase; color:#e5e7eb; }
+    .sidebar-sub { font-size:0.78rem; color:#9ca3af; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#6b7280; margin-bottom:0.4rem; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#e5e7eb; display:flex; align-items:center; gap:0.5rem; text-decoration:none; border:1px solid transparent; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
+    .nav-pill.active { background:rgba(15,118,110,0.2); border-color:rgba(45,212,191,0.4); color:#ecfeff; }
+    .nav-pill:hover { background:rgba(15,23,42,0.9); border-color:rgba(148,163,184,0.5); color:#f9fafb; }
+    .nav-pill-icon { width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:rgba(15,23,42,0.9); color:#a5b4fc; font-size:0.9rem; }
+    .nav-text { display:inline; }
+    .sidebar-footer { margin-top:auto; font-size:0.75rem; color:#6b7280; }
+    .main-shell { padding:1.25rem 1.5rem; }
+    .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.9); background:radial-gradient(circle at top left,#020617 0%, #020617 35%, #020617 100%); padding:1rem; }
+    .badge-soft { border-radius:999px; border:1px solid rgba(148,163,184,0.6); color:#9ca3af; padding:0.15rem 0.6rem; font-size:0.75rem; }
+    .small-note { font-size:0.82rem; color:#9ca3af; }
+    .sidebar-collapsed .app-shell { grid-template-columns: 72px minmax(0, 1fr); }
+    .sidebar-collapsed .sidebar { width: 72px; padding: 1.1rem 0.6rem; }
+    .sidebar-collapsed .nav-text,
+    .sidebar-collapsed .sidebar-title,
+    .sidebar-collapsed .sidebar-sub,
+    .sidebar-collapsed .sidebar-section-title,
+    .sidebar-collapsed .sidebar-footer { display: none; }
+    .sidebar-collapsed .nav-pill { justify-content: center; padding: 0.45rem; }
+    .sidebar-collapsed .nav-pill-icon { margin: 0 auto; }
+    .sidebar-collapsed .sidebar-logo { margin: 0 auto; }
+    .kanban { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; }
+    .kanban-column { border:1px solid rgba(51,65,85,0.9); border-radius:0.9rem; background:rgba(15,23,42,0.7); padding:0.75rem; min-height:240px; }
+    .kanban-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem; color:#e5e7eb; font-weight:600; font-size:0.95rem; }
+    .lead-card { border:1px solid rgba(148,163,184,0.3); border-radius:0.7rem; padding:0.65rem; background:rgba(2,6,23,0.7); color:#e5e7eb; margin-bottom:0.5rem; cursor:grab; }
+    .lead-card.dragging { opacity:0.6; }
+    .kanban-column.drop-target { border-color:#22d3ee; box-shadow:inset 0 0 0 1px #22d3ee; }
+    .lead-meta { font-size:0.8rem; color:#9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-logo">
+          <img src="/static/logo.png" alt="Putzelf Marketing">
+        </div>
+        <div>
+          <div class="sidebar-title">Putzelf Marketing</div>
+          <div class="sidebar-sub">LeadTracker</div>
+        </div>
+      </div>
+      <div>
+        <div class="sidebar-section-title">Workspace</div>
+        <a href="{{ url_for('index') }}" class="nav-pill">
+          <span class="nav-pill-icon">◎</span>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">
+          <span class="nav-pill-icon">👤</span>
+          <span class="nav-text">Schedule</span>
+        </a>
+        <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">
+          <span class="nav-pill-icon">⚙</span>
+          <span class="nav-text">Admin</span>
+        </a>
+        <a href="{{ url_for('leads_dashboard') }}" class="nav-pill active">
+          <span class="nav-pill-icon">📇</span>
+          <span class="nav-text">LeadTracker</span>
+        </a>
+      </div>
+      <div class="sidebar-footer">
+        <div>© <span id="year"></span> Putzelf Marketing</div>
+        <div class="mt-1">Track and advance leads with drag & drop.</div>
+      </div>
+    </aside>
+    <main class="main-shell">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+          <div class="badge-soft mb-2">Leads</div>
+          <h1 class="h4 mb-1 text-light">LeadTracker</h1>
+          <p class="small-note mb-0">Manage leads through New → Qualified → Contacted → Converted.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-light">☰</button>
+          <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary text-light">Logout</a>
+        </div>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-lg-4">
+          <div class="card-surface h-100">
+            <h2 class="h6 text-uppercase text-secondary">Add lead</h2>
+            <form method="post" class="small needs-validation" novalidate>
+              <div class="mb-2">
+                <label class="form-label small-note text-uppercase" for="lead_name">Name</label>
+                <input type="text" class="form-control form-control-sm" id="lead_name" name="name" required>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small-note text-uppercase" for="lead_email">Email</label>
+                <input type="email" class="form-control form-control-sm" id="lead_email" name="email">
+              </div>
+              <div class="mb-2">
+                <label class="form-label small-note text-uppercase" for="lead_phone">Phone</label>
+                <input type="text" class="form-control form-control-sm" id="lead_phone" name="phone">
+              </div>
+              <div class="mb-2">
+                <label class="form-label small-note text-uppercase" for="lead_source">Source</label>
+                <input type="text" class="form-control form-control-sm" id="lead_source" name="source" placeholder="e.g. Web form, Import">
+              </div>
+              <div class="mb-2">
+                <label class="form-label small-note text-uppercase" for="lead_notes">Notes</label>
+                <textarea class="form-control form-control-sm" id="lead_notes" name="notes" rows="2"></textarea>
+              </div>
+              <div class="mb-3">
+                <label class="form-label small-note text-uppercase" for="lead_stage">Stage</label>
+                <select class="form-select form-select-sm" id="lead_stage" name="stage">
+                  {% for s in stages %}
+                    <option value="{{ s }}">{{ s }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <button type="submit" class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">Save lead</button>
+            </form>
+          </div>
+        </div>
+        <div class="col-12 col-lg-8">
+          <div class="card-surface h-100">
+            <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+              <div>
+                <label class="form-label small-note text-uppercase mb-1" for="filter_stage">Stage</label>
+                <select class="form-select form-select-sm" id="filter_stage" name="stage" form="filters-form">
+                  <option value="">All stages</option>
+                  {% for s in stages %}
+                    <option value="{{ s }}" {% if stage_filter==s %}selected{% endif %}>{{ s }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <label class="form-label small-note text-uppercase mb-1" for="filter_start">From</label>
+                <input type="date" class="form-control form-control-sm" id="filter_start" name="start" form="filters-form" value="{{ start_filter or '' }}">
+              </div>
+              <div>
+                <label class="form-label small-note text-uppercase mb-1" for="filter_end">To</label>
+                <input type="date" class="form-control form-control-sm" id="filter_end" name="end" form="filters-form" value="{{ end_filter or '' }}">
+              </div>
+              <div>
+                <label class="form-label small-note text-uppercase mb-1" for="filter_sort">Sort</label>
+                <select class="form-select form-select-sm" id="filter_sort" name="sort" form="filters-form">
+                  <option value="desc" {% if sort=='desc' %}selected{% endif %}>Newest first</option>
+                  <option value="asc" {% if sort=='asc' %}selected{% endif %}>Oldest first</option>
+                </select>
+              </div>
+              <div class="ms-auto d-flex gap-2">
+                <form id="filters-form" method="get" class="d-flex gap-2">
+                  <button class="btn btn-sm btn-outline-light" type="submit">Apply</button>
+                  <a href="{{ url_for('leads_dashboard') }}" class="btn btn-sm btn-outline-secondary text-light">Clear</a>
+                </form>
+              </div>
+            </div>
+            <div class="kanban">
+              {% for stage, stage_leads in grouped_leads.items() %}
+                <div class="kanban-column" data-stage="{{ stage }}">
+                  <div class="kanban-header">
+                    <span>{{ stage }}</span>
+                    <span class="badge bg-secondary">{{ stage_leads|length }}</span>
+                  </div>
+                  <div class="kanban-body" data-stage="{{ stage }}">
+                    {% for lead in stage_leads %}
+                      <div class="lead-card" draggable="true" data-lead-id="{{ lead.id }}">
+                        <div class="d-flex justify-content-between align-items-start">
+                          <div>
+                            <strong>{{ lead.name }}</strong><br>
+                            <span class="lead-meta">{{ (lead.email or '—') }}</span>
+                          </div>
+                          <span class="small-note">{{ lead.created_at.strftime('%d.%m.%Y') }}</span>
+                        </div>
+                        {% if lead.phone %}
+                          <div class="lead-meta mt-1">📞 {{ lead.phone }}</div>
+                        {% endif %}
+                        {% if lead.source %}
+                          <div class="lead-meta">Source: {{ lead.source }}</div>
+                        {% endif %}
+                        {% if lead.notes %}
+                          <div class="lead-meta">Notes: {{ lead.notes }}</div>
+                        {% endif %}
+                      </div>
+                    {% else %}
+                      <div class="small-note text-secondary">No leads</div>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    (function () {
+      const KEY = 'pm-sidebar-collapsed';
+      const body = document.body;
+      const btn = document.getElementById('sidebar-toggle');
+      const setState = (val) => {
+        body.classList.toggle('sidebar-collapsed', val);
+        try { localStorage.setItem(KEY, val ? '1' : '0'); } catch (e) {}
+      };
+      const initial = (() => {
+        try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+      })();
+      setState(initial);
+      if (btn) btn.addEventListener('click', () => setState(!body.classList.contains('sidebar-collapsed')));
+    })();
+
+    // Drag & drop
+    (() => {
+      const cards = document.querySelectorAll('.lead-card');
+      const columns = document.querySelectorAll('.kanban-body');
+      let dragged = null;
+      cards.forEach(card => {
+        card.addEventListener('dragstart', e => {
+          dragged = card;
+          card.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+          dragged = null;
+          columns.forEach(c => c.classList.remove('drop-target'));
+        });
+      });
+      columns.forEach(col => {
+        col.addEventListener('dragover', e => {
+          if (!dragged) return;
+          e.preventDefault();
+          col.classList.add('drop-target');
+          const afterEl = [...col.querySelectorAll('.lead-card:not(.dragging)')].find(el => {
+            const box = el.getBoundingClientRect();
+            return e.clientY < box.top + box.height / 2;
+          });
+          if (afterEl) col.insertBefore(dragged, afterEl); else col.appendChild(dragged);
+        });
+        col.addEventListener('dragleave', () => col.classList.remove('drop-target'));
+        col.addEventListener('drop', async e => {
+          col.classList.remove('drop-target');
+          if (!dragged) return;
+          const stage = col.dataset.stage;
+          const id = dragged.dataset.leadId;
+          try {
+            await fetch('{{ url_for("leads_stage") }}', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id, stage })
+            });
+          } catch (err) {
+            console.error('Failed to update stage', err);
+          }
+        });
       });
     })();
   </script>
@@ -625,6 +926,10 @@ HTML_TEMPLATE = """
         <a href="#" class="nav-pill">
           <span class="nav-pill-icon">✉</span>
           <span class="nav-text">Sequences <span class="small-note">(coming soon)</span></span>
+        </a>
+        <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">
+          <span class="nav-pill-icon">📇</span>
+          <span class="nav-text">LeadTracker</span>
         </a>
       </div>
       <div>
@@ -1135,6 +1440,10 @@ SCHEDULE_TEMPLATE = """
           <span class="nav-pill-icon">⚙</span>
           <span class="nav-text">Manage employees &amp; sites</span>
         </a>
+        <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">
+          <span class="nav-pill-icon">📇</span>
+          <span class="nav-text">LeadTracker</span>
+        </a>
       </div>
       <div class="sidebar-footer">
         <div>© <span id="year"></span> Putzelf Marketing</div>
@@ -1165,28 +1474,32 @@ SCHEDULE_TEMPLATE = """
               </select>
             </div>
             <div>
+              <label class="form-label small-note text-uppercase mb-1" for="start_date">Start week (Monday)</label>
+              <input type="date" class="form-control form-control-sm" id="start_date" name="start_date" value="{{ start_date or week_days[0].isoformat() }}" onchange="this.form.submit()">
+            </div>
+            <div>
               <label class="form-label small-note text-uppercase mb-1" for="weeks">Range (weeks)</label>
               <select class="form-select form-select-sm" id="weeks" name="weeks" onchange="this.form.submit()">
                 {% for n in [1,2,4,8,12] %}
                   <option value="{{ n }}" {% if weeks == n %}selected{% endif %}>{{ n }} week{% if n>1 %}s{% endif %}</option>
                 {% endfor %}
               </select>
-            </div>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
+          </div>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
               <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-light">☰</button>
-              <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-light">Admin panel</a>
-              {% if reportlab_available %}
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-light">Admin panel</a>
+            {% if reportlab_available %}
                 <a href="{{ pdf_url }}" class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">
-                  Download PDF
-                </a>
-              {% else %}
-                <span class="small-note">Install <code>reportlab</code> to enable PDF export.</span>
-              {% endif %}
+                Download PDF
+              </a>
+            {% else %}
+              <span class="small-note">Install <code>reportlab</code> to enable PDF export.</span>
+            {% endif %}
               {% if selected_employee %}
                 <span class="small-note">Showing {{ selected_employee.name }} only</span>
               {% endif %}
               <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Logout</a>
-            </div>
+          </div>
           </form>
         </div>
       </header>
@@ -1335,6 +1648,39 @@ ADMIN_TEMPLATE = """
     .sidebar-collapsed .sidebar-footer { display: none; }
     .sidebar-collapsed .nav-pill { justify-content: center; padding: 0.45rem; }
     .sidebar-collapsed .sidebar { align-items: center; }
+    .sidebar-logo img { max-width: 80%; max-height: 80%; object-fit: contain; }
+    .kanban {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 1rem;
+    }
+    .kanban-column {
+      border: 1px solid rgba(51,65,85,0.9);
+      border-radius: 0.9rem;
+      background: rgba(15,23,42,0.7);
+      padding: 0.75rem;
+      min-height: 260px;
+    }
+    .kanban-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      color: #e5e7eb;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .lead-card {
+      border: 1px solid rgba(148,163,184,0.3);
+      border-radius: 0.7rem;
+      padding: 0.65rem;
+      background: rgba(2,6,23,0.7);
+      color: #e5e7eb;
+      margin-bottom: 0.5rem;
+      cursor: grab;
+    }
+    .lead-card.dragging { opacity: 0.6; }
+    .kanban-column.drop-target { border-color: #22d3ee; box-shadow: inset 0 0 0 1px #22d3ee; }
     @media(max-width:992px){ .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{ display:none;} }
   </style>
 </head>
@@ -1345,6 +1691,7 @@ ADMIN_TEMPLATE = """
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill active">⚙ <span class="nav-text">Admin</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Dashboard</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">👤 <span class="nav-text">Schedule</span></a>
+      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">LeadTracker</span></a>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
     <main class="main-shell text-light">
@@ -1359,6 +1706,7 @@ ADMIN_TEMPLATE = """
           <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-light">View schedule</a>
           <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-light">Crawler</a>
           <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary text-light border-light">Logout</a>
+          <a href="{{ url_for('leads_dashboard') }}" class="btn btn-sm btn-outline-info text-light">LeadTracker</a>
         </div>
       </div>
       <div class="row g-3">
@@ -1413,19 +1761,64 @@ ADMIN_TEMPLATE = """
         <div class="col-12 col-lg-6">
           <div class="card-surface h-100">
             <h2 class="h6 text-uppercase text-secondary">Sites</h2>
+            <form method="get" class="row g-2 mb-2">
+              <div class="col-9">
+                <label class="form-label" for="search_q">Search (name or address)</label>
+                <div class="input-group input-group-sm">
+                  <input type="text" class="form-control" id="search_q" name="q" value="{{ search_q or '' }}" placeholder="Search sites...">
+                  <button class="btn btn-outline-light" type="submit">Search</button>
+                </div>
+              </div>
+              <div class="col-3 d-flex align-items-end">
+                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary w-100">Clear</a>
+              </div>
+            </form>
             <form method="post" class="row g-2 mb-3">
               <input type="hidden" name="entity" value="site">
               <input type="hidden" name="action" value="create">
               <div class="col-6">
-                <label class="form-label" for="new_site_name">Name</label>
-                <input type="text" class="form-control form-control-sm" id="new_site_name" name="name" required>
-              </div>
-              <div class="col-6">
                 <label class="form-label" for="new_site_address">Address</label>
                 <input type="text" class="form-control form-control-sm" id="new_site_address" name="address" required>
               </div>
+              <div class="col-6">
+                <label class="form-label" for="new_site_name">Name</label>
+                <input type="text" class="form-control form-control-sm" id="new_site_name" name="name" required>
+              </div>
               <div class="col-12">
                 <button type="submit" class="btn btn-sm btn-primary">Add site</button>
+              </div>
+            </form>
+            <form method="post" class="little-card p-3 mb-3">
+              <input type="hidden" name="entity" value="site_bulk">
+              <input type="hidden" name="action" value="bulk_update">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h3 class="h6 mb-0 text-secondary">Edit all sites</h3>
+                <button type="submit" class="btn btn-sm btn-success">Save all</button>
+              </div>
+              <div class="table-responsive" style="max-height:280px;">
+                <table class="table table-sm table-dark align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for site in sites %}
+                    <tr>
+                      <td>
+                        <input type="hidden" name="site_id" value="{{ site.id }}">
+                        <input type="text" class="form-control form-control-sm" name="site_name" value="{{ site.name }}" required>
+                      </td>
+                      <td>
+                        <input type="text" class="form-control form-control-sm" name="site_address" value="{{ site.address or '' }}" required>
+                      </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="2" class="text-secondary small">No sites yet.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
               </div>
             </form>
             <div class="vstack gap-2">
@@ -1435,12 +1828,12 @@ ADMIN_TEMPLATE = """
                   <input type="hidden" name="id" value="{{ site.id }}">
                   <div class="row g-2">
                     <div class="col-5">
-                      <label class="form-label">Name</label>
-                      <input type="text" class="form-control form-control-sm" name="name" value="{{ site.name }}" required>
-                    </div>
-                    <div class="col-5">
                       <label class="form-label">Address</label>
                       <input type="text" class="form-control form-control-sm" name="address" value="{{ site.address or '' }}" required>
+                    </div>
+                    <div class="col-5">
+                      <label class="form-label">Name</label>
+                      <input type="text" class="form-control form-control-sm" name="name" value="{{ site.name }}" required>
                     </div>
                     <div class="col-2 d-flex align-items-end justify-content-end gap-1">
                       <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Save">
@@ -1870,6 +2263,21 @@ def _generate_schedule_pdf(week_days, employees, matrix):
     return buf
 
 
+def _site_exists(db, name: str, address: str, exclude_id: int | None = None) -> bool:
+    """Return True if a site with same name+address (case-insensitive) exists."""
+    name_norm = (name or "").strip().lower()
+    address_norm = (address or "").strip().lower()
+    if not name_norm or not address_norm:
+        return False
+    q = db.query(Site).filter(
+        func.lower(Site.name) == name_norm,
+        func.lower(Site.address) == address_norm,
+    )
+    if exclude_id:
+        q = q.filter(Site.id != exclude_id)
+    return db.query(q.exists()).scalar()
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if session.get("auth"):
@@ -1930,8 +2338,15 @@ def schedule_dashboard():
         selected_employee_id = request.args.get("employee_id", type=int)
         weeks = request.args.get("weeks", default=1, type=int) or 1
         weeks = max(1, min(weeks, 12))
+        start_date_str = request.args.get("start_date")
+        start_date_val = None
+        if start_date_str:
+            try:
+                start_date_val = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                start_date_val = None
 
-        week_days = _get_day_range(weeks=weeks)
+        week_days = _get_day_range(start=start_date_val, weeks=weeks)
         employees, sites, matrix = _load_schedule_context(db, week_days)
 
         selected_employee = None
@@ -1945,6 +2360,8 @@ def schedule_dashboard():
         pdf_params["weeks"] = weeks
         if selected_employee_id:
             pdf_params["employee_id"] = selected_employee_id
+        if start_date_val:
+            pdf_params["week"] = week_days[0].isoformat()
         pdf_url = url_for("schedule_pdf", **pdf_params)
 
         schedule_html = render_template_string(
@@ -1954,6 +2371,7 @@ def schedule_dashboard():
             sites=sites,
             week_days=week_days,
             weeks=weeks,
+            start_date=start_date_val.isoformat() if start_date_val else "",
             cells=matrix,
             reportlab_available=REPORTLAB_AVAILABLE,
             selected_employee_id=selected_employee_id,
@@ -1996,29 +2414,140 @@ def admin_dashboard():
                 if action == "create":
                     name = (request.form.get("name") or "").strip()
                     address = (request.form.get("address") or "").strip()
-                    if name and address:
+                    if name and address and not _site_exists(db, name, address):
                         db.add(Site(name=name, address=address))
                         db.commit()
                 elif action == "update" and site_id:
                     site = db.get(Site, int(site_id))
                     if site:
-                        site.name = (request.form.get("name") or "").strip() or site.name
-                        site.address = (request.form.get("address") or "").strip() or ""
-                        db.commit()
+                        new_name = (request.form.get("name") or "").strip() or site.name
+                        new_address = (request.form.get("address") or "").strip() or site.address
+                        if not _site_exists(db, new_name, new_address, exclude_id=site.id):
+                            site.name = new_name
+                            site.address = new_address
+                            db.commit()
                 elif action == "delete" and site_id:
                     site = db.get(Site, int(site_id))
                     if site:
                         db.delete(site)
                         db.commit()
+            elif entity == "site_bulk" and action == "bulk_update":
+                ids = request.form.getlist("site_id")
+                names = request.form.getlist("site_name")
+                addresses = request.form.getlist("site_address")
+                seen_pairs = set()
+                for sid, n, a in zip(ids, names, addresses):
+                    n = (n or "").strip()
+                    a = (a or "").strip()
+                    if not sid or not n or not a:
+                        continue
+                    key = (n.lower(), a.lower())
+                    if key in seen_pairs:
+                        continue
+                    seen_pairs.add(key)
+                    site = db.get(Site, int(sid))
+                    if site and not _site_exists(db, n, a, exclude_id=site.id):
+                        site.name = n
+                        site.address = a
+                db.commit()
             return redirect(url_for("admin_dashboard"))
 
+        search_q = (request.args.get("q") or "").strip()
         employees = db.query(Employee).order_by(Employee.name).all()
-        sites = db.query(Site).order_by(Site.name).all()
+        site_query = db.query(Site)
+        if search_q:
+            like = f"%{search_q}%"
+            site_query = site_query.filter(or_(Site.name.ilike(like), Site.address.ilike(like)))
+        sites = site_query.order_by(Site.name).all()
         return render_template_string(
             ADMIN_TEMPLATE,
             employees=employees,
             sites=sites,
+            search_q=search_q,
         )
+    finally:
+        db.close()
+
+
+@app.route("/leads", methods=["GET", "POST"])
+def leads_dashboard():
+    db = SessionLocal()
+    try:
+        if request.method == "POST":
+            name = (request.form.get("name") or "").strip()
+            if name:
+                lead = Lead(
+                    name=name,
+                    email=(request.form.get("email") or "").strip() or None,
+                    phone=(request.form.get("phone") or "").strip() or None,
+                    source=(request.form.get("source") or "").strip() or None,
+                    notes=(request.form.get("notes") or "").strip() or None,
+                    stage=(request.form.get("stage") or "New Leads"),
+                )
+                if lead.stage not in LEAD_STAGES:
+                    lead.stage = "New Leads"
+                db.add(lead)
+                db.commit()
+            return redirect(url_for("leads_dashboard"))
+
+        stage_filter = (request.args.get("stage") or "").strip() or None
+        start_filter = request.args.get("start")
+        end_filter = request.args.get("end")
+        sort = request.args.get("sort", "desc")
+
+        query = db.query(Lead)
+        if stage_filter and stage_filter in LEAD_STAGES:
+            query = query.filter(Lead.stage == stage_filter)
+        if start_filter:
+            try:
+                start_dt = datetime.strptime(start_filter, "%Y-%m-%d")
+                query = query.filter(Lead.created_at >= start_dt)
+            except ValueError:
+                pass
+        if end_filter:
+            try:
+                end_dt = datetime.strptime(end_filter, "%Y-%m-%d") + timedelta(days=1)
+                query = query.filter(Lead.created_at < end_dt)
+            except ValueError:
+                pass
+        if sort == "asc":
+            query = query.order_by(Lead.created_at.asc())
+        else:
+            query = query.order_by(Lead.created_at.desc())
+
+        leads = query.all()
+        grouped = {stage: [] for stage in LEAD_STAGES}
+        for lead in leads:
+            grouped.setdefault(lead.stage, []).append(lead)
+
+        return render_template_string(
+            LEADS_TEMPLATE,
+            stages=LEAD_STAGES,
+            grouped_leads=grouped,
+            stage_filter=stage_filter,
+            start_filter=start_filter,
+            end_filter=end_filter,
+            sort=sort,
+        )
+    finally:
+        db.close()
+
+
+@app.route("/leads/stage", methods=["POST"])
+def leads_stage():
+    data = request.get_json(silent=True) or {}
+    lead_id = data.get("id")
+    stage = data.get("stage")
+    if not lead_id or stage not in LEAD_STAGES:
+        return jsonify({"error": "Invalid request"}), 400
+    db = SessionLocal()
+    try:
+        lead = db.get(Lead, int(lead_id))
+        if not lead:
+            return jsonify({"error": "Lead not found"}), 404
+        lead.stage = stage
+        db.commit()
+        return jsonify({"status": "ok"})
     finally:
         db.close()
 
