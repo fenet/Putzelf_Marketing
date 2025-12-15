@@ -19,6 +19,7 @@ from flask import (
     redirect,
     url_for,
     session,
+  flash,
 )
 from sqlalchemy import create_engine, Column, Integer, String, Date, Time, ForeignKey, or_, func, DateTime
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker, scoped_session
@@ -458,6 +459,7 @@ LEADS_TEMPLATE = """
           <div class="card-surface h-100">
             <h2 class="h6 text-uppercase text-secondary">Add lead</h2>
             <form method="post" class="small needs-validation" novalidate>
+              <input type="hidden" name="action" value="create">
               <div class="mb-2">
                 <label class="form-label small-note text-uppercase" for="lead_name">Name</label>
                 <input type="text" class="form-control form-control-sm" id="lead_name" name="name" required>
@@ -533,13 +535,23 @@ LEADS_TEMPLATE = """
                   </div>
                   <div class="kanban-body" data-stage="{{ stage }}">
                     {% for lead in stage_leads %}
-                      <div class="lead-card" draggable="true" data-lead-id="{{ lead.id }}">
-                        <div class="d-flex justify-content-between align-items-start">
+                      <div class="lead-card" draggable="true" data-lead-id="{{ lead.id }}" data-lead-name="{{ lead.name|e }}" data-lead-email="{{ (lead.email or '')|e }}" data-lead-phone="{{ (lead.phone or '')|e }}" data-lead-source="{{ (lead.source or '')|e }}" data-lead-notes="{{ (lead.notes or '')|e }}" data-lead-stage="{{ lead.stage|e }}">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
                           <div>
                             <strong>{{ lead.name }}</strong><br>
                             <span class="lead-meta">{{ (lead.email or '—') }}</span>
                           </div>
-                          <span class="small-note">{{ lead.created_at.strftime('%d.%m.%Y') }}</span>
+                          <div class="text-end">
+                            <span class="small-note d-block">{{ lead.created_at.strftime('%d.%m.%Y') }}</span>
+                            <div class="btn-group btn-group-sm mt-1" role="group" aria-label="Lead actions">
+                              <button type="button" class="btn btn-outline-light btn-sm py-0 lead-edit" data-bs-toggle="modal" data-bs-target="#leadModal" title="Edit lead">
+                                ✎
+                              </button>
+                              <button type="button" class="btn btn-outline-danger btn-sm py-0 lead-delete" data-lead-id="{{ lead.id }}" title="Delete lead">
+                                ✕
+                              </button>
+                            </div>
+                          </div>
                         </div>
                         {% if lead.phone %}
                           <div class="lead-meta mt-1">📞 {{ lead.phone }}</div>
@@ -558,6 +570,58 @@ LEADS_TEMPLATE = """
                 </div>
               {% endfor %}
             </div>
+          </div>
+        </div>
+      </div>
+      <form id="lead-delete-form" method="post" action="{{ url_for('leads_dashboard') }}" class="d-none">
+        <input type="hidden" name="action" value="delete">
+        <input type="hidden" name="id" id="lead-delete-id">
+      </form>
+      <div class="modal fade" id="leadModal" tabindex="-1" aria-labelledby="leadModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content bg-dark text-light border border-secondary">
+            <form id="lead-edit-form" method="post" action="{{ url_for('leads_dashboard') }}" class="needs-validation" novalidate>
+              <input type="hidden" name="action" value="update">
+              <input type="hidden" name="id" id="lead-edit-id">
+              <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="leadModalLabel">Edit lead</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <div class="mb-2">
+                  <label for="lead-edit-name" class="form-label small-note text-uppercase">Name</label>
+                  <input type="text" class="form-control form-control-sm" id="lead-edit-name" name="name" required>
+                </div>
+                <div class="mb-2">
+                  <label for="lead-edit-email" class="form-label small-note text-uppercase">Email</label>
+                  <input type="email" class="form-control form-control-sm" id="lead-edit-email" name="email">
+                </div>
+                <div class="mb-2">
+                  <label for="lead-edit-phone" class="form-label small-note text-uppercase">Phone</label>
+                  <input type="text" class="form-control form-control-sm" id="lead-edit-phone" name="phone">
+                </div>
+                <div class="mb-2">
+                  <label for="lead-edit-source" class="form-label small-note text-uppercase">Source</label>
+                  <input type="text" class="form-control form-control-sm" id="lead-edit-source" name="source">
+                </div>
+                <div class="mb-2">
+                  <label for="lead-edit-notes" class="form-label small-note text-uppercase">Notes</label>
+                  <textarea class="form-control form-control-sm" id="lead-edit-notes" name="notes" rows="3"></textarea>
+                </div>
+                <div class="mb-2">
+                  <label for="lead-edit-stage" class="form-label small-note text-uppercase">Stage</label>
+                  <select class="form-select form-select-sm" id="lead-edit-stage" name="stage">
+                    {% for s in stages %}
+                      <option value="{{ s }}">{{ s }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="modal-footer border-secondary d-flex justify-content-between">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">Save changes</button>
+              </div>
+            </form>
           </div>
         </div>
       </div>
@@ -590,6 +654,7 @@ LEADS_TEMPLATE = """
           dragged = card;
           card.classList.add('dragging');
           e.dataTransfer.effectAllowed = 'move';
+          try { e.dataTransfer.setData('text/plain', card.dataset.leadId || '0'); } catch (err) {}
         });
         card.addEventListener('dragend', () => {
           card.classList.remove('dragging');
@@ -598,22 +663,39 @@ LEADS_TEMPLATE = """
         });
       });
       columns.forEach(col => {
+        const highlight = () => col.classList.add('drop-target');
+        const removeHighlight = () => col.classList.remove('drop-target');
+        col.addEventListener('dragenter', e => {
+          if (!dragged) return;
+          e.preventDefault();
+          highlight();
+        });
         col.addEventListener('dragover', e => {
           if (!dragged) return;
           e.preventDefault();
-          col.classList.add('drop-target');
-          const afterEl = [...col.querySelectorAll('.lead-card:not(.dragging)')].find(el => {
+          e.dataTransfer.dropEffect = 'move';
+          highlight();
+          const siblings = [...col.querySelectorAll('.lead-card:not(.dragging)')];
+          const afterEl = siblings.find(el => {
             const box = el.getBoundingClientRect();
             return e.clientY < box.top + box.height / 2;
           });
-          if (afterEl) col.insertBefore(dragged, afterEl); else col.appendChild(dragged);
+          if (afterEl) {
+            col.insertBefore(dragged, afterEl);
+          } else {
+            col.appendChild(dragged);
+          }
         });
-        col.addEventListener('dragleave', () => col.classList.remove('drop-target'));
+        col.addEventListener('dragleave', () => {
+          if (!dragged) removeHighlight();
+        });
         col.addEventListener('drop', async e => {
-          col.classList.remove('drop-target');
+          e.preventDefault();
+          removeHighlight();
           if (!dragged) return;
           const stage = col.dataset.stage;
           const id = dragged.dataset.leadId;
+          dragged.dataset.leadStage = stage;
           try {
             await fetch('{{ url_for("leads_stage") }}', {
               method: 'POST',
@@ -625,6 +707,63 @@ LEADS_TEMPLATE = """
           }
         });
       });
+    })();
+
+    // Lead modals and actions
+    (() => {
+      const editForm = document.getElementById('lead-edit-form');
+      const deleteForm = document.getElementById('lead-delete-form');
+      if (!editForm || !deleteForm) return;
+      const editModalEl = document.getElementById('leadModal');
+      const stageSelect = document.getElementById('lead-edit-stage');
+      const nameInput = document.getElementById('lead-edit-name');
+      const emailInput = document.getElementById('lead-edit-email');
+      const phoneInput = document.getElementById('lead-edit-phone');
+      const sourceInput = document.getElementById('lead-edit-source');
+      const notesInput = document.getElementById('lead-edit-notes');
+      const idInput = document.getElementById('lead-edit-id');
+      document.querySelectorAll('.lead-edit').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const card = btn.closest('.lead-card');
+          if (!card) return;
+          idInput.value = card.dataset.leadId || '';
+          nameInput.value = card.dataset.leadName || '';
+          emailInput.value = card.dataset.leadEmail || '';
+          phoneInput.value = card.dataset.leadPhone || '';
+          sourceInput.value = card.dataset.leadSource || '';
+          notesInput.value = card.dataset.leadNotes || '';
+          const currentStage = card.dataset.leadStage || '';
+          if (stageSelect) {
+            [...stageSelect.options].forEach(opt => {
+              opt.selected = opt.value === currentStage;
+            });
+          }
+        });
+      });
+      document.querySelectorAll('.lead-delete').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const id = btn.dataset.leadId;
+          if (!id) return;
+          if (!confirm('Delete this lead?')) return;
+          const hiddenId = document.getElementById('lead-delete-id');
+          hiddenId.value = id;
+          deleteForm.submit();
+        });
+      });
+      editForm.addEventListener('submit', function (event) {
+        if (!editForm.checkValidity()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        editForm.classList.add('was-validated');
+      });
+      if (editModalEl) {
+        editModalEl.addEventListener('shown.bs.modal', () => {
+          nameInput && nameInput.focus();
+        });
+      }
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -1695,6 +1834,17 @@ ADMIN_TEMPLATE = """
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
     <main class="main-shell text-light">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }} border-0 text-dark" role="alert">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div>
           <div class="badge-soft mb-2">Configuration</div>
@@ -2414,15 +2564,20 @@ def admin_dashboard():
                 if action == "create":
                     name = (request.form.get("name") or "").strip()
                     address = (request.form.get("address") or "").strip()
-                    if name and address and not _site_exists(db, name, address):
-                        db.add(Site(name=name, address=address))
-                        db.commit()
+                    if name and address:
+                        if _site_exists(db, name, address):
+                            flash("Site already exists with the same name and address.", "warning")
+                        else:
+                            db.add(Site(name=name, address=address))
+                            db.commit()
                 elif action == "update" and site_id:
                     site = db.get(Site, int(site_id))
                     if site:
                         new_name = (request.form.get("name") or "").strip() or site.name
                         new_address = (request.form.get("address") or "").strip() or site.address
-                        if not _site_exists(db, new_name, new_address, exclude_id=site.id):
+                        if _site_exists(db, new_name, new_address, exclude_id=site.id):
+                            flash("Another site already uses that name and address.", "warning")
+                        else:
                             site.name = new_name
                             site.address = new_address
                             db.commit()
@@ -2474,20 +2629,45 @@ def leads_dashboard():
     db = SessionLocal()
     try:
         if request.method == "POST":
-            name = (request.form.get("name") or "").strip()
-            if name:
-                lead = Lead(
-                    name=name,
-                    email=(request.form.get("email") or "").strip() or None,
-                    phone=(request.form.get("phone") or "").strip() or None,
-                    source=(request.form.get("source") or "").strip() or None,
-                    notes=(request.form.get("notes") or "").strip() or None,
-                    stage=(request.form.get("stage") or "New Leads"),
-                )
-                if lead.stage not in LEAD_STAGES:
-                    lead.stage = "New Leads"
-                db.add(lead)
-                db.commit()
+            action = (request.form.get("action") or "create").strip().lower()
+            if action == "delete":
+                lead_id = request.form.get("id")
+                if lead_id:
+                    lead = db.get(Lead, int(lead_id))
+                    if lead:
+                        db.delete(lead)
+                        db.commit()
+            elif action == "update":
+                lead_id = request.form.get("id")
+                if lead_id:
+                    lead = db.get(Lead, int(lead_id))
+                    if lead:
+                        name = (request.form.get("name") or lead.name).strip()
+                        if name:
+                            lead.name = name
+                        lead.email = (request.form.get("email") or "").strip() or None
+                        lead.phone = (request.form.get("phone") or "").strip() or None
+                        lead.source = (request.form.get("source") or "").strip() or None
+                        lead.notes = (request.form.get("notes") or "").strip() or None
+                        stage = (request.form.get("stage") or lead.stage).strip()
+                        if stage in LEAD_STAGES:
+                            lead.stage = stage
+                        db.commit()
+            else:
+                name = (request.form.get("name") or "").strip()
+                if name:
+                    lead = Lead(
+                        name=name,
+                        email=(request.form.get("email") or "").strip() or None,
+                        phone=(request.form.get("phone") or "").strip() or None,
+                        source=(request.form.get("source") or "").strip() or None,
+                        notes=(request.form.get("notes") or "").strip() or None,
+                        stage=(request.form.get("stage") or "New Leads"),
+                    )
+                    if lead.stage not in LEAD_STAGES:
+                        lead.stage = "New Leads"
+                    db.add(lead)
+                    db.commit()
             return redirect(url_for("leads_dashboard"))
 
         stage_filter = (request.args.get("stage") or "").strip() or None
