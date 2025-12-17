@@ -1,6 +1,5 @@
 import re
 import io
-import csv
 import logging
 import os
 from collections import deque
@@ -364,7 +363,7 @@ LEADS_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing — LeadTracker</title>
+  <title>Putzelf Marketing — Lead-Center</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     :root { --bs-primary: #0f766e; }
@@ -415,7 +414,7 @@ LEADS_TEMPLATE = """
         </div>
         <div>
           <div class="sidebar-title">Putzelf Marketing</div>
-          <div class="sidebar-sub">LeadTracker</div>
+          <div class="sidebar-sub">Lead-Center</div>
         </div>
       </div>
       <div>
@@ -434,7 +433,7 @@ LEADS_TEMPLATE = """
         </a>
         <a href="{{ url_for('leads_dashboard') }}" class="nav-pill active">
           <span class="nav-pill-icon">📇</span>
-          <span class="nav-text">LeadTracker</span>
+          <span class="nav-text">Lead-Center</span>
         </a>
       </div>
       <div class="sidebar-footer">
@@ -446,7 +445,7 @@ LEADS_TEMPLATE = """
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
           <div class="badge-soft mb-2">Leads</div>
-          <h1 class="h4 mb-1 text-light">LeadTracker</h1>
+          <h1 class="h4 mb-1 text-light">Lead-Center</h1>
           <p class="small-note mb-0">Manage leads through New → Qualified → Contacted → Converted.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
@@ -962,23 +961,6 @@ HTML_TEMPLATE = """
       flex-direction: column;
       gap: 1rem;
     }
-    .metrics-row {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 0.75rem;
-    }
-    .metric-card {
-      border-radius: 0.9rem;
-      border: 1px solid rgba(51, 65, 85, 0.9);
-      background: radial-gradient(circle at top left,#020617 0%, #020617 35%, #020617 100%);
-      padding: 0.7rem 0.8rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.15rem;
-    }
-    .metric-label { font-size: 0.75rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.14em; }
-    .metric-value { font-size: 1.1rem; font-weight: 600; color: #e5e7eb; }
-    .metric-note { font-size: 0.75rem; color: #9ca3af; }
     .card-surface {
       border-radius: 0.9rem;
       border: 1px solid rgba(51, 65, 85, 0.9);
@@ -1030,10 +1012,8 @@ HTML_TEMPLATE = """
       .app-shell { grid-template-columns: minmax(0, 1fr); }
       .sidebar { display: none; }
       .main-shell { padding: 1rem; }
-      .metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 640px) {
-      .metrics-row { grid-template-columns: minmax(0, 1fr); }
       .content-shell { padding: 0.85rem; }
     }
    
@@ -1062,13 +1042,9 @@ HTML_TEMPLATE = """
           <span class="nav-pill-icon">↗</span>
           <span class="nav-text">Crawl history <span class="small-note">(coming soon)</span></span>
         </a>
-        <a href="#" class="nav-pill">
-          <span class="nav-pill-icon">✉</span>
-          <span class="nav-text">Sequences <span class="small-note">(coming soon)</span></span>
-        </a>
         <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">
           <span class="nav-pill-icon">📇</span>
-          <span class="nav-text">LeadTracker</span>
+          <span class="nav-text">Lead-Center</span>
         </a>
       </div>
       <div>
@@ -1110,27 +1086,6 @@ HTML_TEMPLATE = """
         </div>
       </header>
       <main class="content-shell">
-        <section class="metrics-row">
-          <div class="metric-card">
-            <div class="metric-label">Last export</div>
-            <div class="metric-value">On demand</div>
-            <div class="metric-note">Run a crawl to generate a fresh CSV.</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Crawl scope</div>
-            <div class="metric-value">Same domain</div>
-            <div class="metric-note">Automatically avoids external sites &amp; assets.</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">GPT status</div>
-            <div class="metric-value">
-              {{ 'Ready' if gpt_enabled else 'Disabled' }}
-            </div>
-            <div class="metric-note">
-              {% if gpt_enabled %}Use the panel on the right to generate copy.{% else %}Set OPENAI_API_KEY to enable AI assistant.{% endif %}
-            </div>
-          </div>
-        </section>
         <section class="row g-3 mt-1">
           <div class="col-12 col-lg-6">
             <div class="card-surface h-100">
@@ -1138,7 +1093,7 @@ HTML_TEMPLATE = """
                 <div>
                   <div class="card-title">1. Crawl new contacts</div>
                   <div class="card-subtitle">
-                    Start from any page on a domain and collect emails and phone numbers into a single CSV.
+                    Start from any page on a domain and collect emails and phone numbers into a polished PDF report.
                   </div>
                 </div>
                 <span class="badge-soft">Crawler</span>
@@ -1149,36 +1104,20 @@ HTML_TEMPLATE = """
                   <input type="url" class="form-control form-control-sm" id="start_url" name="start_url" placeholder="https://example.com" required>
                   <div class="invalid-feedback">Please enter a valid URL to start crawling.</div>
                 </div>
-                <div class="row">
-                  <div class="col-7 mb-3">
-                    <label for="max_pages" class="form-label small-note text-uppercase">Max pages</label>
-                    <input type="number" class="form-control form-control-sm" id="max_pages" name="max_pages" min="1" max="200" value="100" required>
-                    <div class="form-text small-note">1–200 pages per crawl, same domain only.</div>
-                  </div>
-                  <div class="col-5 mb-3">
-                    <label class="form-label small-note text-uppercase">Rendering</label>
-                    <div class="form-check">
-                      <input class="form-check-input" type="checkbox" value="1" id="render_js" name="render_js">
-                      <label class="form-check-label small-note" for="render_js">
-                        Use headless browser (JS-heavy sites)
-                      </label>
-                    </div>
-                  </div>
+                <div class="mb-3">
+                  <label for="max_pages" class="form-label small-note text-uppercase">Max pages</label>
+                  <input type="number" class="form-control form-control-sm" id="max_pages" name="max_pages" min="1" max="200" value="100" required>
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                   <button id="submit-btn" type="submit" class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">
                     <span id="btn-spinner" class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
-                    Crawl &amp; download CSV
+                    Crawl &amp; download PDF
                   </button>
                   <button id="reset-btn" type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('crawl-form').reset()">
                     Reset
                   </button>
                   <div id="status" class="ms-1 small-note" aria-live="polite"></div>
                 </div>
-                <hr class="my-3">
-                <p class="small-note mb-0">
-                  Use only on websites you are allowed to crawl. Respect robots.txt, terms of service and local regulations.
-                </p>
               </form>
             </div>
           </div>
@@ -1197,14 +1136,6 @@ HTML_TEMPLATE = """
                     {% if gpt_enabled %}Connected{% else %}API key missing{% endif %}
                   </div>
                 </div>
-              </div>
-              <div class="chat-bubble mb-3">
-                <div class="small-note mb-1">Examples you can ask:</div>
-                <ul class="small-note ps-3 mb-0">
-                  <li>“Draft a friendly cold email for these contacts.”</li>
-                  <li>“Summarize the types of companies in this CSV.”</li>
-                  <li>“Create a 3-step LinkedIn outreach sequence.”</li>
-                </ul>
               </div>
               <form id="gpt-form" class="d-flex flex-column flex-grow-1">
                 <div class="mb-2">
@@ -1273,7 +1204,7 @@ HTML_TEMPLATE = """
           const resp = await fetch('/', { method: 'POST', body: formData });
           if (!resp.ok) throw new Error('Server returned ' + resp.status);
           const blob = await resp.blob();
-          let filename = 'contacts.csv';
+          let filename = 'contacts.pdf';
           const cd = resp.headers.get('content-disposition');
           if (cd) {
             const m = cd.match(/filename\\*=UTF-8''([^;]+)|filename="?([^";]+)"?/);
@@ -1581,7 +1512,7 @@ SCHEDULE_TEMPLATE = """
         </a>
         <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">
           <span class="nav-pill-icon">📇</span>
-          <span class="nav-text">LeadTracker</span>
+          <span class="nav-text">Lead-Center</span>
         </a>
       </div>
       <div class="sidebar-footer">
@@ -1669,8 +1600,15 @@ SCHEDULE_TEMPLATE = """
                 </select>
               </div>
               <div class="mb-2">
-                <label class="form-label small-note text-uppercase" for="day">Day</label>
-                <input type="date" class="form-control form-control-sm" id="day" name="day" required>
+                <label class="form-label small-note text-uppercase" for="day-list">Day(s)</label>
+                <div class="vstack gap-2" id="day-list">
+                  <div class="input-group input-group-sm day-item">
+                    <input type="date" class="form-control form-control-sm" name="day" required>
+                    <button type="button" class="btn btn-outline-danger remove-day" title="Remove day">✕</button>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-light mt-1" id="add-day-btn">Add another day</button>
+                <p class="small-note mt-2 mb-0">Use the button to schedule the same shift across multiple days.</p>
               </div>
               <div class="row">
                 <div class="col-6 mb-2">
@@ -1753,6 +1691,61 @@ SCHEDULE_TEMPLATE = """
         btn.addEventListener('click', () => setState(!body.classList.contains('sidebar-collapsed')));
       }
     })();
+    (function () {
+      const dayList = document.getElementById('day-list');
+      const addBtn = document.getElementById('add-day-btn');
+      if (!dayList || !addBtn) return;
+      const createItem = () => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'input-group input-group-sm day-item';
+        const input = document.createElement('input');
+        input.type = 'date';
+        input.name = 'day';
+        input.className = 'form-control form-control-sm';
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-outline-danger remove-day';
+        removeBtn.title = 'Remove day';
+        removeBtn.textContent = '✕';
+        wrapper.appendChild(input);
+        wrapper.appendChild(removeBtn);
+        return wrapper;
+      };
+      const updateRemoveState = () => {
+        const items = dayList.querySelectorAll('.day-item');
+        items.forEach((item, index) => {
+          const input = item.querySelector('input[type="date"]');
+          if (input) {
+            input.required = index === 0;
+          }
+          const removeBtn = item.querySelector('.remove-day');
+          if (removeBtn) {
+            removeBtn.disabled = items.length <= 1;
+          }
+        });
+      };
+      addBtn.addEventListener('click', () => {
+        const item = createItem();
+        dayList.appendChild(item);
+        updateRemoveState();
+      });
+      dayList.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        if (target.classList.contains('remove-day')) {
+          event.preventDefault();
+          const item = target.closest('.day-item');
+          if (!item) return;
+          const remaining = dayList.querySelectorAll('.day-item').length;
+          if (remaining <= 1) return;
+          item.remove();
+          updateRemoveState();
+        }
+      });
+      updateRemoveState();
+    })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
@@ -1830,7 +1823,7 @@ ADMIN_TEMPLATE = """
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill active">⚙ <span class="nav-text">Admin</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Dashboard</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">👤 <span class="nav-text">Schedule</span></a>
-      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">LeadTracker</span></a>
+      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
     <main class="main-shell text-light">
@@ -1856,7 +1849,7 @@ ADMIN_TEMPLATE = """
           <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-light">View schedule</a>
           <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-light">Crawler</a>
           <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary text-light border-light">Logout</a>
-          <a href="{{ url_for('leads_dashboard') }}" class="btn btn-sm btn-outline-info text-light">LeadTracker</a>
+          <a href="{{ url_for('leads_dashboard') }}" class="btn btn-sm btn-outline-info text-light">Lead-Center</a>
         </div>
       </div>
       <div class="row g-3">
@@ -2263,7 +2256,7 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
                 if not e or e in seen_emails:
                     continue
                 seen_emails.add(e)
-                rows.append({"url": url, "email": email, "phone": phone_sample})
+            rows.append({"url": url, "email": email, "phone": phone_sample})
         else:
             for phone in phones:
                 p = normalize_phone(phone)
@@ -2272,7 +2265,7 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
                 if not is_valid_phone(p):
                     continue
                 seen_phones.add(p)
-                rows.append({"url": url, "email": "", "phone": p})
+            rows.append({"url": url, "email": "", "phone": p})
 
     app.logger.info("Crawl finished: found %d contact rows", len(rows))
     return rows
@@ -2413,6 +2406,74 @@ def _generate_schedule_pdf(week_days, employees, matrix):
     return buf
 
 
+
+def _generate_contacts_pdf(rows: list[dict[str, str]]):
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=40,
+        rightMargin=40,
+        topMargin=48,
+        bottomMargin=32,
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "ContactsTitle",
+        parent=styles["Heading1"],
+        fontSize=16,
+        leading=20,
+        textColor=colors.HexColor("#0f172a"),
+    )
+    subtitle_style = ParagraphStyle(
+        "ContactsSubtitle",
+        parent=styles["Normal"],
+        fontSize=10,
+        textColor=colors.HexColor("#475569"),
+        spaceAfter=12,
+    )
+
+    elements: list = []
+    generated_at = datetime.utcnow().strftime("%d %b %Y %H:%M UTC")
+    elements.append(Paragraph("Putzelf Marketing - Contact Crawl", title_style))
+    elements.append(Paragraph(f"Generated {generated_at}", subtitle_style))
+
+    table_data = [["Email", "Phone"]]
+    for row in rows:
+        email = (row.get("email") or "").strip() or "N/A"
+        phone = (row.get("phone") or "").strip() or "N/A"
+        table_data.append([email, phone])
+    if len(table_data) == 1:
+        table_data.append(["N/A", "N/A"])
+
+    table = Table(table_data, colWidths=[doc.width * 0.6, doc.width * 0.4], hAlign="LEFT")
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f766e")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("FONTSIZE", (0, 0), (-1, 0), 11),
+                ("FONTSIZE", (0, 1), (-1, -1), 10),
+                ("LINEABOVE", (0, 1), (-1, -1), 0.25, colors.HexColor("#cbd5f5")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.HexColor("#f1f5f9")]),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#0f172a")),
+            ]
+        )
+    )
+
+    elements.append(table)
+    doc.build(elements)
+    buf.seek(0)
+    return buf
+
+
 def _site_exists(db, name: str, address: str, exclude_id: int | None = None) -> bool:
     """Return True if a site with same name+address (case-insensitive) exists."""
     name_norm = (name or "").strip().lower()
@@ -2460,29 +2521,48 @@ def schedule_dashboard():
         if request.method == "POST":
             emp_id = request.form.get("employee_id")
             site_id = request.form.get("site_id")
-            day_str = request.form.get("day")
+            day_values_raw = [ (d or "").strip() for d in request.form.getlist("day") ]
             start_str = request.form.get("start_time")
             duration_hours_str = request.form.get("duration_hours")
-            if emp_id and site_id and day_str and start_str and duration_hours_str:
+            day_values: list[date] = []
+            seen_days: set[date] = set()
+            for day_str in day_values_raw:
+              if not day_str:
+                continue
+              try:
                 day_val = datetime.strptime(day_str, "%Y-%m-%d").date()
+              except ValueError:
+                continue
+              if day_val in seen_days:
+                continue
+              seen_days.add(day_val)
+              day_values.append(day_val)
+            if emp_id and site_id and day_values and start_str and duration_hours_str:
+              try:
                 start_val = datetime.strptime(start_str, "%H:%M").time()
-                try:
-                    duration_hours = float(duration_hours_str)
-                except (TypeError, ValueError):
-                    duration_hours = 0
-                if duration_hours > 0 and duration_hours <= 24:
-                    duration_delta = timedelta(hours=duration_hours)
-                    end_dt = datetime.combine(day_val, start_val) + duration_delta
-                    end_val = end_dt.time()
-                    shift = Shift(
-                        employee_id=int(emp_id),
-                        site_id=int(site_id),
-                        day=day_val,
-                        start_time=start_val,
-                        end_time=end_val,
-                    )
-                    db.add(shift)
-                    db.commit()
+              except ValueError:
+                start_val = None
+              try:
+                duration_hours = float(duration_hours_str)
+              except (TypeError, ValueError):
+                duration_hours = 0
+              if start_val and 0 < duration_hours <= 24:
+                duration_delta = timedelta(hours=duration_hours)
+                created = 0
+                for day_val in day_values:
+                  end_dt = datetime.combine(day_val, start_val) + duration_delta
+                  end_val = end_dt.time()
+                  shift = Shift(
+                    employee_id=int(emp_id),
+                    site_id=int(site_id),
+                    day=day_val,
+                    start_time=start_val,
+                    end_time=end_val,
+                  )
+                  db.add(shift)
+                  created += 1
+                if created:
+                  db.commit()
             return redirect(url_for("schedule_dashboard"))
 
         selected_employee_id = request.args.get("employee_id", type=int)
@@ -2774,10 +2854,19 @@ def index():
     if request.method == "GET":
         return render_template_string(HTML_TEMPLATE, gpt_enabled=bool(openai_client))
 
-    start_url = request.form.get("start_url")
+    if not REPORTLAB_AVAILABLE:
+        return (
+            jsonify({"error": "reportlab not installed; cannot generate PDF output."}),
+            503,
+        )
+
+    start_url = (request.form.get("start_url") or "").strip()
+    if not start_url:
+        return jsonify({"error": "Missing start URL"}), 400
+
     try:
         max_pages = int(request.form.get("max_pages", "100"))
-    except Exception:
+    except (TypeError, ValueError):
         max_pages = 100
     max_pages = max(1, min(max_pages, 200))
 
@@ -2785,20 +2874,14 @@ def index():
 
     data = crawl(start_url, max_pages=max_pages, render_js=render_js)
 
-    output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=["url", "email", "phone"])
-    writer.writeheader()
-    for row in data:
-        writer.writerow({"url": row.get("url", ""), "email": row.get("email", ""), "phone": row.get("phone", "")})
-
-    mem = io.BytesIO(output.getvalue().encode("utf-8"))
-    mem.seek(0)
+    pdf_buffer = _generate_contacts_pdf(data)
+    filename = f"putzelf_contacts_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf"
 
     return send_file(
-        mem,
-        mimetype="text/csv",
+        pdf_buffer,
+        mimetype="application/pdf",
         as_attachment=True,
-        download_name="putzelf_contacts.csv",
+        download_name=filename,
     )
 
 
