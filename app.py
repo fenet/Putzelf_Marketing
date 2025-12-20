@@ -255,6 +255,20 @@ ADMIN_EMPLOYEES_TEMPLATE = """
     .credential-value { font-size:1rem; font-weight:600; color:#f8fafc; }
     .credential-note { font-size:0.78rem; color:#bae6fd; }
     .credential-actions { display:flex; flex-wrap:wrap; gap:0.5rem; }
+    .employee-action-buttons { display:flex; flex-wrap:wrap; gap:0.5rem; justify-content:flex-end; }
+    .employee-action-buttons .btn { flex:1 1 120px; }
+    @media(max-width:768px){ .employee-action-buttons { justify-content:flex-start; } .employee-action-buttons .btn { flex:1 1 100%; } }
+    .assignment-section { border-radius:0.75rem; border:1px dashed rgba(148,163,184,0.3); background:rgba(15,23,42,0.55); padding:0.85rem; }
+    .assignment-collapse { margin:0; border-radius:0.6rem; overflow:hidden; background:rgba(15,23,42,0.35); border:1px solid rgba(71,85,105,0.3); }
+    .assignment-collapse + .assignment-collapse { margin-top:0.65rem; }
+    .assignment-collapse summary { cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:0.75rem 0.85rem; font-weight:600; color:#e2e8f0; user-select:none; }
+    .assignment-collapse summary::-webkit-details-marker { display:none; }
+    .assignment-count { font-size:0.82rem; letter-spacing:0.08em; text-transform:uppercase; color:#94a3b8; }
+    .assignment-list { margin:0; padding:0.15rem 0.85rem 0.8rem; list-style:none; display:grid; gap:0.6rem; }
+    .assignment-list li { padding:0.6rem 0.55rem 0.55rem; border-radius:0.6rem; border:1px solid rgba(71,85,105,0.35); background:rgba(15,23,42,0.45); }
+    .assignment-primary { font-weight:600; color:#f8fafc; }
+    .assignment-meta { font-size:0.85rem; color:#cbd5f5; }
+    .assignment-status { font-size:0.78rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.08em; margin-top:0.2rem; }
     .credential-edit { border:1px dashed rgba(148,163,184,0.35); border-radius:0.75rem; padding:1rem; background:rgba(15,23,42,0.55); }
     .placeholder { color:#64748b; font-size:0.85rem; }
     .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-bottom:1.5rem; }
@@ -350,13 +364,8 @@ ADMIN_EMPLOYEES_TEMPLATE = """
               </div>
             </form>
           </div>
-          <div class="card-surface">
-            <h2 class="h6 text-uppercase text-secondary mb-3">Guidance</h2>
-            <p class="placeholder mb-1">Keep names consistent with the schedule so shift assignments stay clear.</p>
-            <p class="placeholder mb-0">Roles help you filter quickly when staffing new sites.</p>
-          </div>
         </div>
-          <div class="col-12 col-lg-8">
+        <div class="col-12 col-lg-8">
             {% if employees %}
               <div class="vstack gap-3">
                 {% for emp in employees %}
@@ -371,7 +380,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                         <label class="form-label">Role</label>
                         <input type="text" class="form-control form-control-sm" name="role" value="{{ emp.role or '' }}">
                       </div>
-                      <div class="col-md-2 col-12 d-flex justify-content-end gap-2">
+                      <div class="col-md-2 col-12 employee-action-buttons">
                         <button type="submit" name="action" value="update" class="btn btn-sm btn-success">Save</button>
                         <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ emp.name }}?')">Delete</button>
                       </div>
@@ -449,6 +458,50 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                           <button type="submit" class="btn btn-sm btn-success">Save credentials</button>
                         </div>
                       </form>
+                    </div>
+
+                    {% set shift_block = employee_shift_groups.get(emp.id, {}) %}
+                    {% set future_jobs = shift_block.get('upcoming', []) %}
+                    {% set past_jobs = shift_block.get('history', []) %}
+                    <div class="assignment-section mt-3">
+                      <details class="assignment-collapse">
+                        <summary>
+                          <span>Upcoming jobs</span>
+                          <span class="assignment-count">{{ future_jobs|length }}</span>
+                        </summary>
+                        {% if future_jobs %}
+                          <ul class="assignment-list">
+                            {% for job in future_jobs %}
+                              <li>
+                                <div class="assignment-primary">{{ job.site_name }}</div>
+                                <div class="assignment-meta">{{ job.day_label }} · {{ job.time_window }}</div>
+                                <div class="assignment-status">{{ job.status_label }}</div>
+                              </li>
+                            {% endfor %}
+                          </ul>
+                        {% else %}
+                          <div class="placeholder px-3 pb-3">No upcoming jobs yet.</div>
+                        {% endif %}
+                      </details>
+                      <details class="assignment-collapse">
+                        <summary>
+                          <span>Previous jobs</span>
+                          <span class="assignment-count">{{ past_jobs|length }}</span>
+                        </summary>
+                        {% if past_jobs %}
+                          <ul class="assignment-list">
+                            {% for job in past_jobs %}
+                              <li>
+                                <div class="assignment-primary">{{ job.site_name }}</div>
+                                <div class="assignment-meta">{{ job.day_label }} · {{ job.time_window }}</div>
+                                <div class="assignment-status">{{ job.status_label }}</div>
+                              </li>
+                            {% endfor %}
+                          </ul>
+                        {% else %}
+                          <div class="placeholder px-3 pb-3">No completed jobs yet.</div>
+                        {% endif %}
+                      </details>
                     </div>
                   </div>
                 {% endfor %}
@@ -748,7 +801,7 @@ LOGIN_TEMPLATE = """
     </div>
     <h1 class="h5 text-light mb-3">Sign in</h1>
     <form method="post" class="needs-validation" novalidate>
-      <input type="hidden" name="next" value="{{ request.args.get('next','') }}">
+      <input type="hidden" name="next" value="{{ next_value or request.args.get('next','') }}">
       <div class="mb-3">
         <label class="form-label small-note text-uppercase" for="username">Username or login code</label>
         <input class="form-control form-control-sm" id="username" name="username" required autofocus>
@@ -929,16 +982,24 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
     .action-form button {
       width: 100%;
       border: none;
-      padding: 1.1rem 1.2rem;
       border-radius: 0.95rem;
       font-size: 1.12rem;
       font-weight: 600;
       letter-spacing: 0.04em;
       transition: transform 0.18s ease, box-shadow 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      padding: 1rem 1.2rem;
     }
+    .action-form button .btn-icon { font-size: 1.35rem; line-height: 1; }
     .action-form button:hover { transform: translateY(-2px); box-shadow: 0 15px 28px rgba(0,0,0,0.18); }
     .btn-clock { background: linear-gradient(135deg,#38bdf8,#0ea5e9); color: #0f172a; }
-    .btn-upload { background: linear-gradient(135deg,#f59e0b,#ef4444); color: #0f172a; }
+    .btn-upload-before { background: linear-gradient(135deg,rgba(56,189,248,0.2),rgba(14,165,233,0.4)); color:#e0f2fe; border:1px solid rgba(56,189,248,0.45); }
+    .btn-upload-before:hover { box-shadow: 0 18px 32px rgba(14,165,233,0.25); }
+    .btn-upload-after { background: linear-gradient(135deg,rgba(187,247,208,0.25),rgba(34,197,94,0.45)); color:#ecfdf5; border:1px solid rgba(34,197,94,0.45); }
+    .btn-upload-after:hover { box-shadow: 0 18px 32px rgba(34,197,94,0.28); }
     .btn-done { background: linear-gradient(135deg,#22c55e,#14b8a6); color: #022c22; position: relative; overflow: hidden; }
     .photo-preview img {
       width: 100%;
@@ -947,22 +1008,49 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
       border: 2px solid rgba(148,163,184,0.35);
     }
     .photo-preview { display: flex; flex-wrap: wrap; gap: 1rem; }
-    .history-section { display: grid; gap: 0.9rem; }
-    .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
-    .section-title { font-size: 1.15rem; font-weight: 600; margin: 0; }
-    .section-sub { font-size: 0.85rem; color: rgba(226,232,240,0.7); }
-    .history-card {
-      background: rgba(15,23,42,0.6);
-      border: 1px solid rgba(148,163,184,0.28);
+    .timeline-stack { display: grid; gap: 0.9rem; }
+    .timeline-collapse {
       border-radius: 1rem;
-      padding: 1rem 1.2rem;
-      display: grid;
-      gap: 0.4rem;
+      border: 1px solid rgba(148,163,184,0.28);
+      background: rgba(15,23,42,0.6);
+      overflow: hidden;
     }
-    .history-meta { display: flex; flex-wrap: wrap; gap: 0.6rem; font-size: 0.88rem; color: rgba(226,232,240,0.78); }
-    .history-meta strong { font-weight: 600; color: #f8fafc; }
-    .history-status { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; color: #cbd5f5; }
-    .history-note { font-size: 0.82rem; color: rgba(203,213,225,0.82); }
+    .timeline-collapse summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.95rem 1.1rem;
+      cursor: pointer;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #e2e8f0;
+    }
+    .timeline-collapse summary::-webkit-details-marker { display: none; }
+    .timeline-count {
+      font-size: 0.82rem;
+      color: #bae6fd;
+      background: rgba(14,165,233,0.18);
+      border: 1px solid rgba(125,211,252,0.35);
+      border-radius: 999px;
+      padding: 0.18rem 0.65rem;
+      letter-spacing: 0.08em;
+    }
+    .timeline-content { padding: 0.75rem 1.1rem 1.1rem; display: grid; gap: 0.75rem; }
+    .timeline-card {
+      border-radius: 0.9rem;
+      border: 1px solid rgba(71,85,105,0.35);
+      background: rgba(15,23,42,0.55);
+      padding: 0.85rem 0.95rem;
+      display: grid;
+      gap: 0.45rem;
+    }
+    .timeline-primary { font-weight: 600; font-size: 1.05rem; color: #f8fafc; }
+    .timeline-meta { font-size: 0.9rem; color: rgba(226,232,240,0.78); }
+    .timeline-note { font-size: 0.86rem; color: rgba(203,213,225,0.78); }
+    .timeline-status { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; color: #cbd5f5; }
+    .timeline-empty { font-size: 0.85rem; color: rgba(148,163,184,0.88); }
     .empty-state {
       background: rgba(2,6,23,0.7);
       border: 1px dashed rgba(148,163,184,0.4);
@@ -1012,13 +1100,16 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
       body { padding: 0.85rem; display: block; }
       .wrapper { padding: 1.3rem; border-radius: 1.05rem; }
       .hero { margin-bottom: 1.1rem; }
-      .action-form button { font-size: 1.02rem; padding: 1rem 1.1rem; }
+      .action-form button { font-size: 1.02rem; padding: 0.95rem 1rem; gap: 0.5rem; }
       .action-deck { grid-template-columns: 1fr; }
+      .timeline-collapse summary { padding: 0.85rem 0.95rem; }
     }
     @media (max-width: 540px) {
       .top-brand { width: 100%; justify-content: space-between; }
       .brand-sub { font-size: 0.75rem; }
       .logout-link { width: 100%; justify-content: center; }
+      .timeline-content { padding: 0.65rem 0.85rem 0.95rem; }
+      .timeline-card { padding: 0.75rem 0.8rem; }
     }
   </style>
 </head>
@@ -1100,7 +1191,8 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
 
             <form class="action-form" method="post" action="{{ shift.upload_url }}" enctype="multipart/form-data">
               <input type="hidden" name="photo_type" value="before">
-              <label class="btn-upload" style="display:block; cursor:pointer;">
+              <label class="btn-upload-before" style="display:block; cursor:pointer;">
+                <span class="btn-icon" aria-hidden="true">📸</span>
                 <span>{% if shift.before_photo_url %}Replace before photo{% else %}Upload before photo{% endif %}</span>
                 <input type="file" name="photo" accept="image/*" style="display:none;" onchange="this.form.submit()">
               </label>
@@ -1108,7 +1200,8 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
 
             <form class="action-form" method="post" action="{{ shift.upload_url }}" enctype="multipart/form-data">
               <input type="hidden" name="photo_type" value="after">
-              <label class="btn-upload" style="display:block; cursor:pointer;">
+              <label class="btn-upload-after" style="display:block; cursor:pointer;">
+                <span class="btn-icon" aria-hidden="true">✨</span>
                 <span>{% if shift.after_photo_url %}Replace after photo{% else %}Upload after photo{% endif %}</span>
                 <input type="file" name="photo" accept="image/*" style="display:none;" onchange="this.form.submit()">
               </label>
@@ -1146,34 +1239,61 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
       </div>
     {% endif %}
 
-    <section class="history-section">
-      <div class="section-head">
-        <h2 class="section-title">Recent jobs</h2>
-        <span class="section-sub">Last assignments you were scheduled on</span>
-      </div>
-      {% if history %}
-        {% for item in history %}
-          <article class="history-card">
-            <div class="history-meta">
-              <strong>{{ item.site_name }}</strong>
-              <span>{{ item.day_label }}</span>
-              <span>{{ item.time_window }}</span>
-            </div>
-            <div class="detail-chips">
-              <span class="detail-chip">Scheduled · {{ item.scheduled_duration }}</span>
-              {% if item.has_actual_duration %}
-                <span class="detail-chip detail-chip--actual">Actual · {{ item.actual_duration }}</span>
-              {% endif %}
-            </div>
-            <div class="history-status">{{ item.status_label }}</div>
-            <div class="history-note">{{ item.instructions }}</div>
-          </article>
-        {% endfor %}
-      {% else %}
-        <article class="history-card">
-          <div class="history-note">No past jobs recorded yet. Once you complete assignments, they’ll show up here for quick reference.</div>
-        </article>
-      {% endif %}
+    <section class="timeline-stack">
+      <details class="timeline-collapse">
+        <summary>
+          <span>Upcoming jobs</span>
+          <span class="timeline-count">{{ upcoming_jobs|length }}</span>
+        </summary>
+        <div class="timeline-content">
+          {% if upcoming_jobs %}
+            {% for job in upcoming_jobs %}
+              <article class="timeline-card">
+                <div class="timeline-primary">{{ job.site_name }}</div>
+                <div class="timeline-meta">{{ job.day_label }} · {{ job.time_window }}</div>
+                {% if job.address %}
+                  <div class="timeline-note">{{ job.address }}</div>
+                {% endif %}
+                {% if job.instructions %}
+                  <div class="timeline-note">{{ job.instructions }}</div>
+                {% endif %}
+                <div class="timeline-status">{{ job.status_label }}</div>
+              </article>
+            {% endfor %}
+          {% else %}
+            <div class="timeline-empty">No upcoming jobs yet.</div>
+          {% endif %}
+        </div>
+      </details>
+
+      <details class="timeline-collapse">
+        <summary>
+          <span>Previous jobs</span>
+          <span class="timeline-count">{{ history|length }}</span>
+        </summary>
+        <div class="timeline-content">
+          {% if history %}
+            {% for item in history %}
+              <article class="timeline-card">
+                <div class="timeline-primary">{{ item.site_name }}</div>
+                <div class="timeline-meta">{{ item.day_label }} · {{ item.time_window }}</div>
+                <div class="detail-chips">
+                  <span class="detail-chip">Scheduled · {{ item.scheduled_duration }}</span>
+                  {% if item.has_actual_duration %}
+                    <span class="detail-chip detail-chip--actual">Actual · {{ item.actual_duration }}</span>
+                  {% endif %}
+                </div>
+                <div class="timeline-status">{{ item.status_label }}</div>
+                {% if item.instructions %}
+                  <div class="timeline-note">{{ item.instructions }}</div>
+                {% endif %}
+              </article>
+            {% endfor %}
+          {% else %}
+            <div class="timeline-empty">No previous jobs logged yet.</div>
+          {% endif %}
+        </div>
+      </details>
     </section>
   </main>
 
@@ -3816,9 +3936,29 @@ def _build_admin_dashboard_context(db):
   }
 
 
+def _safe_next_url() -> str | None:
+  candidate = request.form.get("next") or request.args.get("next")
+  if not candidate:
+    return None
+  try:
+    resolved = urlparse(urljoin(request.host_url, candidate))
+  except Exception:
+    return None
+  if resolved.netloc and resolved.netloc != request.host:
+    return None
+  path = resolved.path or ""
+  if not path:
+    return None
+  login_path = url_for("login")
+  if path == login_path:
+    return None
+  query = f"?{resolved.query}" if resolved.query else ""
+  return f"{path}{query}"
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
-  next_url = request.args.get("next")
+  next_url = _safe_next_url()
   if session.get("role") == "admin" and session.get("auth"):
     return redirect(next_url or url_for("index"))
   if session.get("role") == "employee" and session.get("employee_id"):
@@ -3828,14 +3968,13 @@ def login():
   if request.method == "POST":
     username_raw = (request.form.get("username") or "").strip()
     password = request.form.get("password") or ""
-    dest = request.form.get("next") or request.args.get("next")
     if username_raw and password:
       if username_raw == AUTH_USERNAME and password == AUTH_PASSWORD:
         session.clear()
         session["auth"] = True
         session["role"] = "admin"
         session["user"] = username_raw
-        return redirect(dest or url_for("index"))
+        return redirect(next_url or url_for("index"))
 
       normalized = username_raw.lower()
       db = SessionLocal()
@@ -3860,12 +3999,12 @@ def login():
           session["employee_id"] = employee.id
           session["employee_name"] = employee.name
           session["employee_code"] = employee.login_code
-          return redirect(dest or url_for("employee_dashboard"))
+          return redirect(next_url or url_for("employee_dashboard"))
       error = "Invalid credentials"
     else:
       error = "Username and password are required"
 
-  return render_template_string(LOGIN_TEMPLATE, error=error)
+  return render_template_string(LOGIN_TEMPLATE, error=error, next_value=next_url)
 
 
 @app.route("/employee")
@@ -3877,6 +4016,7 @@ def employee_dashboard():
   today = date.today()
   db = SessionLocal()
   shift_cards = []
+  upcoming_cards = []
   history_cards = []
 
   def _format_minutes(total_minutes: int | None) -> str:
@@ -3895,6 +4035,28 @@ def employee_dashboard():
     finish = datetime.combine(date.min, shift_obj.end_time)
     delta = finish - baseline
     return max(int(delta.total_seconds() // 60), 0)
+
+  def _time_window_label(shift_obj: Shift) -> str:
+    start = shift_obj.start_time
+    end = shift_obj.end_time
+    if start and end:
+      start_label = start.strftime("%I:%M %p").lstrip("0")
+      end_label = end.strftime("%I:%M %p").lstrip("0")
+      return f"{start_label} – {end_label}"
+    if start:
+      start_label = start.strftime("%I:%M %p").lstrip("0")
+      return f"Starts {start_label}"
+    if end:
+      end_label = end.strftime("%I:%M %p").lstrip("0")
+      return f"Ends {end_label}"
+    return "Time to be scheduled"
+
+  def _status_text(shift_obj: Shift) -> str:
+    if shift_obj.clock_out_at:
+      return "Completed"
+    if shift_obj.clock_in_at:
+      return "In progress"
+    return "Scheduled"
 
   try:
     todays_shifts = (
@@ -3968,6 +4130,29 @@ def employee_dashboard():
         }
       )
 
+    upcoming_shifts = (
+      db.query(Shift)
+      .filter(Shift.employee_id == employee_id, Shift.day > today)
+      .order_by(Shift.day.asc(), Shift.start_time.asc())
+      .limit(20)
+      .all()
+    )
+
+    for shift in upcoming_shifts:
+      site_name = shift.site.name if shift.site else "Scheduled job"
+      address = shift.site.address if shift.site and shift.site.address else None
+      upcoming_cards.append(
+        {
+          "id": shift.id,
+          "site_name": site_name,
+          "day_label": shift.day.strftime("%a, %d %b %Y") if shift.day else "Date to be set",
+          "time_window": _time_window_label(shift),
+          "status_label": _status_text(shift),
+          "address": address,
+          "instructions": shift.instructions or None,
+        }
+      )
+
     history_shifts = (
       db.query(Shift)
       .filter(Shift.employee_id == employee_id, Shift.day < today)
@@ -3995,7 +4180,7 @@ def employee_dashboard():
           "id": shift.id,
           "site_name": shift.site.name if shift.site else "Scheduled job",
           "day_label": shift.day.strftime("%a, %d %b %Y"),
-          "time_window": f"{shift.start_time.strftime('%I:%M %p').lstrip('0')} – {shift.end_time.strftime('%I:%M %p').lstrip('0')}",
+          "time_window": _time_window_label(shift),
           "status_label": status_label,
           "scheduled_duration": _format_minutes(scheduled_minutes),
           "actual_duration": _format_minutes(actual_minutes),
@@ -4021,6 +4206,7 @@ def employee_dashboard():
     today_label=today_label,
     friendly_message=friendly_message,
     shifts=shift_cards,
+    upcoming_jobs=upcoming_cards,
     history=history_cards,
   )
 
@@ -4393,6 +4579,51 @@ def admin_employees():
       .group_by(Shift.employee_id)
       .all()
     }
+    employee_shift_groups = {}
+    employee_ids = [emp.id for emp in employees if emp.id]
+    if employee_ids:
+      for emp_id in employee_ids:
+        employee_shift_groups[emp_id] = {"upcoming": [], "history": []}
+      shift_rows = (
+        db.query(Shift)
+        .filter(Shift.employee_id.in_(employee_ids))
+        .order_by(Shift.day.asc(), Shift.start_time.asc())
+        .all()
+      )
+      today_marker = date.today()
+      for shift in shift_rows:
+        if not shift.employee_id:
+          continue
+        bucket = "upcoming"
+        if shift.day and shift.day < today_marker:
+          bucket = "history"
+        site_name = shift.site.name if shift.site else "Unassigned site"
+        if shift.start_time and shift.end_time:
+          start_label = shift.start_time.strftime("%I:%M %p").lstrip("0")
+          end_label = shift.end_time.strftime("%I:%M %p").lstrip("0")
+          time_window = f"{start_label} – {end_label}"
+        elif shift.start_time:
+          start_label = shift.start_time.strftime("%I:%M %p").lstrip("0")
+          time_window = f"Starts {start_label}"
+        else:
+          time_window = "Time to be set"
+        status_label = "Scheduled"
+        if shift.clock_out_at:
+          status_label = "Completed"
+        elif shift.clock_in_at:
+          status_label = "In progress"
+        entry = {
+          "site_name": site_name,
+          "day_label": shift.day.strftime("%a, %d %b %Y") if shift.day else "Date to be set",
+          "time_window": time_window,
+          "status_label": status_label,
+        }
+        groups = employee_shift_groups.setdefault(shift.employee_id, {"upcoming": [], "history": []})
+        if bucket == "history":
+          groups[bucket].insert(0, entry)
+        else:
+          groups[bucket].append(entry)
+
     today_shifts = (
       db.query(func.count(Shift.id)).filter(Shift.day == date.today()).scalar()
       or 0
@@ -4420,6 +4651,7 @@ def admin_employees():
       today_shifts=today_shifts,
       unassigned_employees=unassigned_employees,
       credential_snippets=credential_snippets,
+      employee_shift_groups=employee_shift_groups,
     )
   finally:
     db.close()
