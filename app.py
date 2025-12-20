@@ -1,265 +1,685 @@
 import re
 import io
+import csv
 import logging
 import os
+import secrets
 from collections import deque
 from datetime import datetime, date, timedelta
-from urllib.parse import urljoin, urldefrag, urlparse
+from functools import wraps
+from urllib.parse import urljoin, urldefrag, urlparse, quote_plus
 from dotenv import load_dotenv
+
 load_dotenv()
+
 import requests
 from bs4 import BeautifulSoup
 from flask import (
-    Flask,
-    request,
-    send_file,
-    render_template_string,
-    jsonify,
-    redirect,
-    url_for,
-    session,
+  Flask,
+  request,
+  send_file,
+  render_template_string,
+  jsonify,
+  redirect,
+  url_for,
+  session,
   flash,
 )
-from sqlalchemy import create_engine, Column, Integer, String, Date, Time, ForeignKey, or_, func, DateTime
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from sqlalchemy import (
+  create_engine,
+  Column,
+  Integer,
+  String,
+  Date,
+  Time,
+  ForeignKey,
+  or_,
+  func,
+  DateTime,
+  Text,
+  text,
+  Float,
+)
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker, scoped_session
 
-try:
-    # Optional: only used when GPT integration is configured
-    from openai import OpenAI
-except Exception:  # pragma: no cover - optional dependency
-    OpenAI = None
+ADMIN_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — Admin Overview</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --accent: #0f766e; }
+    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); }
+    .sidebar { background:rgba(2,6,23,0.82); border-right:1px solid rgba(148,163,184,0.25); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#6b7280; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#e5e7eb; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
+    .nav-pill.active, .nav-pill:hover { background:rgba(15,118,110,0.22); border-color:rgba(45,212,191,0.4); color:#ecfeff; }
+    .nav-text { display:inline; }
+    .nav-pill-logout { margin-top:0.3rem; background:rgba(248,250,252,0.12); border-color:rgba(148,163,184,0.35); color:#f8fafc; }
+    .nav-pill-logout:hover { background:rgba(248,250,252,0.18); border-color:rgba(248,250,252,0.3); color:#ffffff; }
+    .main-shell { padding:1.75rem; }
+    .badge-soft { border-radius:999px; border:1px solid rgba(148,163,184,0.45); color:#9ca3af; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; }
+    .metrics-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; }
+    .metric-card { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.7); background:rgba(15,23,42,0.85); padding:1rem; }
+    .metric-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#94a3b8; margin-bottom:0.35rem; }
+    .metric-value { font-size:2rem; font-weight:600; color:#f8fafc; margin-bottom:0.1rem; }
+    .metric-sub { font-size:0.85rem; color:#94a3b8; }
+    .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.7); background:rgba(15,23,42,0.78); padding:1.2rem; height:100%; }
+    .list-entry { border-bottom:1px solid rgba(148,163,184,0.18); padding:0.6rem 0; }
+    .list-entry:last-child { border-bottom:none; }
+    .list-title { font-weight:600; color:#f1f5f9; }
+    .list-sub { font-size:0.85rem; color:#94a3b8; }
+    .placeholder { color:#64748b; font-size:0.85rem; }
+    @media(max-width:992px){ .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{ display:none;} }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-section-title">Navigation</div>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Overview</span></a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Manage employees</span></a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Assign coverage</span></a>
+      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
+      <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
+      <div class="sidebar-section-title">Account</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
+      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
+    </aside>
+    <main class="main-shell text-light">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'warning' if category == 'warning' else 'info' }} border-0 text-dark" role="alert">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
 
-try:
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import inch
-    from reportlab.platypus import (
-        SimpleDocTemplate,
-        Table,
-        TableStyle,
-        Paragraph,
-        Spacer,
-        Image,
-    )
+      <header class="mb-4">
+        <div class="badge-soft mb-2">Operations overview</div>
+        <h1 class="h4 text-light mb-1">This week at a glance</h1>
+        <p class="text-secondary mb-0">{{ today_label }} · Week {{ week_label }}</p>
+      </header>
 
-    REPORTLAB_AVAILABLE = True
-except Exception:  # pragma: no cover - optional dependency
-    REPORTLAB_AVAILABLE = False
+      <section class="metrics-grid mb-4">
+        <div class="metric-card">
+          <div class="metric-label">Employees</div>
+          <div class="metric-value">{{ stats.employees }}</div>
+          <div class="metric-sub">Active in the roster</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Sites</div>
+          <div class="metric-value">{{ stats.sites }}</div>
+          <div class="metric-sub">Locations to cover</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Shifts this week</div>
+          <div class="metric-value">{{ stats.weekly_shifts }}</div>
+          <div class="metric-sub">Scheduled between {{ week_label }}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">New leads</div>
+          <div class="metric-value">{{ stats.new_leads }}</div>
+          <div class="metric-sub">Arrived in the last 7 days</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Unassigned sites</div>
+          <div class="metric-value">{{ stats.unassigned_sites }}</div>
+          <div class="metric-sub">Need a shift this week</div>
+        </div>
+      </section>
 
-app = Flask(__name__)
-app.logger.setLevel(logging.DEBUG)
-app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY", "dev-secret-key-change-me")
+      <section class="row g-3">
+        <div class="col-12 col-lg-6">
+          <div class="card-surface">
+            <h2 class="h6 text-uppercase text-secondary mb-3">Recently added employees</h2>
+            {% if recent_employees %}
+              {% for emp in recent_employees %}
+                <div class="list-entry">
+                  <div class="list-title">{{ emp.name }}</div>
+                  <div class="list-sub">{{ emp.role or 'No role yet' }}</div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p class="placeholder mb-0">No employees registered yet.</p>
+            {% endif %}
+            <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-light mt-3">Manage employees</a>
+          </div>
+        </div>
+        <div class="col-12 col-lg-6">
+          <div class="card-surface">
+            <h2 class="h6 text-uppercase text-secondary mb-3">Newest sites</h2>
+            {% if recent_sites %}
+              {% for site in recent_sites %}
+                <div class="list-entry">
+                  <div class="list-title">{{ site.name }}</div>
+                  <div class="list-sub">{{ site.address or 'Address TBD' }}</div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p class="placeholder mb-0">No sites have been added yet.</p>
+            {% endif %}
+            <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-outline-light mt-3">Manage sites</a>
+          </div>
+        </div>
+      </section>
 
-AUTH_USERNAME = os.getenv("APP_USERNAME", "admin")
-AUTH_PASSWORD = os.getenv("APP_PASSWORD", "Putzelf%12_34")
+      <section class="row g-3 mt-1">
+        <div class="col-12 col-lg-7">
+          <div class="card-surface">
+            <h2 class="h6 text-uppercase text-secondary mb-3">Upcoming shifts</h2>
+            {% if upcoming_shifts %}
+              {% for shift in upcoming_shifts %}
+                <div class="list-entry d-flex justify-content-between align-items-start">
+                  <div>
+                    <div class="list-title">{{ shift.employee.name if shift.employee else 'Unassigned' }}</div>
+                    <div class="list-sub">{{ shift.site.name if shift.site else 'No site set' }}</div>
+                  </div>
+                  <div class="text-end text-secondary small">
+                    {{ shift.day.strftime('%d %b') }} · {{ shift.start_time.strftime('%H:%M') }} – {{ shift.end_time.strftime('%H:%M') }}
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p class="placeholder mb-0">No shifts scheduled yet. Add some from the schedule view.</p>
+            {% endif %}
+            <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-light mt-3">Go to schedule</a>
+          </div>
+        </div>
+        <div class="col-12 col-lg-5">
+          <div class="card-surface">
+            <h2 class="h6 text-uppercase text-secondary mb-3">Sites without coverage</h2>
+            {% if unassigned_sites_sample %}
+              {% for site in unassigned_sites_sample %}
+                <div class="list-entry">
+                  <div class="list-title">{{ site.name }}</div>
+                  <div class="list-sub">{{ site.address or 'Address TBD' }}</div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p class="placeholder mb-0">All sites are covered for the current week.</p>
+            {% endif %}
+            <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-outline-light mt-3">Assign coverage</a>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+"""
 
-openai_client = None
-if OpenAI is not None and os.getenv("OPENAI_API_KEY"):
-    try:
-        openai_client = OpenAI()
-        app.logger.info("OpenAI client initialized for GPT integration.")
-    except Exception as e:  # pragma: no cover - defensive
-        app.logger.warning("Failed to initialize OpenAI client: %s", e)
+ADMIN_EMPLOYEES_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — Employees</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); }
+    .sidebar { background:rgba(2,6,23,0.82); border-right:1px solid rgba(148,163,184,0.25); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#6b7280; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#e5e7eb; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
+    .nav-pill.active, .nav-pill:hover { background:rgba(15,118,110,0.22); border-color:rgba(45,212,191,0.4); color:#ecfeff; }
+    .nav-text { display:inline; }
+    .nav-pill-logout { margin-top:0.3rem; background:rgba(248,250,252,0.12); border-color:rgba(148,163,184,0.35); color:#f8fafc; }
+    .nav-pill-logout:hover { background:rgba(248,250,252,0.18); border-color:rgba(248,250,252,0.3); color:#ffffff; }
+    .main-shell { padding:1.75rem; }
+    .badge-soft { border-radius:999px; border:1px solid rgba(148,163,184,0.45); color:#9ca3af; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; }
+    .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.7); background:rgba(15,23,42,0.78); padding:1.25rem; }
+    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#94a3b8; }
+    .little-card { border-radius:0.85rem; border:1px solid rgba(51,65,85,0.65); background:rgba(2,6,23,0.75); }
+    .credential-box { border-radius:0.85rem; border:1px solid rgba(125,211,252,0.35); background:rgba(14,116,144,0.18); padding:1rem; }
+    .credential-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:0.75rem; }
+    .credential-label { font-size:0.72rem; letter-spacing:0.12em; text-transform:uppercase; color:#94a3b8; }
+    .credential-value { font-size:1rem; font-weight:600; color:#f8fafc; }
+    .credential-note { font-size:0.78rem; color:#bae6fd; }
+    .credential-actions { display:flex; flex-wrap:wrap; gap:0.5rem; }
+    .credential-edit { border:1px dashed rgba(148,163,184,0.35); border-radius:0.75rem; padding:1rem; background:rgba(15,23,42,0.55); }
+    .placeholder { color:#64748b; font-size:0.85rem; }
+    .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+    .stat-card { border-radius:0.85rem; border:1px solid rgba(45,212,191,0.25); background:rgba(15,118,110,0.1); padding:1rem; }
+    .stat-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#94a3b8; margin-bottom:0.35rem; }
+    .stat-value { font-size:1.6rem; font-weight:600; color:#f8fafc; }
+    @media(max-width:992px){ .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{ display:none;} }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-section-title">Navigation</div>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Overview</span></a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Manage employees</span></a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Assign coverage</span></a>
+      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
+      <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
+      <div class="sidebar-section-title">Account</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
+      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
+    </aside>
+    <main class="main-shell text-light">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }} border-0 text-dark">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
 
+      <header class="mb-4">
+        <div class="badge-soft mb-2">Team directory</div>
+        <h1 class="h4 text-light mb-1">Manage employees</h1>
+        <p class="text-secondary mb-0">{{ filtered_employees }} shown · {{ total_employees }} total · {{ today_shifts }} shifts today</p>
+      </header>
 
-# --- simple auth gate ---
-PUBLIC_ENDPOINTS = {"login", "static"}
+      <section class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total employees</div>
+          <div class="stat-value">{{ total_employees }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Listed here</div>
+          <div class="stat-value">{{ filtered_employees }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">On schedule today</div>
+          <div class="stat-value">{{ today_shifts }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Unassigned this week</div>
+          <div class="stat-value">{{ unassigned_employees }}</div>
+        </div>
+      </section>
 
+      <section class="card-surface mb-4">
+        <form method="get" class="row g-2 align-items-end">
+          <div class="col-sm-8">
+            <label class="form-label" for="employee_search">Search employees</label>
+            <div class="input-group input-group-sm">
+              <input type="text" class="form-control" id="employee_search" name="q" value="{{ search_q or '' }}" placeholder="Search by name or role">
+              <button class="btn btn-outline-light" type="submit">Search</button>
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-secondary w-100">Clear filters</a>
+          </div>
+        </form>
+      </section>
 
-@app.before_request
-def enforce_login():
-    if request.endpoint in PUBLIC_ENDPOINTS or request.endpoint is None:
-        return
-    if not session.get("auth"):
-        return redirect(url_for("login", next=request.path))
+      <div class="row g-3">
+        <div class="col-12 col-lg-4">
+          <div class="card-surface mb-3">
+            <h2 class="h6 text-uppercase text-secondary mb-3">Add employee</h2>
+            <form method="post" class="row g-3">
+              <input type="hidden" name="action" value="create">
+              <div class="col-12">
+                <label class="form-label" for="new_employee_name">Name</label>
+                <input type="text" class="form-control form-control-sm" id="new_employee_name" name="name" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="new_employee_role">Role</label>
+                <input type="text" class="form-control form-control-sm" id="new_employee_role" name="role" placeholder="e.g. Field technician">
+              </div>
+              <div class="col-12">
+                <button type="submit" class="btn btn-sm btn-primary w-100">Add employee</button>
+              </div>
+            </form>
+          </div>
+          <div class="card-surface">
+            <h2 class="h6 text-uppercase text-secondary mb-3">Guidance</h2>
+            <p class="placeholder mb-1">Keep names consistent with the schedule so shift assignments stay clear.</p>
+            <p class="placeholder mb-0">Roles help you filter quickly when staffing new sites.</p>
+          </div>
+        </div>
+          <div class="col-12 col-lg-8">
+            {% if employees %}
+              <div class="vstack gap-3">
+                {% for emp in employees %}
+                  <div class="little-card p-3">
+                    <form method="post" class="row g-2 align-items-end">
+                      <input type="hidden" name="id" value="{{ emp.id }}">
+                      <div class="col-md-5 col-12">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control form-control-sm" name="name" value="{{ emp.name }}" required>
+                      </div>
+                      <div class="col-md-5 col-12">
+                        <label class="form-label">Role</label>
+                        <input type="text" class="form-control form-control-sm" name="role" value="{{ emp.role or '' }}">
+                      </div>
+                      <div class="col-md-2 col-12 d-flex justify-content-end gap-2">
+                        <button type="submit" name="action" value="update" class="btn btn-sm btn-success">Save</button>
+                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ emp.name }}?')">Delete</button>
+                      </div>
+                    </form>
+                    <div class="small text-secondary mt-2">Shifts scheduled: <span class="text-light">{{ shift_counts.get(emp.id, 0) }}</span></div>
 
+                    {% set snippet = (credential_snippets|default({})).get(emp.id|string) %}
+                    {% set code_display = snippet.code if snippet and snippet.code else (emp.login_code or 'Pending') %}
+                    {% set pin_display = snippet.pin if snippet and snippet.pin else None %}
 
-# --- simple SQLite scheduling backend (employees / sites / shifts) ---
-Base = declarative_base()
+                    <div class="credential-box mt-3">
+                      <div class="credential-grid">
+                        <div>
+                          <div class="credential-label">Login code</div>
+                          <div class="credential-value">{{ code_display }}</div>
+                        </div>
+                        <div>
+                          <div class="credential-label">PIN</div>
+                          <div class="credential-value">
+                            {% if pin_display %}
+                              {{ pin_display }}
+                            {% elif emp.login_pin_hash %}
+                              Hidden — use Share to refresh
+                            {% else %}
+                              Generating…
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="credential-label">Login email</div>
+                          <div class="credential-value">{{ emp.login_email or 'Not set' }}</div>
+                        </div>
+                      </div>
+                      {% if pin_display %}
+                        <div class="credential-note mt-2">New PIN generated — share it with {{ emp.name }} soon.</div>
+                      {% endif %}
+                    </div>
 
+                    <div class="credential-actions mt-3">
+                      <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="credentials_share">
+                        <input type="hidden" name="id" value="{{ emp.id }}">
+                        {% if search_q %}
+                          <input type="hidden" name="redirect_q" value="{{ search_q }}">
+                        {% endif %}
+                        <button type="submit" class="btn btn-sm btn-outline-info">Share new PIN</button>
+                      </form>
+                      {% if pin_display %}
+                        {% set share_text = 'Login code: ' ~ code_display ~ ' · PIN: ' ~ pin_display %}
+                        <button type="button" class="btn btn-sm btn-outline-light cred-copy-btn" data-credentials="{{ share_text }}">Copy details</button>
+                      {% endif %}
+                      <button type="button" class="btn btn-sm btn-outline-secondary cred-edit-btn" data-edit-target="cred-edit-{{ emp.id }}" aria-expanded="false">Edit</button>
+                    </div>
 
-class Employee(Base):
-    __tablename__ = "employees"
+                    <div class="credential-edit d-none mt-3" id="cred-edit-{{ emp.id }}">
+                      <form method="post" class="row g-2 align-items-end">
+                        <input type="hidden" name="action" value="credentials_update">
+                        <input type="hidden" name="id" value="{{ emp.id }}">
+                        {% if search_q %}
+                          <input type="hidden" name="redirect_q" value="{{ search_q }}">
+                        {% endif %}
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Login email</label>
+                          <input type="email" class="form-control form-control-sm" name="login_email" value="{{ emp.login_email or '' }}" placeholder="Optional email">
+                        </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Login code</label>
+                          <input type="text" class="form-control form-control-sm" name="login_code" value="{{ code_display }}" required>
+                        </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">New PIN (4 digits)</label>
+                          <input type="text" class="form-control form-control-sm" name="login_pin" pattern="\d{4}" placeholder="Leave blank to keep">
+                        </div>
+                        <div class="col-12 d-flex justify-content-end gap-2">
+                          <button type="submit" class="btn btn-sm btn-success">Save credentials</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+            <div class="card-surface">
+              <p class="placeholder mb-0">No employees match this filter. Try broadening your search.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </main>
+  </div>
+    <script>
+      document.getElementById('year').textContent = new Date().getFullYear();
+      document.querySelectorAll('.cred-copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const payload = btn.dataset.credentials;
+          if (!payload) {
+            return;
+          }
+          const original = btn.textContent;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(payload).then(() => {
+              btn.textContent = 'Copied!';
+              setTimeout(() => { btn.textContent = original; }, 1800);
+            }).catch(() => {
+              window.prompt('Copy credentials:', payload);
+            });
+          } else {
+            window.prompt('Copy credentials:', payload);
+          }
+        });
+      });
+      document.querySelectorAll('.cred-edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const targetId = btn.dataset.editTarget;
+          const target = document.getElementById(targetId);
+          if (!target) {
+            return;
+          }
+          const isHidden = target.classList.contains('d-none');
+          if (isHidden) {
+            target.classList.remove('d-none');
+            btn.setAttribute('aria-expanded', 'true');
+          } else {
+            target.classList.add('d-none');
+            btn.setAttribute('aria-expanded', 'false');
+          }
+        });
+      });
+    </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+"""
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
-    role = Column(String, nullable=True)
+ADMIN_SITES_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — Site Library</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition:grid-template-columns 0.2s ease; }
+    .sidebar { background:rgba(2,6,23,0.82); border-right:1px solid rgba(148,163,184,0.25); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#6b7280; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#e5e7eb; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
+    .nav-pill.active, .nav-pill:hover { background:rgba(15,118,110,0.22); border-color:rgba(45,212,191,0.4); color:#ecfeff; }
+    .nav-text { display:inline; }
+    .main-shell { padding:1.75rem; }
+    .badge-soft { border-radius:999px; border:1px solid rgba(148,163,184,0.45); color:#9ca3af; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; }
+    .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.7); background:rgba(15,23,42,0.78); padding:1.25rem; }
+    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#94a3b8; }
+    .little-card { border-radius:0.85rem; border:1px solid rgba(51,65,85,0.65); background:rgba(2,6,23,0.75); }
+    .placeholder { color:#64748b; font-size:0.85rem; }
+    .table thead th { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#94a3b8; }
+    @media(max-width:992px){ .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{ display:none;} }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-section-title">Navigation</div>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Overview</span></a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Manage employees</span></a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Assign coverage</span></a>
+      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
+      <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
+      <div class="sidebar-section-title">Account</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
+      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
+    </aside>
+    <main class="main-shell text-light">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }} border-0 text-dark">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+        <div>
+          <div class="badge-soft mb-2">Location library</div>
+          <h1 class="h3 mb-1 text-light">Manage client sites</h1>
+          <p class="text-secondary mb-0">{{ filtered_sites }} shown · {{ total_sites }} total sites</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-light">Back to overview</a>
+          <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-light">Open schedule</a>
+        </div>
+      </div>
+      <form method="get" class="row g-2 align-items-end mb-4">
+        <div class="col-sm-8">
+          <label class="form-label" for="site_search">Search sites</label>
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control" id="site_search" name="q" value="{{ search_q or '' }}" placeholder="Search by name or address">
+            <button class="btn btn-outline-light" type="submit">Search</button>
+          </div>
+        </div>
+        <div class="col-sm-4">
+          <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-outline-secondary w-100">Clear filters</a>
+        </div>
+      </form>
+      <div class="row g-3">
+        <div class="col-12 col-lg-4">
+          <div class="card-surface mb-3">
+            <h2 class="h6 text-uppercase text-secondary mb-3">Add site</h2>
+            <form method="post" class="row g-3">
+              <input type="hidden" name="entity" value="site">
+              <input type="hidden" name="action" value="create">
+              <div class="col-12">
+                <label class="form-label" for="new_site_name">Site name</label>
+                <input type="text" class="form-control form-control-sm" id="new_site_name" name="name" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="new_site_address">Address</label>
+                <input type="text" class="form-control form-control-sm" id="new_site_address" name="address" placeholder="Street, city" required>
+              </div>
+              <div class="col-12">
+                <button type="submit" class="btn btn-sm btn-primary w-100">Add site</button>
+              </div>
+            </form>
+          </div>
+          <div class="card-surface">
+            <h2 class="h6 text-uppercase text-secondary mb-3">Snapshot</h2>
+            <ul class="list-unstyled mb-0 small text-secondary">
+              <li class="mb-1">Total sites: <span class="text-light">{{ total_sites }}</span></li>
+              <li class="mb-1">Sites with shifts this week: <span class="text-light">{{ covered_sites }}</span></li>
+              <li>Unassigned sites: <span class="text-light">{{ total_sites - covered_sites }}</span></li>
+            </ul>
+          </div>
+        </div>
+        <div class="col-12 col-lg-8">
+          {% if sites %}
+            <div class="card-surface mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h6 text-uppercase text-secondary mb-0">Bulk update</h2>
+                <button form="bulk-site-update" type="submit" class="btn btn-sm btn-success">Save all</button>
+              </div>
+              <form id="bulk-site-update" method="post" class="table-responsive" style="max-height:260px;">
+                <input type="hidden" name="entity" value="site_bulk">
+                <input type="hidden" name="action" value="bulk_update">
+                <table class="table table-sm table-dark align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th scope="col">Name</th>
+                      <th scope="col">Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for site in sites %}
+                      <tr>
+                        <td>
+                          <input type="hidden" name="site_id" value="{{ site.id }}">
+                          <input type="text" class="form-control form-control-sm" name="site_name" value="{{ site.name }}" required>
+                        </td>
+                        <td>
+                          <input type="text" class="form-control form-control-sm" name="site_address" value="{{ site.address or '' }}" required>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </form>
+            </div>
+            <div class="vstack gap-3">
+              {% for site in sites %}
+                <form method="post" class="little-card p-3">
+                  <input type="hidden" name="entity" value="site">
+                  <input type="hidden" name="id" value="{{ site.id }}">
+                  <div class="row g-2 align-items-end">
+                    <div class="col-md-5 col-12">
+                      <label class="form-label">Name</label>
+                      <input type="text" name="name" value="{{ site.name }}" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="col-md-5 col-12">
+                      <label class="form-label">Address</label>
+                      <input type="text" name="address" value="{{ site.address or '' }}" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="col-md-2 col-12 d-flex justify-content-end gap-2">
+                      <button type="submit" name="action" value="update" class="btn btn-sm btn-success">Save</button>
+                      <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ site.name }}?')">Delete</button>
+                    </div>
+                  </div>
+                  <div class="small text-secondary mt-2">Shifts scheduled: <span class="text-light">{{ shift_counts.get(site.id, 0) }}</span></div>
+                </form>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="card-surface">
+              <p class="placeholder mb-0">No sites match this filter. Add locations or adjust your search.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+"""
 
-    shifts = relationship("Shift", back_populates="employee", cascade="all, delete-orphan")
-
-    def __repr__(self) -> str:  # pragma: no cover - debug
-        return f"<Employee {self.id} {self.name!r}>"
-
-
-class Site(Base):
-    __tablename__ = "sites"
-
-    id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
-    address = Column(String, nullable=True)
-
-    shifts = relationship("Shift", back_populates="site", cascade="all, delete-orphan")
-
-    def __repr__(self) -> str:  # pragma: no cover - debug
-        return f"<Site {self.id} {self.name!r}>"
-
-
-class Shift(Base):
-    __tablename__ = "shifts"
-
-    id = Column(Integer, primary_key=True)
-    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
-    site_id = Column(Integer, ForeignKey("sites.id"), nullable=False)
-    day = Column(Date, nullable=False)
-    start_time = Column(Time, nullable=False)
-    end_time = Column(Time, nullable=False)
-
-    employee = relationship("Employee", back_populates="shifts")
-    site = relationship("Site", back_populates="shifts")
-
-    def __repr__(self) -> str:  # pragma: no cover - debug
-        return f"<Shift {self.id} emp={self.employee_id} site={self.site_id} {self.day}>"
-
-
-LEAD_STAGES = ["New Leads", "Qualified Leads", "Contacted", "Converted"]
-
-
-class Lead(Base):
-    __tablename__ = "leads"
-
-    id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
-    email = Column(String, nullable=True)
-    phone = Column(String, nullable=True)
-    source = Column(String, nullable=True)
-    notes = Column(String, nullable=True)
-    stage = Column(String, nullable=False, default="New Leads")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-
-    def __repr__(self) -> str:  # pragma: no cover - debug
-        return f"<Lead {self.id} {self.name!r} {self.stage}>"
-
-
-DB_URL = os.getenv("SCHEDULE_DB_URL", "sqlite:///schedule.db")
-engine = create_engine(DB_URL, future=True)
-SessionLocal = scoped_session(sessionmaker(bind=engine, autoflush=False, autocommit=False))
-
-
-def init_db():
-    """Create tables and some seed data if empty."""
-    Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    try:
-        if db.query(Employee).count() == 0:
-            demo_emps = [
-                Employee(name="Anna", role="Cleaning"),
-                Employee(name="Markus", role="Supervisor"),
-                Employee(name="Sara", role="Cleaning"),
-            ]
-            db.add_all(demo_emps)
-        if db.query(Site).count() == 0:
-            demo_sites = [
-                Site(name="Site A – City Center", address="Vienna, Kärntner Straße 1"),
-                Site(name="Site B – Office Park", address="Graz, Office Park 12"),
-                Site(name="Site C – Warehouse", address="Linz, Industrial Way 7"),
-            ]
-            db.add_all(demo_sites)
-        if db.query(Lead).count() == 0:
-            demo_leads = [
-                Lead(name="Alice Bauer", email="alice@example.com", stage="New Leads", source="Web form"),
-                Lead(name="Bob Mayer", email="bob@example.com", stage="Qualified Leads", source="Import"),
-                Lead(name="Carla Novak", email="carla@example.com", stage="Contacted", source="Manual"),
-            ]
-            db.add_all(demo_leads)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
-
-
-# Initialize DB eagerly on import so it works with Flask 3.x (no before_first_request)
-init_db()
-
-# Email regex (unchanged)
-EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}")
-
-# Much stricter phone regex (only real-world-like patterns)
-PHONE_REGEX = re.compile(
-    r"""
-    (?<!\d)                 # must not be part of longer number
-    (?:\+|00)?\d{1,3}?      # optional country code (+43, 0043, +1, etc.)
-    [\s./()\-]*             # optional separators after country code
-    (?:\d[\s./()\-]*){6,12} # 7–15 digits total (digit groups with separators)
-    (?!\d)                  # must not be part of longer number
-    """,
-    re.VERBOSE,
-)
-
-# Labels we consider authoritative for nearby phone numbers
-PHONE_LABELS = ["tel", "telefon", "t:", "m:", "mobil", "mobile", "mob", "phone", "kontakt", "fax", "call"]
-
-
-def normalize_phone(s: str) -> str:
-    """Normalize phone: keep leading + if present, otherwise digits only. Return '' if too short."""
-    if not s:
-        return ""
-    s = s.strip()
-    has_plus = s.startswith("+")
-    digits = re.sub(r"[^0-9]", "", s)
-    if len(digits) < 6:
-        return ""
-    return ("+" + digits) if has_plus else digits
-
-
-# --- validation helpers ---
-def is_valid_phone(norm: str) -> bool:
-    """Simple validation on normalized phone (digits w/ optional leading +)."""
-    if not norm:
-        return False
-    digits = norm[1:] if norm.startswith("+") else norm
-    if not digits.isdigit():
-        return False
-    if not (7 <= len(digits) <= 15):
-        return False
-    if len(set(digits)) == 1:
-        return False
-    return True
-
-
-_phone_label_re = re.compile(r"(?:tel|telefon|t:|m:|mobil|mobile|mob|phone|kontakt|fax|call)", re.I)
-
-
-def has_phone_label(context: str, match_start: int) -> bool:
-    """Check up to 40 chars before match for common phone labels."""
-    if not context:
-        return False
-    start = max(0, match_start - 40)
-    snippet = context[start:match_start].lower()
-    return bool(_phone_label_re.search(snippet))
-
-
-def find_labelled_phones(text: str):
-    """Return list of normalized, validated phones that appear near a phone label inside text."""
-    results = []
-    if not text:
-        return results
-    for label in PHONE_LABELS:
-        pattern = rf"{re.escape(label)}[^0-9+]{{0,15}}({PHONE_REGEX.pattern})"
-        try:
-            for m in re.finditer(pattern, text, flags=re.I | re.VERBOSE):
-                raw = m.group(1)
-                n = normalize_phone(raw)
-                if n and is_valid_phone(n):
-                    results.append(n)
-        except re.error:
-            continue
-    return results
-
-
-# Modern HTML interface with dashboard-style layout inspired by modern B2B tools
 LOGIN_TEMPLATE = """
 <!doctype html>
 <html lang="en">
@@ -321,7 +741,7 @@ LOGIN_TEMPLATE = """
     <form method="post" class="needs-validation" novalidate>
       <input type="hidden" name="next" value="{{ request.args.get('next','') }}">
       <div class="mb-3">
-        <label class="form-label small-note text-uppercase" for="username">Username</label>
+        <label class="form-label small-note text-uppercase" for="username">Username or login code</label>
         <input class="form-control form-control-sm" id="username" name="username" required autofocus>
       </div>
       <div class="mb-3">
@@ -331,9 +751,9 @@ LOGIN_TEMPLATE = """
       {% if error %}
         <div class="alert alert-danger py-2" role="alert">{{ error }}</div>
       {% endif %}
-      <div class="d-flex align-items-center gap-2">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
         <button class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">Login</button>
-        <span class="small-note">Use your admin credentials.</span>
+        <span class="small-note">Admins use their username and password. Employees use their work email or login code plus PIN.</span>
       </div>
     </form>
   </div>
@@ -353,6 +773,462 @@ LOGIN_TEMPLATE = """
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+"""
+
+
+EMPLOYEE_DASHBOARD_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — My Jobs</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --night: #020617;
+      --card: #0f172a;
+      --accent: #0ea5e9;
+      --accent-secondary: #f97316;
+      --success: #16a34a;
+      --muted: #64748b;
+    }
+    body {
+      background: radial-gradient(circle at top,#38bdf8 0%,#0ea5e9 24%,#1e293b 58%,#020617 100%);
+      min-height: 100vh;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(1rem, 3vw + 0.5rem, 2.5rem);
+      font-family: 'Inter', sans-serif;
+    }
+    .wrapper {
+      width: min(880px, 100%);
+      backdrop-filter: blur(14px);
+      background: rgba(15,23,42,0.88);
+      border: 1px solid rgba(148,163,184,0.25);
+      border-radius: 1.2rem;
+      padding: clamp(1.5rem, 3vw + 1rem, 2.2rem);
+      box-shadow: 0 25px 65px rgba(15,23,42,0.45);
+      display: flex;
+      flex-direction: column;
+      gap: 1.4rem;
+    }
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .top-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+    .brand-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.6rem;
+      height: 2.6rem;
+      border-radius: 0.9rem;
+      background: linear-gradient(135deg, rgba(14,165,233,0.4), rgba(56,189,248,0.6));
+      font-size: 1.3rem;
+    }
+    .brand-title {
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .brand-sub {
+      font-size: 0.82rem;
+      color: rgba(226,232,240,0.7);
+    }
+    .logout-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.55rem 1rem;
+      border-radius: 999px;
+      background: rgba(248,250,252,0.14);
+      color: #f8fafc;
+      text-decoration: none;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      transition: transform 0.18s ease, background 0.18s ease;
+    }
+    .logout-link:hover { transform: translateY(-1px); background: rgba(248,250,252,0.24); }
+    .hero {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(1.6rem, 3vw, 2.4rem);
+      font-weight: 700;
+      margin: 0;
+    }
+    .hero p {
+      margin: 0;
+      color: rgba(226,232,240,0.85);
+    }
+    .alerts {
+      margin-bottom: 1rem;
+    }
+    .shift-card {
+      background: linear-gradient(135deg, rgba(14,165,233,0.18), rgba(14,116,144,0.25));
+      border-radius: 1.15rem;
+      padding: 1.4rem 1.6rem;
+      border: 1px solid rgba(125,211,252,0.35);
+      box-shadow: inset 0 0 0 1px rgba(14,165,233,0.15);
+      display: grid;
+      gap: 1rem;
+    }
+    .shift-card + .shift-card { margin-top: 1.3rem; }
+    .shift-header { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: baseline; justify-content: space-between; }
+    .shift-title { font-size: 1.25rem; font-weight: 600; letter-spacing: 0.01em; }
+    .badge-soft { padding: 0.35rem 0.85rem; border-radius: 999px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.09em; }
+    .badge-scheduled { background: rgba(14,165,233,0.22); color: #bae6fd; border: 1px solid rgba(14,165,233,0.5); }
+    .badge-progress { background: rgba(249,115,22,0.18); color: #fed7aa; border: 1px solid rgba(253,186,116,0.45); }
+    .badge-complete { background: rgba(22,163,74,0.18); color: #bbf7d0; border: 1px solid rgba(74,222,128,0.45); }
+    .details-grid { display: grid; gap: 0.5rem; font-size: 0.95rem; }
+    .detail-label { color: rgba(226,232,240,0.75); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.12em; }
+    .detail-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.35rem; }
+    .detail-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(14,165,233,0.14);
+      color: #bae6fd;
+      border: 1px solid rgba(125,211,252,0.35);
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .detail-chip--actual { background: rgba(34,197,94,0.18); border-color: rgba(74,222,128,0.4); color: #bbf7d0; }
+    .detail-checkpoints { display: flex; flex-wrap: wrap; gap: 1.1rem; color: rgba(203,213,225,0.9); font-size: 0.88rem; margin-top: 0.35rem; }
+    .link-map { color: #a5f3fc; font-weight: 600; text-decoration: none; }
+    .link-map:hover { text-decoration: underline; }
+    .action-deck { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+    .action-form button {
+      width: 100%;
+      border: none;
+      padding: 1rem 1.1rem;
+      border-radius: 0.9rem;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+    .action-form button:hover { transform: translateY(-2px); box-shadow: 0 15px 28px rgba(0,0,0,0.18); }
+    .btn-clock { background: linear-gradient(135deg,#38bdf8,#0ea5e9); color: #0f172a; }
+    .btn-upload { background: linear-gradient(135deg,#f59e0b,#ef4444); color: #0f172a; }
+    .btn-done { background: linear-gradient(135deg,#22c55e,#14b8a6); color: #022c22; position: relative; overflow: hidden; }
+    .photo-preview img {
+      width: 100%;
+      max-width: 220px;
+      border-radius: 0.75rem;
+      border: 2px solid rgba(148,163,184,0.35);
+    }
+    .photo-preview { display: flex; flex-wrap: wrap; gap: 1rem; }
+    .history-section { display: grid; gap: 0.9rem; }
+    .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+    .section-title { font-size: 1.15rem; font-weight: 600; margin: 0; }
+    .section-sub { font-size: 0.85rem; color: rgba(226,232,240,0.7); }
+    .history-card {
+      background: rgba(15,23,42,0.6);
+      border: 1px solid rgba(148,163,184,0.28);
+      border-radius: 1rem;
+      padding: 1rem 1.2rem;
+      display: grid;
+      gap: 0.4rem;
+    }
+    .history-meta { display: flex; flex-wrap: wrap; gap: 0.6rem; font-size: 0.88rem; color: rgba(226,232,240,0.78); }
+    .history-meta strong { font-weight: 600; color: #f8fafc; }
+    .history-status { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; color: #cbd5f5; }
+    .history-note { font-size: 0.82rem; color: rgba(203,213,225,0.82); }
+    .empty-state {
+      background: rgba(2,6,23,0.7);
+      border: 1px dashed rgba(148,163,184,0.4);
+      border-radius: 1rem;
+      padding: 2.4rem 1.6rem;
+      text-align: center;
+      color: rgba(203,213,225,0.8);
+    }
+    .confetti-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      overflow: hidden;
+    }
+    .confetti-piece {
+      position: absolute;
+      width: 12px;
+      height: 18px;
+      border-radius: 4px;
+      opacity: 0;
+      animation: confetti-fall 1.05s ease-out forwards;
+    }
+    .confetti-message {
+      position: relative;
+      font-size: clamp(1.5rem, 4vw, 2.2rem);
+      font-weight: 700;
+      color: #f1f5f9;
+      text-shadow: 0 8px 18px rgba(15,23,42,0.62);
+      animation: pop-in 0.5s ease-out forwards;
+      opacity: 0;
+    }
+    @keyframes confetti-fall {
+      0% { transform: translate3d(var(--x-start), -20vh, 0) rotate(0deg); opacity: 0; }
+      15% { opacity: 1; }
+      100% { transform: translate3d(var(--x-end), 110vh, 0) rotate(var(--rotate)); opacity: 0; }
+    }
+    @keyframes pop-in {
+      0% { opacity: 0; transform: scale(0.82); }
+      60% { opacity: 1; transform: scale(1.05); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    @media (max-width: 720px) {
+      body { padding: 0.85rem; display: block; }
+      .wrapper { padding: 1.3rem; border-radius: 1.05rem; }
+      .hero { margin-bottom: 1.1rem; }
+      .action-form button { font-size: 0.98rem; }
+      .action-deck { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 540px) {
+      .top-brand { width: 100%; justify-content: space-between; }
+      .brand-sub { font-size: 0.75rem; }
+      .logout-link { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrapper">
+    <header class="top-bar">
+      <div class="top-brand">
+        <span class="brand-mark" aria-hidden="true">🧽</span>
+        <div>
+          <div class="brand-title">Crew Dashboard</div>
+          <div class="brand-sub">Stay on top of every site</div>
+        </div>
+      </div>
+      <a href="{{ url_for('logout') }}" class="logout-link">Log out</a>
+    </header>
+
+    <div class="hero">
+      <h1>Hey {{ employee_name }} 👋</h1>
+      <p>{{ today_label }} · {{ friendly_message }}</p>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="alerts">
+          {% for message in messages %}
+            <div class="alert alert-light text-dark border-0 shadow-sm" role="alert">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% if shifts %}
+      {% for shift in shifts %}
+        <section class="shift-card">
+          <div class="shift-header">
+            <div>
+              <div class="shift-title">{{ shift.site_name }}</div>
+              <div class="text-uppercase" style="font-size:0.8rem; letter-spacing:0.1em; color:rgba(226,232,240,0.7);">{{ shift.time_window }}</div>
+            </div>
+            <span class="badge-soft {{ shift.status_badge }}">{{ shift.status_label }}</span>
+          </div>
+
+          <div class="details-grid">
+            <div>
+              <div class="detail-label">Address</div>
+              <div>{{ shift.address }}</div>
+              {% if shift.map_url %}
+                <a class="link-map" href="{{ shift.map_url }}" target="_blank" rel="noopener">Open in Google Maps →</a>
+              {% endif %}
+            </div>
+            <div>
+              <div class="detail-label">Instructions</div>
+              <div>{{ shift.instructions }}</div>
+            </div>
+            <div>
+              <div class="detail-label">Duration</div>
+              <div class="detail-chips">
+                <span class="detail-chip">Scheduled · {{ shift.scheduled_duration }}</span>
+                {% if shift.has_actual_duration %}
+                  <span class="detail-chip detail-chip--actual">Actual · {{ shift.actual_duration }}</span>
+                {% endif %}
+              </div>
+            </div>
+            <div>
+              <div class="detail-label">Checkpoints</div>
+              <div class="detail-checkpoints">
+                <span>Clock-in: {{ shift.clock_in_display }}</span>
+                <span>Clock-out: {{ shift.clock_out_display }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="action-deck">
+            <form class="action-form geo-form" method="post" action="{{ shift.clock_in_url }}" data-action="clock-in" data-requires-geo="true">
+              <input type="hidden" name="lat" value="">
+              <input type="hidden" name="lng" value="">
+              <button type="submit" class="btn-clock" {% if shift.clocked_in %}disabled{% endif %}>{{ shift.clocked_in and 'Clocked in ✔' or 'Clock in' }}</button>
+            </form>
+
+            <form class="action-form" method="post" action="{{ shift.upload_url }}" enctype="multipart/form-data">
+              <input type="hidden" name="photo_type" value="before">
+              <label class="btn-upload" style="display:block; cursor:pointer;">
+                <span>{% if shift.before_photo_url %}Replace before photo{% else %}Upload before photo{% endif %}</span>
+                <input type="file" name="photo" accept="image/*" style="display:none;" onchange="this.form.submit()">
+              </label>
+            </form>
+
+            <form class="action-form" method="post" action="{{ shift.upload_url }}" enctype="multipart/form-data">
+              <input type="hidden" name="photo_type" value="after">
+              <label class="btn-upload" style="display:block; cursor:pointer;">
+                <span>{% if shift.after_photo_url %}Replace after photo{% else %}Upload after photo{% endif %}</span>
+                <input type="file" name="photo" accept="image/*" style="display:none;" onchange="this.form.submit()">
+              </label>
+            </form>
+
+            <form class="action-form geo-form celebrate-form" method="post" action="{{ shift.complete_url }}" data-action="complete" data-requires-geo="true">
+              <input type="hidden" name="lat" value="">
+              <input type="hidden" name="lng" value="">
+              <button type="submit" class="btn-done" {% if shift.clocked_out %}disabled{% endif %}>{{ shift.clocked_out and 'Completed 🎉' or 'Done!' }}</button>
+            </form>
+          </div>
+
+          {% if shift.before_photo_url or shift.after_photo_url %}
+            <div class="photo-preview">
+              {% if shift.before_photo_url %}
+                <div>
+                  <div class="detail-label" style="margin-bottom:0.4rem;">Before</div>
+                  <img src="{{ shift.before_photo_url }}" alt="Before photo for {{ shift.site_name }}">
+                </div>
+              {% endif %}
+              {% if shift.after_photo_url %}
+                <div>
+                  <div class="detail-label" style="margin-bottom:0.4rem;">After</div>
+                  <img src="{{ shift.after_photo_url }}" alt="After photo for {{ shift.site_name }}">
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+        </section>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <h2 class="h5 text-light">You’re all set!</h2>
+        <p>No shifts scheduled for today. Check back later or reach out to your manager if you were expecting a job.</p>
+      </div>
+    {% endif %}
+
+    <section class="history-section">
+      <div class="section-head">
+        <h2 class="section-title">Recent jobs</h2>
+        <span class="section-sub">Last assignments you were scheduled on</span>
+      </div>
+      {% if history %}
+        {% for item in history %}
+          <article class="history-card">
+            <div class="history-meta">
+              <strong>{{ item.site_name }}</strong>
+              <span>{{ item.day_label }}</span>
+              <span>{{ item.time_window }}</span>
+            </div>
+            <div class="detail-chips">
+              <span class="detail-chip">Scheduled · {{ item.scheduled_duration }}</span>
+              {% if item.has_actual_duration %}
+                <span class="detail-chip detail-chip--actual">Actual · {{ item.actual_duration }}</span>
+              {% endif %}
+            </div>
+            <div class="history-status">{{ item.status_label }}</div>
+            <div class="history-note">{{ item.instructions }}</div>
+          </article>
+        {% endfor %}
+      {% else %}
+        <article class="history-card">
+          <div class="history-note">No past jobs recorded yet. Once you complete assignments, they’ll show up here for quick reference.</div>
+        </article>
+      {% endif %}
+    </section>
+  </main>
+
+  <script>
+    (function() {
+      const gatherGeo = (form) => {
+        const latField = form.querySelector('input[name="lat"]');
+        const lngField = form.querySelector('input[name="lng"]');
+        if (!navigator.geolocation || !latField || !lngField) {
+          return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+          navigator.geolocation.getCurrentPosition((position) => {
+            latField.value = position.coords.latitude.toFixed(6);
+            lngField.value = position.coords.longitude.toFixed(6);
+            resolve();
+          }, () => resolve(), { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 });
+        });
+      };
+
+      const celebrateAndSubmit = (form) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'confetti-overlay';
+        const message = document.createElement('div');
+        message.className = 'confetti-message';
+        message.textContent = 'Mission complete! 🎉';
+        overlay.appendChild(message);
+
+        const colors = ['#bef264', '#f97316', '#22d3ee', '#facc15', '#fb7185'];
+        for (let i = 0; i < 28; i++) {
+          const piece = document.createElement('span');
+          piece.className = 'confetti-piece';
+          piece.style.background = colors[i % colors.length];
+          const startX = (Math.random() * 100 - 50).toFixed(1) + 'vw';
+          const endX = (Math.random() * 120 - 60).toFixed(1) + 'vw';
+          const rotate = (Math.random() * 720 - 360).toFixed(1) + 'deg';
+          piece.style.setProperty('--x-start', startX);
+          piece.style.setProperty('--x-end', endX);
+          piece.style.setProperty('--rotate', rotate);
+          overlay.appendChild(piece);
+        }
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => { message.style.opacity = '1'; });
+        setTimeout(() => { document.body.removeChild(overlay); }, 1400);
+        setTimeout(() => { HTMLFormElement.prototype.submit.call(form); }, 750);
+      };
+
+      document.querySelectorAll('form[data-action]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+          const requiresGeo = form.dataset.requiresGeo === 'true';
+          const action = form.dataset.action;
+          if (requiresGeo || action === 'complete') {
+            event.preventDefault();
+            gatherGeo(form).finally(() => {
+              if (action === 'complete') {
+                celebrateAndSubmit(form);
+              } else {
+                HTMLFormElement.prototype.submit.call(form);
+              }
+            });
+          }
+        });
+      });
+    })();
+  </script>
 </body>
 </html>
 """
@@ -381,6 +1257,8 @@ LEADS_TEMPLATE = """
     .nav-pill:hover { background:rgba(15,23,42,0.9); border-color:rgba(148,163,184,0.5); color:#f9fafb; }
     .nav-pill-icon { width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:rgba(15,23,42,0.9); color:#a5b4fc; font-size:0.9rem; }
     .nav-text { display:inline; }
+    .nav-pill-logout { margin-top:0.3rem; background:rgba(248,250,252,0.12); border-color:rgba(148,163,184,0.35); color:#f8fafc; }
+    .nav-pill-logout:hover { background:rgba(248,250,252,0.18); border-color:rgba(248,250,252,0.3); color:#ffffff; }
     .sidebar-footer { margin-top:auto; font-size:0.75rem; color:#6b7280; }
     .main-shell { padding:1.25rem 1.5rem; }
     .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.9); background:radial-gradient(circle at top left,#020617 0%, #020617 35%, #020617 100%); padding:1rem; }
@@ -418,24 +1296,34 @@ LEADS_TEMPLATE = """
         </div>
       </div>
       <div>
-        <div class="sidebar-section-title">Workspace</div>
-        <a href="{{ url_for('index') }}" class="nav-pill">
-          <span class="nav-pill-icon">◎</span>
-          <span class="nav-text">Dashboard</span>
-        </a>
-        <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">
-          <span class="nav-pill-icon">👤</span>
-          <span class="nav-text">Schedule</span>
-        </a>
-        <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">
+        <div class="sidebar-section-title">Navigation</div>
+        <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">
           <span class="nav-pill-icon">⚙</span>
-          <span class="nav-text">Admin</span>
+          <span class="nav-text">Overview</span>
         </a>
-        <a href="{{ url_for('leads_dashboard') }}" class="nav-pill active">
+        <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">
+          <span class="nav-pill-icon">👥</span>
+          <span class="nav-text">Manage employees</span>
+        </a>
+        <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">
+          <span class="nav-pill-icon">🏢</span>
+          <span class="nav-text">Manage sites</span>
+        </a>
+        <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">
+          <span class="nav-pill-icon">🗓</span>
+          <span class="nav-text">Assign coverage</span>
+        </a>
+        <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">
           <span class="nav-pill-icon">📇</span>
           <span class="nav-text">Lead-Center</span>
         </a>
+        <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">
+          <span class="nav-pill-icon">◎</span>
+          <span class="nav-text">Crawler</span>
+        </a>
       </div>
+      <div class="sidebar-section-title">Account</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
       <div class="sidebar-footer">
         <div>© <span id="year"></span> Putzelf Marketing</div>
         <div class="mt-1">Track and advance leads with drag & drop.</div>
@@ -1033,31 +1921,34 @@ HTML_TEMPLATE = """
         </div>
       </div>
       <div>
-        <div class="sidebar-section-title">Workspace</div>
-        <a href="#" class="nav-pill active">
-          <span class="nav-pill-icon">◎</span>
-          <span class="nav-text">Dashboard</span>
+        <div class="sidebar-section-title">Navigation</div>
+        <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">
+          <span class="nav-pill-icon">⚙</span>
+          <span class="nav-text">Overview</span>
         </a>
-        <a href="#" class="nav-pill">
-          <span class="nav-pill-icon">↗</span>
-          <span class="nav-text">Crawl history <span class="small-note">(coming soon)</span></span>
+        <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">
+          <span class="nav-pill-icon">👥</span>
+          <span class="nav-text">Manage employees</span>
         </a>
-        <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">
+        <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">
+          <span class="nav-pill-icon">🏢</span>
+          <span class="nav-text">Manage sites</span>
+        </a>
+        <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">
+          <span class="nav-pill-icon">🗓</span>
+          <span class="nav-text">Assign coverage</span>
+        </a>
+        <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">
           <span class="nav-pill-icon">📇</span>
           <span class="nav-text">Lead-Center</span>
         </a>
-      </div>
-      <div>
-        <div class="sidebar-section-title">People</div>
-        <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">
-          <span class="nav-pill-icon">👤</span>
-          <span class="nav-text">Employee schedule</span>
-        </a>
-        <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">
-          <span class="nav-pill-icon">⚙</span>
-          <span class="nav-text">Manage employees &amp; sites</span>
+        <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">
+          <span class="nav-pill-icon">◎</span>
+          <span class="nav-text">Crawler</span>
         </a>
       </div>
+      <div class="sidebar-section-title">Account</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
       <div class="sidebar-footer">
         <div>© <span id="year"></span> Putzelf Marketing</div>
         <div class="mt-1">Built for fast B2B prospecting.</div>
@@ -1295,6 +2186,7 @@ SCHEDULE_TEMPLATE = """
   <title>Putzelf Marketing — Employee Schedule</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
   <style>
     :root { --bs-primary: #0f766e; }
     body {
@@ -1391,6 +2283,8 @@ SCHEDULE_TEMPLATE = """
       color: #a5b4fc;
       font-size: 0.9rem;
     }
+    .nav-pill-logout { margin-top: 0.3rem; background: rgba(248, 250, 252, 0.12); border-color: rgba(148, 163, 184, 0.35); color: #f8fafc; }
+    .nav-pill-logout:hover { background: rgba(248, 250, 252, 0.18); border-color: rgba(248, 250, 252, 0.3); color: #ffffff; }
     .sidebar-footer {
       margin-top: auto;
       font-size: 0.75rem;
@@ -1423,46 +2317,284 @@ SCHEDULE_TEMPLATE = """
     }
     .content-shell {
       margin-top: 0.25rem;
-      border-radius: 1rem;
+      border-radius: 1.15rem;
       background: radial-gradient(circle at top,#020617 0%, #020617 18%, #020617 45%, #020617 100%);
-      border: 1px solid rgba(31, 41, 55, 0.9);
-      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.95);
-      padding: 1.1rem 1.1rem 1.3rem;
+      border: 1px solid rgba(31, 41, 55, 0.85);
+      box-shadow: 0 30px 90px rgba(8, 11, 22, 0.88);
+      padding: 1.35rem 1.35rem 1.6rem;
       color: #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
     }
-    .small-note { font-size:0.82rem; color:#9ca3af; }
+    .section-card {
+      background: rgba(2, 6, 23, 0.92);
+      border: 1px solid rgba(46, 62, 94, 0.7);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 16px 40px rgba(8, 11, 22, 0.55);
+    }
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .page-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+    .btn-icon {
+      width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border-radius: 0.65rem;
+    }
+    .section-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .section-kicker {
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #38bdf8;
+      margin-bottom: 0.4rem;
+    }
+    .section-title {
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: #f8fafc;
+      margin-bottom: 0.35rem;
+    }
+    .section-subtitle {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      max-width: 560px;
+      margin-bottom: 0;
+    }
+    .section-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+    .insight-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.1rem;
+    }
+    .insight-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 999px;
+      border: 1px solid rgba(45, 212, 191, 0.45);
+      background: rgba(15, 118, 110, 0.12);
+      color: #5eead4;
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .filter-toolbar {
+      display: grid;
+      gap: 0.75rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(30, 41, 59, 0.9);
+      border-radius: 0.85rem;
+      padding: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .filter-toolbar .form-label {
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 0.35rem;
+    }
+    .filter-toolbar .form-select,
+    .filter-toolbar input[type="date"] {
+      background: rgba(8, 11, 22, 0.85);
+      border: 1px solid rgba(51, 65, 85, 0.8);
+      color: #e5e7eb;
+      font-size: 0.82rem;
+    }
+    .filter-toolbar .form-select:focus,
+    .filter-toolbar input[type="date"]:focus {
+      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15);
+      border-color: rgba(45, 212, 191, 0.55);
+    }
+    .table-wrapper {
+      background: rgba(8, 11, 22, 0.75);
+      border: 1px solid rgba(30, 41, 59, 0.9);
+      border-radius: 0.85rem;
+      overflow: hidden;
+    }
+    .table-scroll {
+      max-height: 460px;
+      overflow: auto;
+    }
+    .schedule-table {
+      margin-bottom: 0;
+      color: #e2e8f0;
+    }
     .schedule-table th,
     .schedule-table td {
       font-size: 0.82rem;
       vertical-align: top;
+      border-color: rgba(39, 51, 75, 0.85);
     }
     .schedule-table th {
-      background: #020617;
-      color: #9ca3af;
-      border-color: rgba(51,65,85,0.9);
+      background: rgba(8, 13, 25, 0.95);
+      color: #94a3b8;
       position: sticky;
       top: 0;
       z-index: 5;
     }
-    .schedule-table td { border-color: rgba(31,41,55,0.9); }
+    .schedule-table tbody tr:nth-child(odd) {
+      background: rgba(12, 17, 31, 0.65);
+    }
+    .schedule-table tbody tr:nth-child(even) {
+      background: rgba(7, 11, 22, 0.45);
+    }
     .shift-pill {
-      display: inline-block;
-      padding: 0.1rem 0.4rem;
+      display: inline-flex;
+      align-items: center;
+      padding: 0.18rem 0.55rem;
       border-radius: 999px;
-      background: rgba(8,47,73,0.9);
-      border: 1px solid rgba(56,189,248,0.7);
-      color: #e0f2fe;
-      font-size: 0.75rem;
-      margin-bottom: 0.15rem;
+      background: linear-gradient(135deg, rgba(20, 184, 166, 0.18), rgba(14, 165, 233, 0.22));
+      border: 1px solid rgba(56, 189, 248, 0.55);
+      color: #f0f9ff;
+      font-size: 0.74rem;
+      margin-bottom: 0.25rem;
+      white-space: nowrap;
     }
     .free-pill {
-      display: inline-block;
-      padding: 0.1rem 0.4rem;
+      display: inline-flex;
+      align-items: center;
+      padding: 0.18rem 0.55rem;
       border-radius: 999px;
-      border: 1px dashed rgba(55,65,81,0.8);
-      color: #6b7280;
-      font-size: 0.75rem;
+      border: 1px dashed rgba(71, 85, 105, 0.7);
+      color: #64748b;
+      font-size: 0.74rem;
     }
+    .form-card .section-subtitle {
+      max-width: 600px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.1rem;
+    }
+    .form-grid .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .form-field-span {
+      grid-column: 1 / -1;
+    }
+    .form-grid .form-select,
+    .form-grid input[type="text"],
+    .form-grid input[type="time"],
+    .form-grid input[type="number"] {
+      background: rgba(8, 11, 22, 0.85);
+      border: 1px solid rgba(51, 65, 85, 0.8);
+      color: #e5e7eb;
+    }
+    #day-picker {
+      background: rgba(8, 11, 22, 0.85);
+      border: 1px solid rgba(51, 65, 85, 0.8);
+      color: #e5e7eb;
+    }
+    #day-picker:focus,
+    .form-grid .form-select:focus,
+    .form-grid input:focus {
+      border-color: rgba(45, 212, 191, 0.55);
+      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
+    }
+    .selected-days {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+    .day-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.18rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.18);
+      border: 1px solid rgba(45, 212, 191, 0.4);
+      color: #a5f3fc;
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .form-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .tip-callout {
+      margin-top: 1.25rem;
+      border-radius: 0.85rem;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px dashed rgba(56, 189, 248, 0.45);
+      padding: 0.9rem 1rem;
+      color: #94a3b8;
+      font-size: 0.85rem;
+    }
+    .tag-muted {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #14b8a6, #0ea5e9);
+      border: 1px solid rgba(14, 165, 233, 0.45);
+      color: #02131b;
+      font-weight: 600;
+      box-shadow: 0 12px 20px rgba(8, 47, 73, 0.35);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #0ea5e9, #818cf8);
+      border-color: rgba(129, 140, 248, 0.55);
+      color: #010b12;
+      transform: translateY(-1px);
+    }
+    .btn-outline-light {
+      border: 1px solid rgba(226, 232, 240, 0.25);
+      color: #e2e8f0;
+    }
+    .btn-outline-light:hover {
+      background: rgba(148, 163, 184, 0.12);
+      color: #f8fafc;
+    }
+    .btn-outline-secondary {
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      color: #94a3b8;
+    }
+    .btn-outline-secondary:hover {
+      background: rgba(148, 163, 184, 0.15);
+      color: #f8fafc;
+    }
+    .small-note { font-size:0.82rem; color:#94a3b8; }
     .sidebar-collapsed .app-shell { grid-template-columns: 72px minmax(0, 1fr); }
     .sidebar-collapsed .sidebar { width: 72px; padding: 1.1rem 0.6rem; }
     .sidebar-collapsed .nav-text,
@@ -1477,7 +2609,7 @@ SCHEDULE_TEMPLATE = """
       .app-shell { grid-template-columns: minmax(0, 1fr); }
       .sidebar { display: none; }
       .main-shell { padding: 1rem; }
-      .content-shell { padding: 0.9rem; }
+      .content-shell { padding: 1rem; }
     }
   </style>
 </head>
@@ -1494,48 +2626,87 @@ SCHEDULE_TEMPLATE = """
         </div>
       </div>
       <div>
-        <div class="sidebar-section-title">Workspace</div>
-        <a href="{{ url_for('index') }}" class="nav-pill">
-          <span class="nav-pill-icon">◎</span>
-          <span class="nav-text">Dashboard</span>
-        </a>
-      </div>
-      <div>
-        <div class="sidebar-section-title">People</div>
-        <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill active">
-          <span class="nav-pill-icon">👤</span>
-          <span class="nav-text">Employee schedule</span>
-        </a>
-        <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">
+        <div class="sidebar-section-title">Navigation</div>
+        <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">
           <span class="nav-pill-icon">⚙</span>
-          <span class="nav-text">Manage employees &amp; sites</span>
+          <span class="nav-text">Overview</span>
         </a>
-        <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">
+        <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">
+          <span class="nav-pill-icon">👥</span>
+          <span class="nav-text">Manage employees</span>
+        </a>
+        <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">
+          <span class="nav-pill-icon">🏢</span>
+          <span class="nav-text">Manage sites</span>
+        </a>
+        <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">
+          <span class="nav-pill-icon">🗓</span>
+          <span class="nav-text">Assign coverage</span>
+        </a>
+        <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">
           <span class="nav-pill-icon">📇</span>
           <span class="nav-text">Lead-Center</span>
         </a>
+        <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">
+          <span class="nav-pill-icon">◎</span>
+          <span class="nav-text">Crawler</span>
+        </a>
       </div>
+      <div class="sidebar-section-title">Account</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
       <div class="sidebar-footer">
         <div>© <span id="year"></span> Putzelf Marketing</div>
         <div class="mt-1">Simple schedule overview for field teams.</div>
       </div>
     </aside>
     <div class="main-shell">
-      <header class="mb-2">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-          <div>
-            <div class="topbar-title">People</div>
-            <h1 class="topbar-heading mb-0">Employee schedule</h1>
-            <p class="topbar-subtitle mb-0">
-              See who is on which site this week, when they are free, and assign new shifts.
-            </p>
-            <p class="small-note mb-1">
-              Showing {{ week_days[0].strftime('%d.%m.%Y') }} – {{ week_days[-1].strftime('%d.%m.%Y') }} ({{ weeks }} week{% if weeks > 1 %}s{% endif %})
-            </p>
-          </div>
-          <form method="get" action="{{ url_for('schedule_dashboard') }}" class="d-flex align-items-end gap-2 flex-wrap">
+      <header class="page-header">
+        <div>
+          <div class="topbar-title">People</div>
+          <h1 class="topbar-heading mb-0">Employee schedule</h1>
+          <p class="topbar-subtitle mb-0">
+            See who is on which site this week, when they are free, and assign new shifts.
+          </p>
+          <p class="small-note mb-0">
+            Showing {{ week_days[0].strftime('%d.%m.%Y') }} – {{ week_days[-1].strftime('%d.%m.%Y') }} ({{ weeks }} week{% if weeks > 1 %}s{% endif %})
+          </p>
+        </div>
+        <div class="page-header-actions">
+          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-light btn-icon" title="Toggle navigation">☰</button>
+          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-light">Admin panel</a>
+          <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Logout</a>
+        </div>
+      </header>
+      <main class="content-shell">
+        <section class="section-card schedule-card">
+          <div class="section-header">
             <div>
-              <label class="form-label small-note text-uppercase mb-1" for="filter_employee_id">Focus on employee</label>
+              <div class="section-kicker">Team planner</div>
+              <h2 class="section-title">Schedule overview</h2>
+              <p class="section-subtitle">
+                Manage weekly coverage and spot availability across every employee at a glance.
+              </p>
+            </div>
+            <div class="section-actions">
+              {% if reportlab_available %}
+                <a href="{{ pdf_url }}" class="btn btn-sm btn-primary">Download PDF</a>
+              {% else %}
+                <span class="tag-muted">Install reportlab to export PDF</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="insight-badges">
+            <span class="insight-badge">Week {{ week_days[0].strftime('%d.%m') }} – {{ week_days[-1].strftime('%d.%m') }}</span>
+            <span class="insight-badge">Range {{ weeks }} week{% if weeks > 1 %}s{% endif %}</span>
+            {% if selected_employee %}
+              <span class="insight-badge">Focused: {{ selected_employee.name }}</span>
+            {% else %}
+              <span class="insight-badge">All employees</span>
+            {% endif %}
+          </div>
+          <form method="get" action="{{ url_for('schedule_dashboard') }}" class="filter-toolbar">
+            <div>
+              <label class="form-label" for="filter_employee_id">Focus on employee</label>
               <select class="form-select form-select-sm" id="filter_employee_id" name="employee_id" onchange="this.form.submit()">
                 <option value="">All employees</option>
                 {% for emp in employees %}
@@ -1544,94 +2715,20 @@ SCHEDULE_TEMPLATE = """
               </select>
             </div>
             <div>
-              <label class="form-label small-note text-uppercase mb-1" for="start_date">Start week (Monday)</label>
+              <label class="form-label" for="start_date">Start week (Monday)</label>
               <input type="date" class="form-control form-control-sm" id="start_date" name="start_date" value="{{ start_date or week_days[0].isoformat() }}" onchange="this.form.submit()">
             </div>
             <div>
-              <label class="form-label small-note text-uppercase mb-1" for="weeks">Range (weeks)</label>
+              <label class="form-label" for="weeks">Range (weeks)</label>
               <select class="form-select form-select-sm" id="weeks" name="weeks" onchange="this.form.submit()">
                 {% for n in [1,2,4,8,12] %}
                   <option value="{{ n }}" {% if weeks == n %}selected{% endif %}>{{ n }} week{% if n>1 %}s{% endif %}</option>
                 {% endfor %}
               </select>
-          </div>
-          <div class="d-flex align-items-center gap-2 flex-wrap">
-              <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-light">☰</button>
-            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-light">Admin panel</a>
-            {% if reportlab_available %}
-                <a href="{{ pdf_url }}" class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">
-                Download PDF
-              </a>
-            {% else %}
-              <span class="small-note">Install <code>reportlab</code> to enable PDF export.</span>
-            {% endif %}
-              {% if selected_employee %}
-                <span class="small-note">Showing {{ selected_employee.name }} only</span>
-              {% endif %}
-              <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Logout</a>
-          </div>
+            </div>
           </form>
-        </div>
-      </header>
-      <main class="content-shell">
-        <div class="row g-3">
-          <div class="col-12 col-lg-4">
-            <h2 class="h6 mb-2">Assign a new shift</h2>
-            <p class="small-note mb-2">
-              Choose an employee, site and time window. Only simple, non-recurring shifts are supported in this first version.
-            </p>
-            <form method="post" class="small">
-              <div class="mb-2">
-                <label class="form-label small-note text-uppercase" for="employee_id">Employee</label>
-                <select class="form-select form-select-sm" id="employee_id" name="employee_id" required>
-                  <option value="">Select employee…</option>
-                  {% for emp in employees %}
-                    <option value="{{ emp.id }}">{{ emp.name }}{% if emp.role %} — {{ emp.role }}{% endif %}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="mb-2">
-                <label class="form-label small-note text-uppercase" for="site_id">Site</label>
-                <select class="form-select form-select-sm" id="site_id" name="site_id" required>
-                  <option value="">Select site…</option>
-                  {% for site in sites %}
-                    <option value="{{ site.id }}">{{ site.name }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="mb-2">
-                <label class="form-label small-note text-uppercase" for="day-list">Day(s)</label>
-                <div class="vstack gap-2" id="day-list">
-                  <div class="input-group input-group-sm day-item">
-                    <input type="date" class="form-control form-control-sm" name="day" required>
-                    <button type="button" class="btn btn-outline-danger remove-day" title="Remove day">✕</button>
-                  </div>
-                </div>
-                <button type="button" class="btn btn-sm btn-outline-light mt-1" id="add-day-btn">Add another day</button>
-                <p class="small-note mt-2 mb-0">Use the button to schedule the same shift across multiple days.</p>
-              </div>
-              <div class="row">
-                <div class="col-6 mb-2">
-                  <label class="form-label small-note text-uppercase" for="start_time">Start</label>
-                  <input type="time" class="form-control form-control-sm" id="start_time" name="start_time" required>
-                </div>
-                <div class="col-6 mb-2">
-                  <label class="form-label small-note text-uppercase" for="duration_hours">Duration (hours)</label>
-                  <input type="number" step="0.25" min="0.25" max="24" class="form-control form-control-sm" id="duration_hours" name="duration_hours" placeholder="e.g. 8" required>
-                </div>
-              </div>
-              <button type="submit" class="btn btn-sm btn-primary mt-2" style="background-color:#0f766e; border-color:#0f766e;">
-                Save shift
-              </button>
-            </form>
-            <hr class="my-3">
-            <p class="small-note mb-0">
-              Tip: An empty cell in the grid means the employee is free for that entire day.
-            </p>
-          </div>
-          <div class="col-12 col-lg-8">
-            <h2 class="h6 mb-2">Schedule overview</h2>
-            <div class="table-responsive" style="max-height:480px;">
+          <div class="table-wrapper">
+            <div class="table-scroll">
               <table class="table table-dark table-bordered table-sm align-middle schedule-table">
                 <thead>
                   <tr>
@@ -1656,7 +2753,7 @@ SCHEDULE_TEMPLATE = """
                         <td>
                           {% if cell %}
                             {% for label in cell %}
-                              <div class="shift-pill">{{ label }}</div><br>
+                              <div class="shift-pill">{{ label }}</div>
                             {% endfor %}
                           {% else %}
                             <span class="free-pill">Free</span>
@@ -1669,7 +2766,62 @@ SCHEDULE_TEMPLATE = """
               </table>
             </div>
           </div>
-        </div>
+        </section>
+
+        <section class="section-card form-card">
+          <div class="section-header">
+            <div>
+              <div class="section-kicker">Create shift</div>
+              <h2 class="section-title">Assign a new shift</h2>
+              <p class="section-subtitle">
+                Choose an employee, match them to a site, then add the time window and days in one go.
+              </p>
+            </div>
+          </div>
+          <form method="post" class="small">
+            <div class="form-grid">
+              <div class="form-field">
+                <label class="form-label small-note text-uppercase" for="employee_id">Employee</label>
+                <select class="form-select form-select-sm" id="employee_id" name="employee_id" required>
+                  <option value="">Select employee…</option>
+                  {% for emp in employees %}
+                    <option value="{{ emp.id }}">{{ emp.name }}{% if emp.role %} — {{ emp.role }}{% endif %}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-field">
+                <label class="form-label small-note text-uppercase" for="site_id">Site</label>
+                <select class="form-select form-select-sm" id="site_id" name="site_id" required>
+                  <option value="">Select site…</option>
+                  {% for site in sites %}
+                    <option value="{{ site.id }}">{{ site.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-field form-field-span">
+                <label class="form-label small-note text-uppercase" for="day-picker">Day(s)</label>
+                <input type="text" class="form-control form-control-sm" id="day-picker" name="day_display" placeholder="Pick one or more days" required autocomplete="off">
+                <div id="selected-days" class="selected-days mt-2"></div>
+                <div id="day-hidden-inputs" hidden></div>
+              </div>
+              <div class="form-field">
+                <label class="form-label small-note text-uppercase" for="start_time">Start time</label>
+                <input type="time" class="form-control form-control-sm" id="start_time" name="start_time" required>
+              </div>
+              <div class="form-field">
+                <label class="form-label small-note text-uppercase" for="duration_hours">Duration (hours)</label>
+                <input type="number" step="0.25" min="0.25" max="24" class="form-control form-control-sm" id="duration_hours" name="duration_hours" placeholder="e.g. 8" required>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary btn-sm">Save shift</button>
+              <span class="small-note">Calendar picks are duplicated for every day you select.</span>
+            </div>
+          </form>
+          <div class="tip-callout mt-3">
+            Tip: An empty cell in the grid means the employee is free for that entire day.
+          </div>
+        </section>
       </main>
     </div>
   </div>
@@ -1691,335 +2843,421 @@ SCHEDULE_TEMPLATE = """
         btn.addEventListener('click', () => setState(!body.classList.contains('sidebar-collapsed')));
       }
     })();
-    (function () {
-      const dayList = document.getElementById('day-list');
-      const addBtn = document.getElementById('add-day-btn');
-      if (!dayList || !addBtn) return;
-      const createItem = () => {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'input-group input-group-sm day-item';
-        const input = document.createElement('input');
-        input.type = 'date';
-        input.name = 'day';
-        input.className = 'form-control form-control-sm';
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'btn btn-outline-danger remove-day';
-        removeBtn.title = 'Remove day';
-        removeBtn.textContent = '✕';
-        wrapper.appendChild(input);
-        wrapper.appendChild(removeBtn);
-        return wrapper;
-      };
-      const updateRemoveState = () => {
-        const items = dayList.querySelectorAll('.day-item');
-        items.forEach((item, index) => {
-          const input = item.querySelector('input[type="date"]');
-          if (input) {
-            input.required = index === 0;
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof flatpickr === 'undefined') {
+        return;
+      }
+      const dayPicker = document.getElementById('day-picker');
+      if (!dayPicker) {
+        return;
+      }
+      const selectedContainer = document.getElementById('selected-days');
+      const hiddenContainer = document.getElementById('day-hidden-inputs');
+      const renderSelections = (dates, instance) => {
+        if (selectedContainer) {
+          selectedContainer.innerHTML = '';
+        }
+        if (hiddenContainer) {
+          hiddenContainer.innerHTML = '';
+        }
+        const format = (dateObj) => instance.formatDate(dateObj, 'Y-m-d');
+        dates.forEach((dateObj) => {
+          const iso = format(dateObj);
+          if (selectedContainer) {
+            const badge = document.createElement('span');
+            badge.className = 'day-chip';
+            badge.textContent = iso;
+            selectedContainer.appendChild(badge);
           }
-          const removeBtn = item.querySelector('.remove-day');
-          if (removeBtn) {
-            removeBtn.disabled = items.length <= 1;
+          if (hiddenContainer) {
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'day';
+            hidden.value = iso;
+            hiddenContainer.appendChild(hidden);
           }
         });
+        dayPicker.required = dates.length === 0;
+        if (dates.length === 0) {
+          dayPicker.setCustomValidity('Select at least one day.');
+        } else {
+          dayPicker.setCustomValidity('');
+        }
       };
-      addBtn.addEventListener('click', () => {
-        const item = createItem();
-        dayList.appendChild(item);
-        updateRemoveState();
+      const picker = flatpickr(dayPicker, {
+        mode: 'multiple',
+        dateFormat: 'Y-m-d',
+        disableMobile: true,
+        onChange(selectedDates, _dateStr, instance) {
+          renderSelections(selectedDates, instance);
+        },
       });
-      dayList.addEventListener('click', (event) => {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-          return;
-        }
-        if (target.classList.contains('remove-day')) {
-          event.preventDefault();
-          const item = target.closest('.day-item');
-          if (!item) return;
-          const remaining = dayList.querySelectorAll('.day-item').length;
-          if (remaining <= 1) return;
-          item.remove();
-          updateRemoveState();
-        }
-      });
-      updateRemoveState();
-    })();
+      renderSelections(picker.selectedDates, picker);
+      const form = dayPicker.form;
+      if (form) {
+        form.addEventListener('reset', () => {
+          picker.clear();
+          renderSelections([], picker);
+        });
+        form.addEventListener('submit', () => {
+          renderSelections(picker.selectedDates, picker);
+        });
+      }
+    });
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
 """
 
-ADMIN_TEMPLATE = """
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing — Admin</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
- 
-    <style>
-    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%); color:#e5e7eb; }
-    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition: grid-template-columns 0.2s ease; }
-    .sidebar { background: radial-gradient(circle at top,#020617 0%, #020617 45%, #020617 100%); border-right:1px solid rgba(148,163,184,0.3); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; }
-    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#e5e7eb; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
-    .nav-pill.active, .nav-pill:hover { background:rgba(15,118,110,0.2); border-color:rgba(45,212,191,0.4); color:#ecfeff; }
-    .nav-text { display: inline; }
-    .main-shell { padding:1.5rem; }
-    .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.9); background:radial-gradient(circle at top left,#020617 0%, #020617 35%, #020617 100%); padding:1rem; }
-    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#94a3b8; }
-    .badge-soft { border-radius:999px; border:1px solid rgba(148,163,184,0.6); color:#9ca3af; padding:0.15rem 0.6rem; font-size:0.75rem; }
-    .little-card { border-radius:0.7rem; border:1px solid rgba(51,65,85,0.9); background:rgba(15,23,42,0.8); }
-    .sidebar-collapsed .app-shell { grid-template-columns: 72px minmax(0,1fr); }
-    .sidebar-collapsed .sidebar { width: 72px; padding: 1.1rem 0.6rem; }
-    .sidebar-collapsed .nav-text,
-    .sidebar-collapsed .sidebar-footer { display: none; }
-    .sidebar-collapsed .nav-pill { justify-content: center; padding: 0.45rem; }
-    .sidebar-collapsed .sidebar { align-items: center; }
-    .sidebar-logo img { max-width: 80%; max-height: 80%; object-fit: contain; }
-    .kanban {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0,1fr));
-      gap: 1rem;
-    }
-    .kanban-column {
-      border: 1px solid rgba(51,65,85,0.9);
-      border-radius: 0.9rem;
-      background: rgba(15,23,42,0.7);
-      padding: 0.75rem;
-      min-height: 260px;
-    }
-    .kanban-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 0.5rem;
-      color: #e5e7eb;
-      font-weight: 600;
-      font-size: 0.95rem;
-    }
-    .lead-card {
-      border: 1px solid rgba(148,163,184,0.3);
-      border-radius: 0.7rem;
-      padding: 0.65rem;
-      background: rgba(2,6,23,0.7);
-      color: #e5e7eb;
-      margin-bottom: 0.5rem;
-      cursor: grab;
-    }
-    .lead-card.dragging { opacity: 0.6; }
-    .kanban-column.drop-target { border-color: #22d3ee; box-shadow: inset 0 0 0 1px #22d3ee; }
-    @media(max-width:992px){ .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{ display:none;} }
-  </style>
-</head>
-<body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="sidebar-section-title text-uppercase">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill active">⚙ <span class="nav-text">Admin</span></a>
-      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Dashboard</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">👤 <span class="nav-text">Schedule</span></a>
-      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
-      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
-    </aside>
-    <main class="main-shell text-light">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          <div class="mb-3">
-            {% for category, message in messages %}
-              <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }} border-0 text-dark" role="alert">
-                {{ message }}
-              </div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      {% endwith %}
-      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-        <div>
-          <div class="badge-soft mb-2">Configuration</div>
-          <h1 class="h4 mb-1 text-light">Manage employees & sites</h1>
-          <p class="text-secondary mb-0">Entries here feed into the weekly schedule and shift assignments.</p>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-light">☰</button>
-          <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-light">View schedule</a>
-          <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-light">Crawler</a>
-          <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary text-light border-light">Logout</a>
-          <a href="{{ url_for('leads_dashboard') }}" class="btn btn-sm btn-outline-info text-light">Lead-Center</a>
-        </div>
-      </div>
-      <div class="row g-3">
-        <div class="col-12 col-lg-6">
-          <div class="card-surface h-100">
-            <h2 class="h6 text-uppercase text-secondary">Employees</h2>
-            <form method="post" class="row g-2 mb-3">
-              <input type="hidden" name="entity" value="employee">
-              <input type="hidden" name="action" value="create">
-              <div class="col-6">
-                <label class="form-label" for="new_employee_name">Name</label>
-                <input type="text" class="form-control form-control-sm" id="new_employee_name" name="name" required>
-              </div>
-              <div class="col-6">
-                <label class="form-label" for="new_employee_role">Role</label>
-                <input type="text" class="form-control form-control-sm" id="new_employee_role" name="role">
-              </div>
-              <div class="col-12">
-                <button type="submit" class="btn btn-sm btn-primary">Add employee</button>
-              </div>
-            </form>
-            <div class="vstack gap-2">
-              {% for emp in employees %}
-                <form method="post" class="little-card p-3">
-                  <input type="hidden" name="entity" value="employee">
-                  <input type="hidden" name="id" value="{{ emp.id }}">
-                  <div class="row g-2">
-                    <div class="col-5">
-                      <label class="form-label">Name</label>
-                      <input type="text" class="form-control form-control-sm" name="name" value="{{ emp.name }}" required>
-                    </div>
-                    <div class="col-5">
-                      <label class="form-label">Role</label>
-                      <input type="text" class="form-control form-control-sm" name="role" value="{{ emp.role or '' }}">
-                    </div>
-                    <div class="col-2 d-flex align-items-end justify-content-end gap-1">
-                      <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Save">
-                        <i class="bi bi-check2"></i>
-                      </button>
-                      <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ emp.name }}?')" title="Delete">
-                        <i class="bi bi-x-lg"></i>
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              {% else %}
-                <p class="text-secondary small mb-0">No employees yet.</p>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-lg-6">
-          <div class="card-surface h-100">
-            <h2 class="h6 text-uppercase text-secondary">Sites</h2>
-            <form method="get" class="row g-2 mb-2">
-              <div class="col-9">
-                <label class="form-label" for="search_q">Search (name or address)</label>
-                <div class="input-group input-group-sm">
-                  <input type="text" class="form-control" id="search_q" name="q" value="{{ search_q or '' }}" placeholder="Search sites...">
-                  <button class="btn btn-outline-light" type="submit">Search</button>
-                </div>
-              </div>
-              <div class="col-3 d-flex align-items-end">
-                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary w-100">Clear</a>
-              </div>
-            </form>
-            <form method="post" class="row g-2 mb-3">
-              <input type="hidden" name="entity" value="site">
-              <input type="hidden" name="action" value="create">
-              <div class="col-6">
-                <label class="form-label" for="new_site_address">Address</label>
-                <input type="text" class="form-control form-control-sm" id="new_site_address" name="address" required>
-              </div>
-              <div class="col-6">
-                <label class="form-label" for="new_site_name">Name</label>
-                <input type="text" class="form-control form-control-sm" id="new_site_name" name="name" required>
-              </div>
-              <div class="col-12">
-                <button type="submit" class="btn btn-sm btn-primary">Add site</button>
-              </div>
-            </form>
-            <form method="post" class="little-card p-3 mb-3">
-              <input type="hidden" name="entity" value="site_bulk">
-              <input type="hidden" name="action" value="bulk_update">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <h3 class="h6 mb-0 text-secondary">Edit all sites</h3>
-                <button type="submit" class="btn btn-sm btn-success">Save all</button>
-              </div>
-              <div class="table-responsive" style="max-height:280px;">
-                <table class="table table-sm table-dark align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Address</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for site in sites %}
-                    <tr>
-                      <td>
-                        <input type="hidden" name="site_id" value="{{ site.id }}">
-                        <input type="text" class="form-control form-control-sm" name="site_name" value="{{ site.name }}" required>
-                      </td>
-                      <td>
-                        <input type="text" class="form-control form-control-sm" name="site_address" value="{{ site.address or '' }}" required>
-                      </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="2" class="text-secondary small">No sites yet.</td></tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            </form>
-            <div class="vstack gap-2">
-              {% for site in sites %}
-                <form method="post" class="little-card p-3">
-                  <input type="hidden" name="entity" value="site">
-                  <input type="hidden" name="id" value="{{ site.id }}">
-                  <div class="row g-2">
-                    <div class="col-5">
-                      <label class="form-label">Address</label>
-                      <input type="text" class="form-control form-control-sm" name="address" value="{{ site.address or '' }}" required>
-                    </div>
-                    <div class="col-5">
-                      <label class="form-label">Name</label>
-                      <input type="text" class="form-control form-control-sm" name="name" value="{{ site.name }}" required>
-                    </div>
-                    <div class="col-2 d-flex align-items-end justify-content-end gap-1">
-                      <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Save">
-                        <i class="bi bi-check2"></i>
-                      </button>
-                      <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ site.name }}?')" title="Delete">
-                        <i class="bi bi-x-lg"></i>
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              {% else %}
-                <p class="text-secondary small mb-0">No sites yet.</p>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
-  <script>
-    document.getElementById('year').textContent = new Date().getFullYear();
-    (function () {
-      const KEY = 'pm-sidebar-collapsed';
-      const body = document.body;
-      const btn = document.getElementById('sidebar-toggle');
-      const setState = (val) => {
-        body.classList.toggle('sidebar-collapsed', val);
-        try { localStorage.setItem(KEY, val ? '1' : '0'); } catch (e) {}
-      };
-      const initial = (() => {
-        try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
-      })();
-      setState(initial);
-      if (btn) {
-        btn.addEventListener('click', () => setState(!body.classList.contains('sidebar-collapsed')));
+
+# --- Application configuration -------------------------------------------------
+
+logging.basicConfig(level=logging.INFO)
+
+APP_ROOT = os.path.abspath(os.path.dirname(__file__))
+
+app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "change-me")
+app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
+app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
+app.config.setdefault("MAX_CONTENT_LENGTH", 16 * 1024 * 1024)
+
+UPLOAD_FOLDER = os.path.join(APP_ROOT, "static", "uploads")
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "heic", "heif"}
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
+AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "admin")
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+  DATABASE_URL = "sqlite:///" + os.path.join(APP_ROOT, "schedule.db")
+
+_engine_kwargs: dict[str, object] = {}
+if DATABASE_URL.startswith("sqlite"):
+  _engine_kwargs["connect_args"] = {"check_same_thread": False}
+
+engine = create_engine(DATABASE_URL, future=True, **_engine_kwargs)
+SessionLocal = scoped_session(
+  sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+)
+Base = declarative_base()
+
+
+# --- Optional integrations -----------------------------------------------------
+
+try:
+  from reportlab.lib import colors
+  from reportlab.lib.pagesizes import A4, landscape
+  from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+  from reportlab.lib.units import inch
+  from reportlab.platypus import (
+    Image,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+  )
+  REPORTLAB_AVAILABLE = True
+except Exception:  # pragma: no cover - degrade gracefully when missing
+  colors = None
+  A4 = None
+  landscape = None
+  ParagraphStyle = None
+  getSampleStyleSheet = None
+  inch = None
+  Image = None
+  Paragraph = None
+  SimpleDocTemplate = None
+  Spacer = None
+  Table = None
+  TableStyle = None
+  REPORTLAB_AVAILABLE = False
+
+try:
+  from openai import OpenAI
+except ImportError:  # pragma: no cover - optional dependency
+  OpenAI = None
+  openai_client = None
+else:
+  _openai_key = os.getenv("OPENAI_API_KEY")
+  openai_client = OpenAI(api_key=_openai_key) if _openai_key else None
+
+
+# --- Business constants --------------------------------------------------------
+
+LEAD_STAGES = ["New Leads", "Qualified", "Contacted", "Converted"]
+
+EMAIL_REGEX = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.IGNORECASE)
+PHONE_TOKEN_REGEX = re.compile(r"\+?\d[\d\s().\/-]{6,}")
+PHONE_LABEL_REGEX = re.compile(
+  r"(?:tel|telefon|phone|mobil|handy|kontakt|contact|rufnummer|call)[:\s-]*([+0][\d\s().\/-]{5,})",
+  re.IGNORECASE,
+)
+
+
+def normalize_phone(raw: str | None) -> str:
+  if not raw:
+    return ""
+  text = raw.strip()
+  if not text:
+    return ""
+  has_plus = text.startswith("+")
+  digits = re.sub(r"\D", "", text)
+  if not digits:
+    return ""
+  if has_plus:
+    return "+" + digits
+  if text.startswith("00") and len(digits) > 2:
+    return "+" + digits.lstrip("0")
+  return digits
+
+
+def is_valid_phone(number: str | None) -> bool:
+  if not number:
+    return False
+  digits = re.sub(r"\D", "", number)
+  return len(digits) >= 7
+
+
+def find_labelled_phones(text: str | None) -> list[str]:
+  if not text:
+    return []
+  seen: set[str] = set()
+  results: list[str] = []
+  for match in PHONE_LABEL_REGEX.finditer(text):
+    normalized = normalize_phone(match.group(1))
+    if normalized and is_valid_phone(normalized) and normalized not in seen:
+      seen.add(normalized)
+      results.append(normalized)
+  if not results:
+    for match in PHONE_TOKEN_REGEX.finditer(text):
+      normalized = normalize_phone(match.group(0))
+      if normalized and is_valid_phone(normalized) and normalized not in seen:
+        seen.add(normalized)
+        results.append(normalized)
+  return results
+
+
+# --- ORM models ----------------------------------------------------------------
+
+
+class Employee(Base):
+  __tablename__ = "employees"
+
+  id = Column(Integer, primary_key=True)
+  name = Column(String(255), nullable=False)
+  role = Column(String(255))
+  login_email = Column(String(255), unique=True)
+  login_code = Column(String(64), unique=True)
+  login_pin_hash = Column(String(255))
+
+  shifts = relationship("Shift", back_populates="employee", cascade="all, delete-orphan")
+
+
+class Site(Base):
+  __tablename__ = "sites"
+
+  id = Column(Integer, primary_key=True)
+  name = Column(String(255), nullable=False)
+  address = Column(String(255))
+
+  shifts = relationship("Shift", back_populates="site", cascade="all, delete-orphan")
+
+
+class Shift(Base):
+  __tablename__ = "shifts"
+
+  id = Column(Integer, primary_key=True)
+  employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+  site_id = Column(Integer, ForeignKey("sites.id"), nullable=False)
+  day = Column(Date, nullable=False)
+  start_time = Column(Time, nullable=False)
+  end_time = Column(Time, nullable=False)
+  created_at = Column(DateTime, default=datetime.utcnow)
+  instructions = Column(Text)
+  clock_in_at = Column(DateTime)
+  clock_in_lat = Column(Float)
+  clock_in_lng = Column(Float)
+  clock_out_at = Column(DateTime)
+  clock_out_lat = Column(Float)
+  clock_out_lng = Column(Float)
+  before_photo_path = Column(String(255))
+  after_photo_path = Column(String(255))
+
+  employee = relationship("Employee", back_populates="shifts")
+  site = relationship("Site", back_populates="shifts")
+
+
+class Lead(Base):
+  __tablename__ = "leads"
+
+  id = Column(Integer, primary_key=True)
+  name = Column(String(255), nullable=False)
+  email = Column(String(255))
+  phone = Column(String(64))
+  source = Column(String(255))
+  notes = Column(Text)
+  stage = Column(String(64), nullable=False, default="New Leads")
+  created_at = Column(DateTime, default=datetime.utcnow)
+
+
+Base.metadata.create_all(bind=engine)
+
+
+def _ensure_sqlite_column(engine, table: str, column: str, ddl: str):
+  if not DATABASE_URL.startswith("sqlite"):
+    return
+  with engine.begin() as conn:
+    result = conn.execute(text(f"PRAGMA table_info('{table}')"))
+    existing = {row[1] for row in result}
+    if column not in existing:
+      conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
+
+
+_ensure_sqlite_column(engine, "shifts", "created_at", "DATETIME")
+_ensure_sqlite_column(engine, "employees", "login_email", "TEXT")
+_ensure_sqlite_column(engine, "employees", "login_code", "TEXT")
+_ensure_sqlite_column(engine, "employees", "login_pin_hash", "TEXT")
+_ensure_sqlite_column(engine, "shifts", "instructions", "TEXT")
+_ensure_sqlite_column(engine, "shifts", "clock_in_at", "DATETIME")
+_ensure_sqlite_column(engine, "shifts", "clock_in_lat", "FLOAT")
+_ensure_sqlite_column(engine, "shifts", "clock_in_lng", "FLOAT")
+_ensure_sqlite_column(engine, "shifts", "clock_out_at", "DATETIME")
+_ensure_sqlite_column(engine, "shifts", "clock_out_lat", "FLOAT")
+_ensure_sqlite_column(engine, "shifts", "clock_out_lng", "FLOAT")
+_ensure_sqlite_column(engine, "shifts", "before_photo_path", "TEXT")
+_ensure_sqlite_column(engine, "shifts", "after_photo_path", "TEXT")
+
+
+def _allowed_image(filename: str | None) -> bool:
+  if not filename or "." not in filename:
+    return False
+  ext = filename.rsplit(".", 1)[1].lower()
+  return ext in ALLOWED_IMAGE_EXTENSIONS
+
+
+def _coerce_float(value: str | None) -> float | None:
+  try:
+    if value is None:
+      return None
+    return float(value)
+  except (TypeError, ValueError):
+    return None
+
+
+def _remove_photo(path: str | None) -> None:
+  if not path:
+    return
+  try:
+    absolute = path if os.path.isabs(path) else os.path.join(APP_ROOT, "static", path)
+    if os.path.isfile(absolute):
+      os.remove(absolute)
+  except OSError:
+    logging.debug("Failed to remove photo %s", path)
+
+
+def _generate_employee_pin(length: int = 4) -> str:
+  """Return a simple numeric PIN with the desired length."""
+  alphabet = "0123456789"
+  return "".join(secrets.choice(alphabet) for _ in range(max(4, length)))
+
+
+def _collect_existing_codes(db, exclude_id: int | None = None) -> set[str]:
+  codes: set[str] = set()
+  query = db.query(Employee.id, Employee.login_code)
+  if exclude_id is not None:
+    query = query.filter(Employee.id != exclude_id)
+  for _, code in query:
+    if code:
+      normalized = code.strip().lower()
+      if normalized:
+        codes.add(normalized)
+  return codes
+
+
+def _generate_employee_login_code(name: str, existing_codes: set[str]) -> str:
+  base = re.sub(r"[^A-Za-z]", "", name or "").upper()
+  if len(base) >= 3:
+    prefix = base[:3]
+  elif base:
+    prefix = (base + "TEAM")[:3]
+  else:
+    prefix = "TEAM"
+
+  attempt = 0
+  while True:
+    suffix = "".join(secrets.choice("0123456789") for _ in range(3))
+    code = f"{prefix}{suffix}"
+    key = code.lower()
+    if key not in existing_codes:
+      existing_codes.add(key)
+      return code
+    attempt += 1
+    if attempt > 20:
+      prefix = "PXF"
+
+
+def _remember_credentials_for_session(employee_id: int, code: str, pin: str) -> None:
+  snippets = session.get("credential_snippets", {})
+  snippets[str(employee_id)] = {"code": code, "pin": pin}
+  session["credential_snippets"] = snippets
+
+
+def _generate_missing_employee_credentials(db) -> dict[int, dict[str, str | None]]:
+  existing_codes = _collect_existing_codes(db)
+  updated: dict[int, dict[str, str | None]] = {}
+  any_changes = False
+  for emp in db.query(Employee).all():
+    current_code = (emp.login_code or "").strip()
+    current_pin_hash = (emp.login_pin_hash or "").strip()
+    code_generated = None
+    pin_generated = None
+    if not current_code:
+      code_generated = _generate_employee_login_code(emp.name, existing_codes)
+      emp.login_code = code_generated
+      any_changes = True
+    if not current_pin_hash:
+      pin_generated = _generate_employee_pin()
+      emp.login_pin_hash = generate_password_hash(pin_generated)
+      any_changes = True
+    if code_generated or pin_generated:
+      updated[emp.id] = {
+        "code": emp.login_code,
+        "pin": pin_generated,
       }
-    })();
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
-"""
+  if any_changes:
+    db.commit()
+  return updated
+
+
+def login_required(view_func):
+  @wraps(view_func)
+  def wrapper(*args, **kwargs):
+    if session.get("role") == "admin" and session.get("auth"):
+      return view_func(*args, **kwargs)
+    return redirect(url_for("login", next=request.url))
+
+  return wrapper
+
+
+def employee_login_required(view_func):
+  @wraps(view_func)
+  def wrapper(*args, **kwargs):
+    if session.get("role") == "employee" and session.get("employee_id"):
+      return view_func(*args, **kwargs)
+    return redirect(url_for("login", next=request.url))
+
+  return wrapper
+
+
+@app.teardown_appcontext
+def _remove_scoped_session(_exc=None):
+  SessionLocal.remove()
 
 
 def extract_emails(html: str):
@@ -2489,23 +3727,392 @@ def _site_exists(db, name: str, address: str, exclude_id: int | None = None) -> 
     return db.query(q.exists()).scalar()
 
 
+def _build_admin_dashboard_context(db):
+  today = date.today()
+  week_start = today - timedelta(days=today.weekday())
+  week_end = week_start + timedelta(days=7)
+
+  stats = {
+    "employees": db.query(func.count(Employee.id)).scalar() or 0,
+    "sites": db.query(func.count(Site.id)).scalar() or 0,
+    "weekly_shifts": db.query(func.count(Shift.id))
+    .filter(Shift.day >= week_start, Shift.day < week_end)
+    .scalar()
+    or 0,
+    "new_leads": db.query(func.count(Lead.id))
+    .filter(Lead.created_at >= datetime.utcnow() - timedelta(days=7))
+    .scalar()
+    or 0,
+  }
+
+  assigned_site_rows = (
+    db.query(Shift.site_id)
+    .filter(Shift.day >= week_start, Shift.day < week_end)
+    .distinct()
+    .all()
+  )
+  assigned_site_ids = [row[0] for row in assigned_site_rows if row[0] is not None]
+  if assigned_site_ids:
+    unassigned_query = db.query(Site).filter(~Site.id.in_(assigned_site_ids))
+  else:
+    unassigned_query = db.query(Site)
+  unassigned_count = unassigned_query.count()
+  stats["unassigned_sites"] = unassigned_count
+  unassigned_sample = unassigned_query.order_by(Site.name).limit(5).all()
+
+  recent_employees = (
+    db.query(Employee).order_by(Employee.id.desc()).limit(5).all()
+  )
+  recent_sites = db.query(Site).order_by(Site.id.desc()).limit(5).all()
+  upcoming_shifts = (
+    db.query(Shift)
+    .filter(Shift.day >= today)
+    .order_by(Shift.day.asc(), Shift.start_time.asc())
+    .limit(6)
+    .all()
+  )
+
+  week_label = f"{week_start.strftime('%d %b')} – {(week_end - timedelta(days=1)).strftime('%d %b')}"
+  today_label = today.strftime("%A %d %b %Y")
+
+  return {
+    "stats": stats,
+    "recent_employees": recent_employees,
+    "recent_sites": recent_sites,
+    "upcoming_shifts": upcoming_shifts,
+    "unassigned_sites_sample": unassigned_sample,
+    "week_label": week_label,
+    "today_label": today_label,
+  }
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if session.get("auth"):
-        return redirect(request.args.get("next") or url_for("index"))
+  next_url = request.args.get("next")
+  if session.get("role") == "admin" and session.get("auth"):
+    return redirect(next_url or url_for("index"))
+  if session.get("role") == "employee" and session.get("employee_id"):
+    return redirect(next_url or url_for("employee_dashboard"))
 
-    error = None
-    if request.method == "POST":
-        username = (request.form.get("username") or "").strip()
-        password = request.form.get("password") or ""
-        dest = request.form.get("next") or request.args.get("next")
-        if username == AUTH_USERNAME and password == AUTH_PASSWORD:
-            session["auth"] = True
-            session["user"] = username
-            return redirect(dest or url_for("index"))
-        error = "Invalid credentials"
+  error = None
+  if request.method == "POST":
+    username_raw = (request.form.get("username") or "").strip()
+    password = request.form.get("password") or ""
+    dest = request.form.get("next") or request.args.get("next")
+    if username_raw and password:
+      if username_raw == AUTH_USERNAME and password == AUTH_PASSWORD:
+        session.clear()
+        session["auth"] = True
+        session["role"] = "admin"
+        session["user"] = username_raw
+        return redirect(dest or url_for("index"))
 
-    return render_template_string(LOGIN_TEMPLATE, error=error)
+      normalized = username_raw.lower()
+      db = SessionLocal()
+      try:
+        employee = (
+          db.query(Employee)
+          .filter(
+            or_(
+              func.lower(Employee.login_email) == normalized,
+              func.lower(Employee.login_code) == normalized,
+            )
+          )
+          .first()
+        )
+      finally:
+        db.close()
+
+      if employee and employee.login_pin_hash:
+        if check_password_hash(employee.login_pin_hash, password):
+          session.clear()
+          session["role"] = "employee"
+          session["employee_id"] = employee.id
+          session["employee_name"] = employee.name
+          session["employee_code"] = employee.login_code
+          return redirect(dest or url_for("employee_dashboard"))
+      error = "Invalid credentials"
+    else:
+      error = "Username and password are required"
+
+  return render_template_string(LOGIN_TEMPLATE, error=error)
+
+
+@app.route("/employee")
+@app.route("/employee/dashboard")
+@employee_login_required
+def employee_dashboard():
+  employee_id = session.get("employee_id")
+  employee_name = session.get("employee_name", "Team member")
+  today = date.today()
+  db = SessionLocal()
+  shift_cards = []
+  history_cards = []
+
+  def _format_minutes(total_minutes: int | None) -> str:
+    if total_minutes is None or total_minutes <= 0:
+      return "—"
+    hours, minutes = divmod(int(total_minutes), 60)
+    parts = []
+    if hours:
+      parts.append(f"{hours}h")
+    if minutes:
+      parts.append(f"{minutes}m")
+    return " ".join(parts) if parts else "<1m"
+
+  def _scheduled_minutes(shift_obj: Shift) -> int:
+    baseline = datetime.combine(date.min, shift_obj.start_time)
+    finish = datetime.combine(date.min, shift_obj.end_time)
+    delta = finish - baseline
+    return max(int(delta.total_seconds() // 60), 0)
+
+  try:
+    todays_shifts = (
+      db.query(Shift)
+      .filter(Shift.employee_id == employee_id, Shift.day == today)
+      .order_by(Shift.start_time.asc())
+      .all()
+    )
+    for shift in todays_shifts:
+      site_name = shift.site.name if shift.site else "Scheduled job"
+      address = (shift.site.address or "Address coming soon") if shift.site else "Address coming soon"
+      map_url = None
+      if shift.site and shift.site.address:
+        map_url = f"https://www.google.com/maps/search/?api=1&query={quote_plus(shift.site.address)}"
+
+      start_label = shift.start_time.strftime("%I:%M %p").lstrip("0")
+      end_label = shift.end_time.strftime("%I:%M %p").lstrip("0")
+
+      clocked_in = bool(shift.clock_in_at)
+      clocked_out = bool(shift.clock_out_at)
+      if clocked_out:
+        status_label = "Complete"
+        status_badge = "badge-complete"
+      elif clocked_in:
+        status_label = "In progress"
+        status_badge = "badge-progress"
+      else:
+        status_label = "Scheduled"
+        status_badge = "badge-scheduled"
+
+      clock_in_display = shift.clock_in_at.strftime("%I:%M %p") if shift.clock_in_at else "—"
+      clock_out_display = shift.clock_out_at.strftime("%I:%M %p") if shift.clock_out_at else "—"
+
+      scheduled_minutes = _scheduled_minutes(shift)
+      actual_minutes = None
+      if shift.clock_in_at and shift.clock_out_at:
+        delta_actual = shift.clock_out_at - shift.clock_in_at
+        actual_minutes = max(int(delta_actual.total_seconds() // 60), 0)
+
+      before_url = None
+      if shift.before_photo_path:
+        relative = shift.before_photo_path.lstrip("/\\")
+        before_url = url_for("static", filename=relative)
+      after_url = None
+      if shift.after_photo_path:
+        relative_after = shift.after_photo_path.lstrip("/\\")
+        after_url = url_for("static", filename=relative_after)
+
+      shift_cards.append(
+        {
+          "id": shift.id,
+          "site_name": site_name,
+          "address": address,
+          "map_url": map_url,
+          "instructions": (shift.instructions or "No special instructions today."),
+          "time_window": f"{start_label} – {end_label}",
+          "status_label": status_label,
+          "status_badge": status_badge,
+          "clock_in_display": clock_in_display,
+          "clock_out_display": clock_out_display,
+          "clocked_in": clocked_in,
+          "clocked_out": clocked_out,
+          "scheduled_duration": _format_minutes(scheduled_minutes),
+          "actual_duration": _format_minutes(actual_minutes),
+          "has_actual_duration": actual_minutes is not None,
+          "clock_in_url": url_for("employee_clock_in", shift_id=shift.id),
+          "upload_url": url_for("employee_upload_photo", shift_id=shift.id),
+          "complete_url": url_for("employee_complete_shift", shift_id=shift.id),
+          "before_photo_url": before_url,
+          "after_photo_url": after_url,
+        }
+      )
+
+    history_shifts = (
+      db.query(Shift)
+      .filter(Shift.employee_id == employee_id, Shift.day < today)
+      .order_by(Shift.day.desc(), Shift.start_time.desc())
+      .limit(15)
+      .all()
+    )
+
+    for shift in history_shifts:
+      scheduled_minutes = _scheduled_minutes(shift)
+      actual_minutes = None
+      if shift.clock_in_at and shift.clock_out_at:
+        delta_actual = shift.clock_out_at - shift.clock_in_at
+        actual_minutes = max(int(delta_actual.total_seconds() // 60), 0)
+
+      if shift.clock_out_at:
+        status_label = "Completed"
+      elif shift.clock_in_at:
+        status_label = "In progress"
+      else:
+        status_label = "Scheduled"
+
+      history_cards.append(
+        {
+          "id": shift.id,
+          "site_name": shift.site.name if shift.site else "Scheduled job",
+          "day_label": shift.day.strftime("%a, %d %b %Y"),
+          "time_window": f"{shift.start_time.strftime('%I:%M %p').lstrip('0')} – {shift.end_time.strftime('%I:%M %p').lstrip('0')}",
+          "status_label": status_label,
+          "scheduled_duration": _format_minutes(scheduled_minutes),
+          "actual_duration": _format_minutes(actual_minutes),
+          "has_actual_duration": actual_minutes is not None,
+          "instructions": shift.instructions or "No notes recorded.",
+        }
+      )
+  finally:
+    db.close()
+
+  count = len(shift_cards)
+  if count == 0:
+    friendly_message = "No jobs scheduled right now."
+  elif count == 1:
+    friendly_message = "You have 1 mission waiting."
+  else:
+    friendly_message = f"{count} missions lined up for today."
+
+  today_label = today.strftime("%A %d %b %Y")
+  return render_template_string(
+    EMPLOYEE_DASHBOARD_TEMPLATE,
+    employee_name=employee_name,
+    today_label=today_label,
+    friendly_message=friendly_message,
+    shifts=shift_cards,
+    history=history_cards,
+  )
+
+
+@app.route("/employee/shifts/<int:shift_id>/clock-in", methods=["POST"])
+@employee_login_required
+def employee_clock_in(shift_id: int):
+  employee_id = session.get("employee_id")
+  lat = _coerce_float(request.form.get("lat"))
+  lng = _coerce_float(request.form.get("lng"))
+
+  db = SessionLocal()
+  try:
+    shift = db.get(Shift, shift_id)
+    if not shift or shift.employee_id != employee_id:
+      flash("That shift was not found for your profile.")
+      return redirect(url_for("employee_dashboard"))
+
+    if shift.day != date.today():
+      flash("This shift is not scheduled for today.")
+      return redirect(url_for("employee_dashboard"))
+
+    if not shift.clock_in_at:
+      shift.clock_in_at = datetime.utcnow()
+    if lat is not None:
+      shift.clock_in_lat = lat
+    if lng is not None:
+      shift.clock_in_lng = lng
+    db.commit()
+    flash("Clocked in. Go make it shine!")
+  finally:
+    db.close()
+
+  return redirect(url_for("employee_dashboard"))
+
+
+@app.route("/employee/shifts/<int:shift_id>/upload", methods=["POST"])
+@employee_login_required
+def employee_upload_photo(shift_id: int):
+  employee_id = session.get("employee_id")
+  photo_type = (request.form.get("photo_type") or "").strip().lower()
+  file = request.files.get("photo")
+
+  db = SessionLocal()
+  try:
+    shift = db.get(Shift, shift_id)
+    if not shift or shift.employee_id != employee_id:
+      flash("That shift was not found for your profile.")
+      return redirect(url_for("employee_dashboard"))
+
+    if photo_type not in {"before", "after"}:
+      flash("Please choose whether this is a before or after photo.")
+      return redirect(url_for("employee_dashboard"))
+
+    if not file or not file.filename:
+      flash("Choose a photo to upload first.")
+      return redirect(url_for("employee_dashboard"))
+
+    if not _allowed_image(file.filename):
+      flash("Unsupported file type. Use PNG, JPG, or JPEG.")
+      return redirect(url_for("employee_dashboard"))
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    safe_name = secure_filename(f"shift{shift_id}_{photo_type}_{secrets.token_hex(6)}{ext}")
+    destination = os.path.join(app.config["UPLOAD_FOLDER"], safe_name)
+
+    try:
+      file.save(destination)
+    except OSError:
+      logging.exception("Failed to save uploaded photo for shift %s", shift_id)
+      flash("Could not save that photo. Please try again.")
+      return redirect(url_for("employee_dashboard"))
+
+    relative_path = os.path.join("uploads", safe_name).replace(os.sep, "/")
+    photo_label = "Before" if photo_type == "before" else "After"
+    if photo_type == "before":
+      _remove_photo(shift.before_photo_path)
+      shift.before_photo_path = relative_path
+    else:
+      _remove_photo(shift.after_photo_path)
+      shift.after_photo_path = relative_path
+
+    db.commit()
+    flash(f"{photo_label} photo saved. Nice work!")
+  finally:
+    db.close()
+
+  return redirect(url_for("employee_dashboard"))
+
+
+@app.route("/employee/shifts/<int:shift_id>/complete", methods=["POST"])
+@employee_login_required
+def employee_complete_shift(shift_id: int):
+  employee_id = session.get("employee_id")
+  lat = _coerce_float(request.form.get("lat"))
+  lng = _coerce_float(request.form.get("lng"))
+
+  db = SessionLocal()
+  try:
+    shift = db.get(Shift, shift_id)
+    if not shift or shift.employee_id != employee_id:
+      flash("That shift was not found for your profile.")
+      return redirect(url_for("employee_dashboard"))
+
+    if shift.day != date.today():
+      flash("This shift is not scheduled for today.")
+      return redirect(url_for("employee_dashboard"))
+
+    if not shift.clock_in_at:
+      shift.clock_in_at = datetime.utcnow()
+    shift.clock_out_at = datetime.utcnow()
+    if lat is not None:
+      shift.clock_out_lat = lat
+    if lng is not None:
+      shift.clock_out_lng = lng
+
+    db.commit()
+    flash("Shift complete! Thanks for going the extra mile.")
+  finally:
+    db.close()
+
+  return redirect(url_for("employee_dashboard"))
 
 
 @app.route("/logout")
@@ -2515,6 +4122,7 @@ def logout():
 
 
 @app.route("/schedule", methods=["GET", "POST"])
+@login_required
 def schedule_dashboard():
     db = SessionLocal()
     try:
@@ -2522,6 +4130,10 @@ def schedule_dashboard():
             emp_id = request.form.get("employee_id")
             site_id = request.form.get("site_id")
             day_values_raw = [ (d or "").strip() for d in request.form.getlist("day") ]
+            if not any(day_values_raw):
+              fallback_days = (request.form.get("day_display") or "").strip()
+              if fallback_days:
+                day_values_raw = [part.strip() for part in fallback_days.split(",") if part.strip()]
             start_str = request.form.get("start_time")
             duration_hours_str = request.form.get("duration_hours")
             day_values: list[date] = []
@@ -2607,104 +4219,291 @@ def schedule_dashboard():
             selected_employee_id=selected_employee_id,
             selected_employee=selected_employee,
             pdf_url=pdf_url,
+            active_page="schedule",
         )
         return schedule_html
     finally:
         db.close()
 
 
-@app.route("/admin", methods=["GET", "POST"])
+@app.route("/admin")
+@login_required
 def admin_dashboard():
-    db = SessionLocal()
-    try:
-        if request.method == "POST":
-            entity = (request.form.get("entity") or "").strip()
-            action = (request.form.get("action") or "").strip()
-            if entity == "employee":
-                emp_id = request.form.get("id")
-                if action == "create":
-                    name = (request.form.get("name") or "").strip()
-                    role = (request.form.get("role") or "").strip()
-                    if name:
-                        db.add(Employee(name=name, role=role or None))
-                        db.commit()
-                elif action == "update" and emp_id:
-                    emp = db.get(Employee, int(emp_id))
-                    if emp:
-                        emp.name = (request.form.get("name") or "").strip() or emp.name
-                        emp.role = (request.form.get("role") or "").strip() or None
-                        db.commit()
-                elif action == "delete" and emp_id:
-                    emp = db.get(Employee, int(emp_id))
-                    if emp:
-                        db.delete(emp)
-                        db.commit()
-            elif entity == "site":
-                site_id = request.form.get("id")
-                if action == "create":
-                    name = (request.form.get("name") or "").strip()
-                    address = (request.form.get("address") or "").strip()
-                    if name and address:
-                        if _site_exists(db, name, address):
-                            flash("Site already exists with the same name and address.", "warning")
-                        else:
-                            db.add(Site(name=name, address=address))
-                            db.commit()
-                elif action == "update" and site_id:
-                    site = db.get(Site, int(site_id))
-                    if site:
-                        new_name = (request.form.get("name") or "").strip() or site.name
-                        new_address = (request.form.get("address") or "").strip() or site.address
-                        if _site_exists(db, new_name, new_address, exclude_id=site.id):
-                            flash("Another site already uses that name and address.", "warning")
-                        else:
-                            site.name = new_name
-                            site.address = new_address
-                            db.commit()
-                elif action == "delete" and site_id:
-                    site = db.get(Site, int(site_id))
-                    if site:
-                        db.delete(site)
-                        db.commit()
-            elif entity == "site_bulk" and action == "bulk_update":
-                ids = request.form.getlist("site_id")
-                names = request.form.getlist("site_name")
-                addresses = request.form.getlist("site_address")
-                seen_pairs = set()
-                for sid, n, a in zip(ids, names, addresses):
-                    n = (n or "").strip()
-                    a = (a or "").strip()
-                    if not sid or not n or not a:
-                        continue
-                    key = (n.lower(), a.lower())
-                    if key in seen_pairs:
-                        continue
-                    seen_pairs.add(key)
-                    site = db.get(Site, int(sid))
-                    if site and not _site_exists(db, n, a, exclude_id=site.id):
-                        site.name = n
-                        site.address = a
-                db.commit()
-            return redirect(url_for("admin_dashboard"))
+  db = SessionLocal()
+  try:
+    context = _build_admin_dashboard_context(db)
+    return render_template_string(
+      ADMIN_TEMPLATE,
+      active_page="dashboard",
+      **context,
+    )
+  finally:
+    db.close()
 
-        search_q = (request.args.get("q") or "").strip()
-        employees = db.query(Employee).order_by(Employee.name).all()
-        site_query = db.query(Site)
-        if search_q:
-            like = f"%{search_q}%"
-            site_query = site_query.filter(or_(Site.name.ilike(like), Site.address.ilike(like)))
-        sites = site_query.order_by(Site.name).all()
-        return render_template_string(
-            ADMIN_TEMPLATE,
-            employees=employees,
-            sites=sites,
-            search_q=search_q,
+
+@app.route("/dashboard")
+@login_required
+def dashboard_redirect():
+  return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin/employees", methods=["GET", "POST"])
+@login_required
+def admin_employees():
+  db = SessionLocal()
+  try:
+    search_q = (request.args.get("q") or "").strip()
+    if request.method == "POST":
+      action = (request.form.get("action") or "create").strip().lower()
+      emp_id = request.form.get("id")
+      redirect_q = (request.form.get("redirect_q") or "").strip()
+      redirect_url = url_for("admin_employees", q=redirect_q) if redirect_q else url_for("admin_employees")
+
+      if action == "create":
+        name = (request.form.get("name") or "").strip()
+        role = (request.form.get("role") or "").strip()
+        if name:
+          employee = Employee(name=name, role=role or None)
+          db.add(employee)
+          db.commit()
+          existing_codes = _collect_existing_codes(db, exclude_id=employee.id)
+          generated_pin = None
+          if not (employee.login_code or "").strip():
+            employee.login_code = _generate_employee_login_code(name, existing_codes)
+          if not (employee.login_pin_hash or "").strip():
+            generated_pin = _generate_employee_pin()
+            employee.login_pin_hash = generate_password_hash(generated_pin)
+          db.commit()
+          if generated_pin:
+            _remember_credentials_for_session(employee.id, employee.login_code, generated_pin)
+      elif action == "update" and emp_id:
+        emp = db.get(Employee, int(emp_id))
+        if emp:
+          name = (request.form.get("name") or "").strip()
+          role = (request.form.get("role") or "").strip()
+          if name:
+            emp.name = name
+            emp.role = role or None
+            db.commit()
+      elif action == "delete" and emp_id:
+        emp = db.get(Employee, int(emp_id))
+        if emp:
+          db.delete(emp)
+          db.commit()
+      elif action == "credentials_share" and emp_id:
+        emp = db.get(Employee, int(emp_id))
+        if emp:
+          existing_codes = _collect_existing_codes(db, exclude_id=emp.id)
+          if not (emp.login_code or "").strip():
+            emp.login_code = _generate_employee_login_code(emp.name, existing_codes)
+          new_pin = _generate_employee_pin()
+          emp.login_pin_hash = generate_password_hash(new_pin)
+          db.commit()
+          _remember_credentials_for_session(emp.id, emp.login_code, new_pin)
+          flash(f"Credentials refreshed for {emp.name}.")
+        return redirect(redirect_url)
+      elif action == "credentials_update" and emp_id:
+        emp = db.get(Employee, int(emp_id))
+        if emp:
+          new_email = (request.form.get("login_email") or "").strip()
+          new_code = (request.form.get("login_code") or "").strip().upper()
+          new_pin = (request.form.get("login_pin") or "").strip()
+          if not new_code:
+            flash("Login code is required to save credentials.", "warning")
+            return redirect(redirect_url)
+          existing_codes = _collect_existing_codes(db, exclude_id=emp.id)
+          if new_code.lower() in existing_codes:
+            flash("That login code is already in use.", "warning")
+            return redirect(redirect_url)
+          emp.login_code = new_code
+          emp.login_email = new_email or None
+          pin_snippet = None
+          if new_pin:
+            if not new_pin.isdigit() or len(new_pin) != 4:
+              flash("PINs must be exactly 4 digits.", "warning")
+              return redirect(redirect_url)
+            emp.login_pin_hash = generate_password_hash(new_pin)
+            pin_snippet = new_pin
+          db.commit()
+          if pin_snippet:
+            _remember_credentials_for_session(emp.id, emp.login_code, pin_snippet)
+            flash(f"Credentials updated for {emp.name}.")
+          else:
+            flash(f"Login details saved for {emp.name}.")
+        return redirect(redirect_url)
+
+      return redirect(url_for("admin_employees"))
+
+    credential_snippets = session.pop("credential_snippets", {})
+    auto_generated = _generate_missing_employee_credentials(db)
+    for emp_id, data in auto_generated.items():
+      key = str(emp_id)
+      if key not in credential_snippets:
+        credential_snippets[key] = {
+          "code": data.get("code"),
+          "pin": data.get("pin"),
+        }
+
+    query = db.query(Employee)
+    if search_q:
+      like = f"%{search_q}%"
+      query = query.filter(
+        or_(
+          Employee.name.ilike(like),
+          Employee.role.ilike(like),
         )
-    finally:
-        db.close()
+      )
+    employees = query.order_by(Employee.name).all()
+
+    total_employees = db.query(func.count(Employee.id)).scalar() or 0
+    filtered_employees = len(employees)
+    shift_counts = {
+      emp_id: count
+      for emp_id, count in db.query(Shift.employee_id, func.count(Shift.id))
+      .group_by(Shift.employee_id)
+      .all()
+    }
+    today_shifts = (
+      db.query(func.count(Shift.id)).filter(Shift.day == date.today()).scalar()
+      or 0
+    )
+    week_start = date.today() - timedelta(days=date.today().weekday())
+    week_end = week_start + timedelta(days=7)
+    scheduled_emp_ids = {
+      row[0]
+      for row in db.query(Shift.employee_id)
+      .filter(Shift.day >= week_start, Shift.day < week_end)
+      .distinct()
+      .all()
+      if row[0] is not None
+    }
+    unassigned_employees = max(total_employees - len(scheduled_emp_ids), 0)
+
+    return render_template_string(
+      ADMIN_EMPLOYEES_TEMPLATE,
+      active_page="employees",
+      employees=employees,
+      shift_counts=shift_counts,
+      total_employees=total_employees,
+      filtered_employees=filtered_employees,
+      search_q=search_q,
+      today_shifts=today_shifts,
+      unassigned_employees=unassigned_employees,
+      credential_snippets=credential_snippets,
+    )
+  finally:
+    db.close()
+
+
+@app.route("/admin/sites", methods=["GET", "POST"])
+@login_required
+def admin_sites():
+  db = SessionLocal()
+  try:
+    search_q = (request.args.get("q") or "").strip()
+    if request.method == "POST":
+      entity = (request.form.get("entity") or "site").strip()
+      action = (request.form.get("action") or "").strip().lower()
+      if entity == "site":
+        site_id = request.form.get("id")
+        if action == "create":
+          name = (request.form.get("name") or "").strip()
+          address = (request.form.get("address") or "").strip()
+          if name and address:
+            if _site_exists(db, name, address):
+              flash(
+                "Site already exists with the same name and address.",
+                "warning",
+              )
+            else:
+              db.add(Site(name=name, address=address))
+              db.commit()
+        elif action == "update" and site_id:
+          site = db.get(Site, int(site_id))
+          if site:
+            name = (request.form.get("name") or "").strip() or site.name
+            address = (request.form.get("address") or "").strip() or site.address
+            if _site_exists(db, name, address, exclude_id=site.id):
+              flash(
+                "Another site already uses that name and address.",
+                "warning",
+              )
+            else:
+              site.name = name
+              site.address = address
+              db.commit()
+        elif action == "delete" and site_id:
+          site = db.get(Site, int(site_id))
+          if site:
+            db.delete(site)
+            db.commit()
+      elif entity == "site_bulk" and action == "bulk_update":
+        ids = request.form.getlist("site_id")
+        names = request.form.getlist("site_name")
+        addresses = request.form.getlist("site_address")
+        seen_pairs = set()
+        for sid, n, a in zip(ids, names, addresses):
+          n = (n or "").strip()
+          a = (a or "").strip()
+          if not sid or not n or not a:
+            continue
+          key = (n.lower(), a.lower())
+          if key in seen_pairs:
+            continue
+          seen_pairs.add(key)
+          site = db.get(Site, int(sid))
+          if site and not _site_exists(db, n, a, exclude_id=site.id):
+            site.name = n
+            site.address = a
+        db.commit()
+
+      if search_q:
+        return redirect(url_for("admin_sites", q=search_q))
+      return redirect(url_for("admin_sites"))
+
+    query = db.query(Site)
+    if search_q:
+      like = f"%{search_q}%"
+      query = query.filter(
+        or_(Site.name.ilike(like), Site.address.ilike(like))
+      )
+    sites = query.order_by(Site.name).all()
+
+    total_sites = db.query(func.count(Site.id)).scalar() or 0
+    filtered_sites = len(sites)
+    shift_counts = {
+      site_id: count
+      for site_id, count in db.query(Shift.site_id, func.count(Shift.id))
+      .group_by(Shift.site_id)
+      .all()
+    }
+    week_start = date.today() - timedelta(days=date.today().weekday())
+    week_end = week_start + timedelta(days=7)
+    covered_site_ids = {
+      row[0]
+      for row in db.query(Shift.site_id)
+      .filter(Shift.day >= week_start, Shift.day < week_end)
+      .distinct()
+      .all()
+      if row[0] is not None
+    }
+
+    return render_template_string(
+      ADMIN_SITES_TEMPLATE,
+      active_page="sites",
+      sites=sites,
+      search_q=search_q,
+      shift_counts=shift_counts,
+      total_sites=total_sites,
+      filtered_sites=filtered_sites,
+      covered_sites=len(covered_site_ids),
+    )
+  finally:
+    db.close()
 
 
 @app.route("/leads", methods=["GET", "POST"])
+@login_required
 def leads_dashboard():
     db = SessionLocal()
     try:
@@ -2788,12 +4587,14 @@ def leads_dashboard():
             start_filter=start_filter,
             end_filter=end_filter,
             sort=sort,
+          active_page="leads",
         )
     finally:
         db.close()
 
 
 @app.route("/leads/stage", methods=["POST"])
+@login_required
 def leads_stage():
     data = request.get_json(silent=True) or {}
     lead_id = data.get("id")
@@ -2813,6 +4614,7 @@ def leads_stage():
 
 
 @app.route("/schedule/pdf")
+@login_required
 def schedule_pdf():
     if not REPORTLAB_AVAILABLE:
         return jsonify({"error": "reportlab not installed"}), 503
@@ -2850,9 +4652,14 @@ def schedule_pdf():
 
 
 @app.route("/", methods=["GET", "POST"])
+@login_required
 def index():
     if request.method == "GET":
-        return render_template_string(HTML_TEMPLATE, gpt_enabled=bool(openai_client))
+        return render_template_string(
+            HTML_TEMPLATE,
+            gpt_enabled=bool(openai_client),
+            active_page="crawler",
+        )
 
     if not REPORTLAB_AVAILABLE:
         return (
@@ -2886,6 +4693,7 @@ def index():
 
 
 @app.route("/gpt", methods=["POST"])
+@login_required
 def gpt_assistant():
     if openai_client is None:
         return (
@@ -2900,7 +4708,7 @@ def gpt_assistant():
 
     try:
         data = request.get_json(silent=True) or {}
-        prompt = (data.get("prompt") or "").trim()
+        prompt = (data.get("prompt") or "").strip()
         context = (data.get("context") or "").strip()
         if not prompt:
             return jsonify({"error": "Missing prompt"}), 400

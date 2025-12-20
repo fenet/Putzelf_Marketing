@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Clients — Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%); color:#e5e7eb; min-height: 100vh; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); }
+    .sidebar { background: radial-gradient(circle at top,#020617 0%, #020617 45%, #020617 100%); border-right:1px solid rgba(148,163,184,0.3); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; width:260px; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#e5e7eb; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
+    .nav-pill.active, .nav-pill:hover { background:rgba(15,118,110,0.2); border-color:rgba(45,212,191,0.4); color:#ecfeff; }
+    .main-shell { padding:1.5rem; }
+    .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.9); background:radial-gradient(circle at top left,#020617 0%, #020617 35%, #020617 100%); padding:1rem; }
+    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#94a3b8; }
+    .little-card { border-radius:0.7rem; border:1px solid rgba(51,65,85,0.9); background:rgba(15,23,42,0.8); }
+    @media(max-width:992px){ .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{ display:none;} }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-section-title text-uppercase">Navigation</div>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Admin</span></a>
+      <a href="{{ url_for('admin_clients') }}" class="nav-pill active">🤝 <span class="nav-text">Clients</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">👤 <span class="nav-text">Schedule</span></a>
+      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Dashboard</span></a>
+      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
+      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
+    </aside>
+    <main class="main-shell text-light">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }} border-0 text-dark" role="alert">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+          <div class="badge rounded-pill text-bg-secondary text-uppercase mb-2" style="letter-spacing:0.1em; font-size:0.65rem;">Client Registry</div>
+          <h1 class="h4 mb-1 text-light">Manage clients</h1>
+          <p class="text-secondary mb-0">Track B2B vs Private customers, their locations, frequency, and notes.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-light">Back to Admin</a>
+          <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-light">View schedule</a>
+        </div>
+      </div>
+      <div class="card-surface mb-4">
+        <form method="get" class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label" for="client_search">Search</label>
+            <div class="input-group input-group-sm">
+              <input type="text" class="form-control" id="client_search" name="q" value="{{ search_q or '' }}" placeholder="Search clients...">
+              <button class="btn btn-outline-light" type="submit">Search</button>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="client_type_filter">Tag</label>
+            <select class="form-select form-select-sm" id="client_type_filter" name="type">
+              <option value="">All</option>
+              {% for ctype in client_types %}
+                <option value="{{ ctype }}" {% if type_filter == ctype %}selected{% endif %}>{{ ctype }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3 d-flex align-items-end">
+            <a href="{{ url_for('admin_clients') }}" class="btn btn-sm btn-outline-secondary w-100">Clear</a>
+          </div>
+        </form>
+      </div>
+      <div class="card-surface mb-4">
+        <h2 class="h6 text-uppercase text-secondary">Add client</h2>
+        <form method="post" class="row g-2">
+          <input type="hidden" name="entity" value="client">
+          <input type="hidden" name="action" value="create">
+          <div class="col-12 col-lg-4">
+            <label class="form-label" for="new_client_name">Name</label>
+            <input type="text" class="form-control form-control-sm" id="new_client_name" name="name" required>
+          </div>
+          <div class="col-6 col-lg-2">
+            <label class="form-label" for="new_client_type">Tag</label>
+            <select class="form-select form-select-sm" id="new_client_type" name="client_type">
+              {% for ctype in client_types %}
+                <option value="{{ ctype }}">{{ ctype }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6 col-lg-6">
+            <label class="form-label" for="new_client_address">Address</label>
+            <input type="text" class="form-control form-control-sm" id="new_client_address" name="address" placeholder="Street, city...">
+          </div>
+          <div class="col-6 col-lg-3">
+            <label class="form-label" for="new_client_frequency">Cleaning frequency</label>
+            <input type="text" class="form-control form-control-sm" id="new_client_frequency" name="cleaning_frequency" placeholder="e.g. Weekly">
+          </div>
+          <div class="col-12 col-lg-7">
+            <label class="form-label" for="new_client_notes">Notes</label>
+            <textarea class="form-control form-control-sm" id="new_client_notes" name="notes" rows="2" placeholder="Site access, contacts, etc."></textarea>
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-sm btn-primary">Add client</button>
+          </div>
+        </form>
+      </div>
+      <div class="card-surface">
+        <h2 class="h6 text-uppercase text-secondary">Client list</h2>
+        <div class="vstack gap-2">
+          {% for client in clients %}
+            <form method="post" class="little-card p-3">
+              <input type="hidden" name="entity" value="client">
+              <input type="hidden" name="id" value="{{ client.id }}">
+              <div class="row g-2">
+                <div class="col-12 col-md-3">
+                  <label class="form-label">Name</label>
+                  <input type="text" class="form-control form-control-sm" name="name" value="{{ client.name }}" required>
+                </div>
+                <div class="col-6 col-md-2">
+                  <label class="form-label">Tag</label>
+                  <select class="form-select form-select-sm" name="client_type">
+                    {% for ctype in client_types %}
+                      <option value="{{ ctype }}" {% if client.client_type == ctype %}selected{% endif %}>{{ ctype }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label">Address</label>
+                  <input type="text" class="form-control form-control-sm" name="address" value="{{ client.address or '' }}">
+                </div>
+                <div class="col-6 col-md-2">
+                  <label class="form-label">Frequency</label>
+                  <input type="text" class="form-control form-control-sm" name="cleaning_frequency" value="{{ client.cleaning_frequency or '' }}" placeholder="e.g. Weekly">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Notes</label>
+                  <textarea class="form-control form-control-sm" name="notes" rows="2" placeholder="Optional notes">{{ client.notes or '' }}</textarea>
+                </div>
+                <div class="col-12 col-md-2 d-flex align-items-end justify-content-end gap-1">
+                  <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Save">
+                    <i class="bi bi-check2"></i>
+                  </button>
+                  <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ client.name }}?')" title="Delete">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+              </div>
+            </form>
+          {% else %}
+            <p class="text-secondary small mb-0">No clients captured yet.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
