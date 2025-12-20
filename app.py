@@ -55,7 +55,7 @@ ADMIN_TEMPLATE = """
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --accent: #0f766e; }
-    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; }
+    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; font-size:1.05rem; }
     .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); }
     .sidebar { background:rgba(2,6,23,0.82); border-right:1px solid rgba(148,163,184,0.25); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; }
     .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#6b7280; }
@@ -71,6 +71,8 @@ ADMIN_TEMPLATE = """
     .metric-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#94a3b8; margin-bottom:0.35rem; }
     .metric-value { font-size:2rem; font-weight:600; color:#f8fafc; margin-bottom:0.1rem; }
     .metric-sub { font-size:0.85rem; color:#94a3b8; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
+    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
     .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.7); background:rgba(15,23,42,0.78); padding:1.2rem; height:100%; }
     .list-entry { border-bottom:1px solid rgba(148,163,184,0.18); padding:0.6rem 0; }
     .list-entry:last-child { border-bottom:none; }
@@ -233,7 +235,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; }
+    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; font-size:1.05rem; }
     .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); }
     .sidebar { background:rgba(2,6,23,0.82); border-right:1px solid rgba(148,163,184,0.25); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; }
     .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#6b7280; }
@@ -259,6 +261,8 @@ ADMIN_EMPLOYEES_TEMPLATE = """
     .stat-card { border-radius:0.85rem; border:1px solid rgba(45,212,191,0.25); background:rgba(15,118,110,0.1); padding:1rem; }
     .stat-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#94a3b8; margin-bottom:0.35rem; }
     .stat-value { font-size:1.6rem; font-weight:600; color:#f8fafc; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
+    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
     @media(max-width:992px){ .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{ display:none;} }
   </style>
 </head>
@@ -512,7 +516,7 @@ ADMIN_SITES_TEMPLATE = """
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; }
+    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; font-size:1.05rem; }
     .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition:grid-template-columns 0.2s ease; }
     .sidebar { background:rgba(2,6,23,0.82); border-right:1px solid rgba(148,163,184,0.25); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; }
     .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#6b7280; }
@@ -526,6 +530,8 @@ ADMIN_SITES_TEMPLATE = """
     .little-card { border-radius:0.85rem; border:1px solid rgba(51,65,85,0.65); background:rgba(2,6,23,0.75); }
     .placeholder { color:#64748b; font-size:0.85rem; }
     .table thead th { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#94a3b8; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
+    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
     @media(max-width:992px){ .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{ display:none;} }
   </style>
 </head>
@@ -696,6 +702,7 @@ LOGIN_TEMPLATE = """
       justify-content: center;
       background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%);
       color: #e5e7eb;
+      font-size: 1.05rem;
     }
     .login-card {
       width: min(440px, 95vw);
@@ -724,6 +731,8 @@ LOGIN_TEMPLATE = """
     .brand-title { font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; font-size: 0.95rem; }
     .brand-sub { font-size: 0.82rem; color: #9ca3af; }
     .small-note { font-size:0.85rem; color:#9ca3af; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
+    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
   </style>
 </head>
 <body>
@@ -804,6 +813,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
       justify-content: center;
       padding: clamp(1rem, 3vw + 0.5rem, 2.5rem);
       font-family: 'Inter', sans-serif;
+      font-size: 1.05rem;
     }
     .wrapper {
       width: min(880px, 100%);
@@ -851,7 +861,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
       display: inline-flex;
       align-items: center;
       gap: 0.4rem;
-      padding: 0.55rem 1rem;
+      padding: 0.65rem 1.15rem;
       border-radius: 999px;
       background: rgba(248,250,252,0.14);
       color: #f8fafc;
@@ -919,9 +929,9 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
     .action-form button {
       width: 100%;
       border: none;
-      padding: 1rem 1.1rem;
-      border-radius: 0.9rem;
-      font-size: 1.05rem;
+      padding: 1.1rem 1.2rem;
+      border-radius: 0.95rem;
+      font-size: 1.12rem;
       font-weight: 600;
       letter-spacing: 0.04em;
       transition: transform 0.18s ease, box-shadow 0.18s ease;
@@ -1002,7 +1012,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
       body { padding: 0.85rem; display: block; }
       .wrapper { padding: 1.3rem; border-radius: 1.05rem; }
       .hero { margin-bottom: 1.1rem; }
-      .action-form button { font-size: 0.98rem; }
+      .action-form button { font-size: 1.02rem; padding: 1rem 1.1rem; }
       .action-deck { grid-template-columns: 1fr; }
     }
     @media (max-width: 540px) {
@@ -1243,7 +1253,7 @@ LEADS_TEMPLATE = """
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     :root { --bs-primary: #0f766e; }
-    body { min-height: 100vh; background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%); color:#e5e7eb; }
+    body { min-height: 100vh; background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%); color:#e5e7eb; font-size:1.05rem; }
     .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition: grid-template-columns 0.2s ease; }
     .sidebar { background: radial-gradient(circle at top,#020617 0%, #020617 45%, #020617 100%); border-right:1px solid rgba(148,163,184,0.3); color:#e5e7eb; display:flex; flex-direction:column; padding:1.5rem 1.25rem; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; }
     .sidebar-brand { display:flex; align-items:center; gap:0.75rem; }
@@ -1264,6 +1274,8 @@ LEADS_TEMPLATE = """
     .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.9); background:radial-gradient(circle at top left,#020617 0%, #020617 35%, #020617 100%); padding:1rem; }
     .badge-soft { border-radius:999px; border:1px solid rgba(148,163,184,0.6); color:#9ca3af; padding:0.15rem 0.6rem; font-size:0.75rem; }
     .small-note { font-size:0.82rem; color:#9ca3af; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
+    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
     .sidebar-collapsed .app-shell { grid-template-columns: 72px minmax(0, 1fr); }
     .sidebar-collapsed .sidebar { width: 72px; padding: 1.1rem 0.6rem; }
     .sidebar-collapsed .nav-text,
@@ -1672,6 +1684,7 @@ HTML_TEMPLATE = """
       min-height: 100vh;
       background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%);
       color: #0f172a;
+      font-size: 1.05rem;
     }
     .app-shell {
       min-height: 100vh;
@@ -1679,13 +1692,15 @@ HTML_TEMPLATE = """
       grid-template-columns: 260px minmax(0, 1fr);
       background: transparent;
       transition: grid-template-columns 0.2s ease;
-    }
+      color: #e5e7eb;
+      font-size: 1.05rem;
     .sidebar {
       background: radial-gradient(circle at top,#020617 0%, #020617 45%, #020617 100%);
       border-right: 1px solid rgba(148, 163, 184, 0.3);
       color: #e5e7eb;
       display: flex;
       flex-direction: column;
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
       padding: 1.5rem 1.25rem;
       gap: 1.5rem;
       width: 260px;
@@ -1871,6 +1886,18 @@ HTML_TEMPLATE = """
       color: #9ca3af;
       padding: 0.15rem 0.6rem;
       font-size: 0.75rem;
+    }
+    .btn {
+      font-size: 1rem;
+      padding: 0.65rem 1.1rem;
+      border-radius: 0.75rem;
+      min-height: 2.75rem;
+    }
+    .btn-sm {
+      font-size: 0.95rem;
+      padding: 0.55rem 0.95rem;
+      border-radius: 0.7rem;
+      min-height: 2.5rem;
     }
     .small-note { font-size:0.82rem; color:#9ca3af; }
     .divider-label {
@@ -2193,6 +2220,7 @@ SCHEDULE_TEMPLATE = """
       min-height: 100vh;
       background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%);
       color: #0f172a;
+      font-size: 1.05rem;
     }
     .app-shell {
       min-height: 100vh;
@@ -2347,6 +2375,8 @@ SCHEDULE_TEMPLATE = """
       gap: 0.6rem;
       flex-wrap: wrap;
     }
+    .btn { font-size: 1rem; padding: 0.65rem 1.15rem; border-radius: 0.75rem; min-height: 2.75rem; }
+    .btn-sm { font-size: 0.95rem; padding: 0.55rem 0.95rem; border-radius: 0.7rem; min-height: 2.5rem; }
     .btn-icon {
       width: 34px;
       height: 34px;
