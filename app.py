@@ -3956,13 +3956,20 @@ def _safe_next_url() -> str | None:
   return f"{path}{query}"
 
 
+def _employee_redirect_target(next_url: str | None) -> str:
+  # Employees may only land on employee-scoped routes to avoid redirect loops.
+  if next_url and next_url.startswith("/employee"):
+    return next_url
+  return url_for("employee_dashboard")
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
   next_url = _safe_next_url()
   if session.get("role") == "admin" and session.get("auth"):
     return redirect(next_url or url_for("index"))
   if session.get("role") == "employee" and session.get("employee_id"):
-    return redirect(next_url or url_for("employee_dashboard"))
+    return redirect(_employee_redirect_target(next_url))
 
   error = None
   if request.method == "POST":
@@ -3999,7 +4006,7 @@ def login():
           session["employee_id"] = employee.id
           session["employee_name"] = employee.name
           session["employee_code"] = employee.login_code
-          return redirect(next_url or url_for("employee_dashboard"))
+          return redirect(_employee_redirect_target(next_url))
       error = "Invalid credentials"
     else:
       error = "Username and password are required"
