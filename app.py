@@ -7,6 +7,7 @@ import secrets
 from collections import deque
 from datetime import datetime, date, timedelta
 from functools import wraps
+from typing import Any
 from urllib.parse import urljoin, urldefrag, urlparse, quote_plus
 from dotenv import load_dotenv
 
@@ -42,7 +43,7 @@ from sqlalchemy import (
   text,
   Float,
 )
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker, scoped_session
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker, scoped_session, joinedload
 
 ADMIN_TEMPLATE = """
 <!doctype html>
@@ -51,11 +52,18 @@ ADMIN_TEMPLATE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Putzelf Marketing — Admin Overview</title>
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/logo.png">
+  <link rel="manifest" href="/static/admin-manifest.json">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --accent: #0f766e; }
     body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; font-size:1.05rem; }
+    body.mobile-nav-open { overflow:hidden; }
+    body.mobile-nav-open { overflow: hidden; }
     .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); }
     .sidebar { background:rgba(2,6,23,0.82); border-right:1px solid rgba(148,163,184,0.25); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; }
     .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#6b7280; }
@@ -79,12 +87,50 @@ ADMIN_TEMPLATE = """
     .list-title { font-weight:600; color:#f1f5f9; }
     .list-sub { font-size:0.85rem; color:#94a3b8; }
     .placeholder { color:#64748b; font-size:0.85rem; }
+    .mobile-nav-toggle { display:none; }
+    .mobile-nav-backdrop { display:none; }
     @media(max-width:992px){ .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{ display:none;} }
+    @media (max-width: 992px) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: min(82vw, 300px);
+        max-width: 320px;
+        z-index: 1050;
+        display: flex;
+        transform: translateX(-100%);
+        transition: transform 0.2s ease;
+        box-shadow: 0 16px 40px rgba(2, 6, 23, 0.6);
+      }
+      body.mobile-nav-open .sidebar { transform: translateX(0); }
+      .mobile-nav-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.62);
+        z-index: 1040;
+      }
+      body.mobile-nav-open .mobile-nav-backdrop { display: block; }
+      .mobile-nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        border-radius: 0.75rem;
+        border: 1px solid rgba(148,163,184,0.4);
+        background: rgba(2, 6, 23, 0.85);
+        color: #e5e7eb;
+        padding: 0.45rem 0.85rem;
+        font-size: 0.95rem;
+        margin-bottom: 1rem;
+      }
+      .mobile-nav-toggle:focus { outline: 2px solid rgba(45,212,191,0.6); outline-offset: 2px; }
+    }
   </style>
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
+    <aside id="admin-sidebar" class="sidebar">
       <div class="sidebar-section-title">Navigation</div>
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Overview</span></a>
       <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Manage employees</span></a>
@@ -97,6 +143,7 @@ ADMIN_TEMPLATE = """
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
     <main class="main-shell text-light">
+      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="mb-3">
@@ -217,10 +264,48 @@ ADMIN_TEMPLATE = """
       </section>
     </main>
   </div>
+  <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    (function() {
+      const body = document.body;
+      const toggle = document.getElementById('mobile-nav-toggle');
+      const sidebar = document.getElementById('admin-sidebar');
+      const backdrop = document.getElementById('mobile-nav-backdrop');
+      if (!toggle || !sidebar || !backdrop) {
+        return;
+      }
+      const closeNav = () => {
+        body.classList.remove('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      };
+      const openNav = () => {
+        body.classList.add('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'true');
+      };
+      toggle.addEventListener('click', () => {
+        if (body.classList.contains('mobile-nav-open')) {
+          closeNav();
+        } else {
+          openNav();
+        }
+      });
+      backdrop.addEventListener('click', closeNav);
+      sidebar.querySelectorAll('a').forEach((link) => {
+        link.addEventListener('click', closeNav);
+      });
+    })();
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>
 """
@@ -232,6 +317,11 @@ ADMIN_EMPLOYEES_TEMPLATE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Putzelf Marketing — Employees</title>
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/logo.png">
+  <link rel="manifest" href="/static/admin-manifest.json">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -271,18 +361,56 @@ ADMIN_EMPLOYEES_TEMPLATE = """
     .assignment-status { font-size:0.78rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.08em; margin-top:0.2rem; }
     .credential-edit { border:1px dashed rgba(148,163,184,0.35); border-radius:0.75rem; padding:1rem; background:rgba(15,23,42,0.55); }
     .placeholder { color:#64748b; font-size:0.85rem; }
+    .mobile-nav-toggle { display:none; }
+    .mobile-nav-backdrop { display:none; }
     .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-bottom:1.5rem; }
     .stat-card { border-radius:0.85rem; border:1px solid rgba(45,212,191,0.25); background:rgba(15,118,110,0.1); padding:1rem; }
     .stat-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#94a3b8; margin-bottom:0.35rem; }
     .stat-value { font-size:1.6rem; font-weight:600; color:#f8fafc; }
     .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
     .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
-    @media(max-width:992px){ .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{ display:none;} }
+    @media(max-width:992px){
+      .app-shell{ grid-template-columns:minmax(0,1fr);} 
+      .sidebar{
+        position:fixed;
+        top:0;
+        left:0;
+        height:100vh;
+        width:min(82vw,300px);
+        max-width:320px;
+        z-index:1050;
+        display:flex;
+        transform:translateX(-100%);
+        transition:transform 0.2s ease;
+        box-shadow:0 16px 40px rgba(2,6,23,0.6);
+      }
+      body.mobile-nav-open .sidebar{ transform:translateX(0); }
+      .mobile-nav-backdrop{
+        position:fixed;
+        inset:0;
+        background:rgba(15,23,42,0.62);
+        z-index:1040;
+      }
+      body.mobile-nav-open .mobile-nav-backdrop{ display:block; }
+      .mobile-nav-toggle{
+        display:inline-flex;
+        align-items:center;
+        gap:0.4rem;
+        border-radius:0.75rem;
+        border:1px solid rgba(148,163,184,0.4);
+        background:rgba(2,6,23,0.85);
+        color:#e5e7eb;
+        padding:0.45rem 0.85rem;
+        font-size:0.95rem;
+        margin-bottom:1rem;
+      }
+      .mobile-nav-toggle:focus{ outline:2px solid rgba(45,212,191,0.6); outline-offset:2px; }
+    }
   </style>
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
+    <aside id="admin-sidebar" class="sidebar">
       <div class="sidebar-section-title">Navigation</div>
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Overview</span></a>
       <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Manage employees</span></a>
@@ -295,6 +423,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
     <main class="main-shell text-light">
+      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="mb-3">
@@ -517,6 +646,32 @@ ADMIN_EMPLOYEES_TEMPLATE = """
   </div>
     <script>
       document.getElementById('year').textContent = new Date().getFullYear();
+      (function() {
+        const body = document.body;
+        const toggle = document.getElementById('mobile-nav-toggle');
+        const sidebar = document.getElementById('admin-sidebar');
+        const backdrop = document.getElementById('mobile-nav-backdrop');
+        if (!toggle || !sidebar || !backdrop) {
+          return;
+        }
+        const closeNav = () => {
+          body.classList.remove('mobile-nav-open');
+          toggle.setAttribute('aria-expanded', 'false');
+        };
+        const openNav = () => {
+          body.classList.add('mobile-nav-open');
+          toggle.setAttribute('aria-expanded', 'true');
+        };
+        toggle.addEventListener('click', () => {
+          if (body.classList.contains('mobile-nav-open')) {
+            closeNav();
+          } else {
+            openNav();
+          }
+        });
+        backdrop.addEventListener('click', closeNav);
+        sidebar.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeNav));
+      })();
       document.querySelectorAll('.cred-copy-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const payload = btn.dataset.credentials;
@@ -555,6 +710,13 @@ ADMIN_EMPLOYEES_TEMPLATE = """
       });
     </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>
 """
@@ -566,10 +728,16 @@ ADMIN_SITES_TEMPLATE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Putzelf Marketing — Site Library</title>
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/logo.png">
+  <link rel="manifest" href="/static/admin-manifest.json">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; font-size:1.05rem; }
+    body.mobile-nav-open { overflow:hidden; }
     .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition:grid-template-columns 0.2s ease; }
     .sidebar { background:rgba(2,6,23,0.82); border-right:1px solid rgba(148,163,184,0.25); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; }
     .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#6b7280; }
@@ -585,12 +753,50 @@ ADMIN_SITES_TEMPLATE = """
     .table thead th { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#94a3b8; }
     .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
     .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
-    @media(max-width:992px){ .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{ display:none;} }
+    .mobile-nav-toggle { display:none; }
+    .mobile-nav-backdrop { display:none; }
+    @media(max-width:992px){
+      .app-shell{ grid-template-columns:minmax(0,1fr);} 
+      .sidebar{
+        position:fixed;
+        top:0;
+        left:0;
+        height:100vh;
+        width:min(82vw,300px);
+        max-width:320px;
+        z-index:1050;
+        display:flex;
+        transform:translateX(-100%);
+        transition:transform 0.2s ease;
+        box-shadow:0 16px 40px rgba(2,6,23,0.6);
+      }
+      body.mobile-nav-open .sidebar{ transform:translateX(0); }
+      .mobile-nav-backdrop{
+        position:fixed;
+        inset:0;
+        background:rgba(15,23,42,0.62);
+        z-index:1040;
+      }
+      body.mobile-nav-open .mobile-nav-backdrop{ display:block; }
+      .mobile-nav-toggle{
+        display:inline-flex;
+        align-items:center;
+        gap:0.4rem;
+        border-radius:0.75rem;
+        border:1px solid rgba(148,163,184,0.4);
+        background:rgba(2,6,23,0.85);
+        color:#e5e7eb;
+        padding:0.45rem 0.85rem;
+        font-size:0.95rem;
+        margin-bottom:1rem;
+      }
+      .mobile-nav-toggle:focus{ outline:2px solid rgba(45,212,191,0.6); outline-offset:2px; }
+    }
   </style>
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
+    <aside id="admin-sidebar" class="sidebar">
       <div class="sidebar-section-title">Navigation</div>
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Overview</span></a>
       <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Manage employees</span></a>
@@ -603,6 +809,7 @@ ADMIN_SITES_TEMPLATE = """
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
     <main class="main-shell text-light">
+      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="mb-3">
@@ -731,10 +938,44 @@ ADMIN_SITES_TEMPLATE = """
       </div>
     </main>
   </div>
+  <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+    (function() {
+      const body = document.body;
+      const toggle = document.getElementById('mobile-nav-toggle');
+      const sidebar = document.getElementById('admin-sidebar');
+      const backdrop = document.getElementById('mobile-nav-backdrop');
+      if (!toggle || !sidebar || !backdrop) {
+        return;
+      }
+      const closeNav = () => {
+        body.classList.remove('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      };
+      const openNav = () => {
+        body.classList.add('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'true');
+      };
+      toggle.addEventListener('click', () => {
+        if (body.classList.contains('mobile-nav-open')) {
+          closeNav();
+        } else {
+          openNav();
+        }
+      });
+      backdrop.addEventListener('click', closeNav);
+      sidebar.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeNav));
+    })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>
 """
@@ -835,6 +1076,13 @@ LOGIN_TEMPLATE = """
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>
 """
@@ -1248,10 +1496,16 @@ LEADS_TEMPLATE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Putzelf Marketing — Lead-Center</title>
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/logo.png">
+  <link rel="manifest" href="/static/admin-manifest.json">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     :root { --bs-primary: #0f766e; }
     body { min-height: 100vh; background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%); color:#e5e7eb; font-size:1.05rem; }
+    body.mobile-nav-open { overflow:hidden; }
     .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition: grid-template-columns 0.2s ease; }
     .sidebar { background: radial-gradient(circle at top,#020617 0%, #020617 45%, #020617 100%); border-right:1px solid rgba(148,163,184,0.3); color:#e5e7eb; display:flex; flex-direction:column; padding:1.5rem 1.25rem; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; }
     .sidebar-brand { display:flex; align-items:center; gap:0.75rem; }
@@ -1291,11 +1545,50 @@ LEADS_TEMPLATE = """
     .lead-card.dragging { opacity:0.6; }
     .kanban-column.drop-target { border-color:#22d3ee; box-shadow:inset 0 0 0 1px #22d3ee; }
     .lead-meta { font-size:0.8rem; color:#9ca3af; }
+    .mobile-nav-toggle { display:none; }
+    .mobile-nav-backdrop { display:none; }
+    @media (max-width: 992px) {
+      .app-shell { grid-template-columns:minmax(0, 1fr); }
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: min(82vw, 300px);
+        max-width: 320px;
+        z-index: 1050;
+        display: flex;
+        transform: translateX(-100%);
+        transition: transform 0.2s ease;
+        box-shadow: 0 16px 40px rgba(2, 6, 23, 0.6);
+      }
+      body.mobile-nav-open .sidebar { transform: translateX(0); }
+      .mobile-nav-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.62);
+        z-index: 1040;
+      }
+      body.mobile-nav-open .mobile-nav-backdrop { display: block; }
+      .mobile-nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        border-radius: 0.75rem;
+        border: 1px solid rgba(148,163,184,0.4);
+        background: rgba(2, 6, 23, 0.85);
+        color: #e5e7eb;
+        padding: 0.45rem 0.85rem;
+        font-size: 0.95rem;
+        margin-bottom: 1rem;
+      }
+      .mobile-nav-toggle:focus { outline: 2px solid rgba(45,212,191,0.6); outline-offset: 2px; }
+    }
   </style>
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
+    <aside id="admin-sidebar" class="sidebar">
       <div class="sidebar-brand">
         <div class="sidebar-logo">
           <img src="/static/logo.png" alt="Putzelf Marketing">
@@ -1340,6 +1633,7 @@ LEADS_TEMPLATE = """
       </div>
     </aside>
     <main class="main-shell">
+      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
           <div class="badge-soft mb-2">Leads</div>
@@ -1524,8 +1818,35 @@ LEADS_TEMPLATE = """
       </div>
     </main>
   </div>
+  <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+    (function() {
+      const body = document.body;
+      const toggle = document.getElementById('mobile-nav-toggle');
+      const sidebar = document.getElementById('admin-sidebar');
+      const backdrop = document.getElementById('mobile-nav-backdrop');
+      if (!toggle || !sidebar || !backdrop) {
+        return;
+      }
+      const closeNav = () => {
+        body.classList.remove('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      };
+      const openNav = () => {
+        body.classList.add('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'true');
+      };
+      toggle.addEventListener('click', () => {
+        if (body.classList.contains('mobile-nav-open')) {
+          closeNav();
+        } else {
+          openNav();
+        }
+      });
+      backdrop.addEventListener('click', closeNav);
+      sidebar.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeNav));
+    })();
     (function () {
       const KEY = 'pm-sidebar-collapsed';
       const body = document.body;
@@ -1664,6 +1985,13 @@ LEADS_TEMPLATE = """
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>
 """
@@ -2538,7 +2866,8 @@ SCHEDULE_TEMPLATE = """
     .form-grid .form-select,
     .form-grid input[type="text"],
     .form-grid input[type="time"],
-    .form-grid input[type="number"] {
+    .form-grid input[type="number"],
+    .form-grid textarea {
       background: rgba(8, 11, 22, 0.85);
       border: 1px solid rgba(51, 65, 85, 0.8);
       color: #e5e7eb;
@@ -2550,7 +2879,8 @@ SCHEDULE_TEMPLATE = """
     }
     #day-picker:focus,
     .form-grid .form-select:focus,
-    .form-grid input:focus {
+    .form-grid input:focus,
+    .form-grid textarea:focus {
       border-color: rgba(45, 212, 191, 0.55);
       box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
     }
@@ -2717,7 +3047,8 @@ SCHEDULE_TEMPLATE = """
             </div>
             <div class="section-actions">
               {% if reportlab_available %}
-                <a href="{{ pdf_url }}" class="btn btn-sm btn-primary">Download PDF</a>
+                <a href="{{ pdf_url }}" class="btn btn-sm btn-primary">Schedule PDF</a>
+                <a href="{{ hours_pdf_url }}" class="btn btn-sm btn-outline-light">Hours report</a>
               {% else %}
                 <span class="tag-muted">Install reportlab to export PDF</span>
               {% endif %}
@@ -2839,6 +3170,10 @@ SCHEDULE_TEMPLATE = """
               <div class="form-field">
                 <label class="form-label small-note text-uppercase" for="duration_hours">Duration (hours)</label>
                 <input type="number" step="0.25" min="0.25" max="24" class="form-control form-control-sm" id="duration_hours" name="duration_hours" placeholder="e.g. 8" required>
+              </div>
+              <div class="form-field form-field-span">
+                <label class="form-label small-note text-uppercase" for="instructions">Special instructions</label>
+                <textarea class="form-control form-control-sm" id="instructions" name="instructions" rows="3" placeholder="Optional notes for this shift"></textarea>
               </div>
             </div>
             <div class="form-actions">
@@ -3565,6 +3900,306 @@ def _load_schedule_context(db, week_days):
     return employees, sites, matrix
 
 
+def _shift_scheduled_duration(shift: Shift) -> timedelta:
+  start_dt = datetime.combine(shift.day, shift.start_time)
+  end_dt = datetime.combine(shift.day, shift.end_time)
+  if end_dt <= start_dt:
+    end_dt += timedelta(days=1)
+  return end_dt - start_dt
+
+
+def _shift_actual_duration(shift: Shift) -> timedelta | None:
+  if not (shift.clock_in_at and shift.clock_out_at):
+    return None
+  delta = shift.clock_out_at - shift.clock_in_at
+  if delta.total_seconds() < 0:
+    delta += timedelta(days=1)
+  return delta
+
+
+def _format_hours(delta: timedelta | None, *, signed: bool = False) -> str:
+  if delta is None:
+    return "—"
+  hours = delta.total_seconds() / 3600
+  hours = round(hours + 0.0000001, 2)
+  if signed:
+    return f"{hours:+.2f} h"
+  return f"{hours:.2f} h"
+
+
+def _format_clock(dt_val: datetime | None, *, reference_day: date | None = None) -> str:
+  if not dt_val:
+    return "—"
+  if reference_day and dt_val.date() != reference_day:
+    return dt_val.strftime("%d.%m %H:%M")
+  return dt_val.strftime("%H:%M")
+
+
+def _collect_hours_report(
+  db,
+  start_date: date,
+  end_date: date,
+  employee_id: int | None = None,
+) -> list[dict[str, Any]]:
+  query = (
+    db.query(Shift)
+    .options(joinedload(Shift.employee), joinedload(Shift.site))
+    .filter(Shift.day >= start_date, Shift.day <= end_date)
+  )
+  if employee_id:
+    query = query.filter(Shift.employee_id == employee_id)
+
+  shifts = query.order_by(Shift.employee_id, Shift.day, Shift.start_time).all()
+
+  report_map: dict[int, dict[str, Any]] = {}
+  for shift in shifts:
+    employee = shift.employee
+    if not employee:
+      continue
+    site = shift.site
+    record = report_map.setdefault(
+      employee.id,
+      {
+        "employee": employee,
+        "rows": [],
+        "scheduled_total": timedelta(0),
+        "actual_total": timedelta(0),
+        "actual_count": 0,
+        "diff_total": timedelta(0),
+        "diff_count": 0,
+      },
+    )
+
+    scheduled_delta = _shift_scheduled_duration(shift)
+    actual_delta = _shift_actual_duration(shift)
+    diff_delta = actual_delta - scheduled_delta if actual_delta is not None else None
+
+    record["rows"].append(
+      {
+        "date": shift.day,
+        "site_name": site.name if site else "Unassigned",
+        "site_address": site.address if site and site.address else "",
+        "start_time": shift.start_time,
+        "end_time": shift.end_time,
+        "clock_in": shift.clock_in_at,
+        "clock_out": shift.clock_out_at,
+        "scheduled_delta": scheduled_delta,
+        "actual_delta": actual_delta,
+        "diff_delta": diff_delta,
+        "crosses_midnight": shift.end_time <= shift.start_time,
+      }
+    )
+
+    record["scheduled_total"] += scheduled_delta
+    if actual_delta is not None:
+      record["actual_total"] += actual_delta
+      record["actual_count"] += 1
+    if diff_delta is not None:
+      record["diff_total"] += diff_delta
+      record["diff_count"] += 1
+
+  if employee_id and employee_id not in report_map:
+    employee = db.get(Employee, employee_id)
+    if employee:
+      report_map[employee_id] = {
+        "employee": employee,
+        "rows": [],
+        "scheduled_total": timedelta(0),
+        "actual_total": timedelta(0),
+        "actual_count": 0,
+        "diff_total": timedelta(0),
+        "diff_count": 0,
+      }
+
+  return sorted(
+    report_map.values(),
+    key=lambda item: item["employee"].name.lower(),
+  )
+
+
+def _generate_hours_pdf(
+  start_date: date,
+  end_date: date,
+  report_rows: list[dict[str, Any]],
+) -> io.BytesIO:
+  buf = io.BytesIO()
+  doc = SimpleDocTemplate(
+    buf,
+    pagesize=landscape(A4),
+    leftMargin=32,
+    rightMargin=32,
+    topMargin=32,
+    bottomMargin=28,
+  )
+
+  styles = getSampleStyleSheet()
+  title_style = styles["Title"]
+  title_style.fontName = "Helvetica-Bold"
+  subtitle_style = ParagraphStyle(
+    "HoursSubtitle",
+    parent=styles["Heading4"],
+    textColor=colors.HexColor("#475569"),
+  )
+  section_style = ParagraphStyle(
+    "HoursSection",
+    parent=styles["Heading3"],
+    fontSize=14,
+    leading=16,
+    spaceBefore=12,
+    spaceAfter=6,
+    textColor=colors.HexColor("#0f172a"),
+  )
+  header_style = ParagraphStyle(
+    "HoursHeader",
+    parent=styles["Heading5"],
+    alignment=1,
+    fontSize=10,
+    leading=12,
+    textColor=colors.whitesmoke,
+  )
+  cell_style = ParagraphStyle(
+    "HoursCell",
+    parent=styles["BodyText"],
+    fontSize=9,
+    leading=12,
+    textColor=colors.HexColor("#0f172a"),
+  )
+
+  elements: list[Any] = []
+
+  logo_path = os.path.join(app.root_path, "static", "logo.png")
+  if os.path.exists(logo_path):
+    logo = Image(logo_path, width=1.0 * inch, height=1.0 * inch)
+    logo.hAlign = "LEFT"
+    elements.append(logo)
+    elements.append(Spacer(1, 8))
+
+  elements.append(Paragraph("Employee Hours Report", title_style))
+  elements.append(
+    Paragraph(
+      f"Period: {start_date.strftime('%d %b %Y')} - {end_date.strftime('%d %b %Y')}",
+      subtitle_style,
+    )
+  )
+
+  total_scheduled = sum((row["scheduled_total"] for row in report_rows), timedelta(0))
+  recorded_actual = sum((row["actual_total"] for row in report_rows), timedelta(0))
+  has_recorded = any(row["actual_count"] > 0 for row in report_rows)
+  total_diff = sum((row["diff_total"] for row in report_rows), timedelta(0)) if has_recorded else None
+
+  summary_parts = [f"Scheduled hours: {_format_hours(total_scheduled)}"]
+  if has_recorded:
+    summary_parts.append(
+      f"Recorded hours: {_format_hours(recorded_actual)}"
+    )
+    summary_parts.append(
+      f"Recorded vs scheduled: {_format_hours(total_diff, signed=True)}"
+    )
+  else:
+    summary_parts.append("Recorded hours: —")
+  elements.append(Paragraph(" | ".join(summary_parts), styles["Normal"]))
+  elements.append(Spacer(1, 12))
+
+  if not report_rows:
+    elements.append(Paragraph("No shifts found for the selected period.", styles["Normal"]))
+    doc.build(elements)
+    buf.seek(0)
+    return buf
+
+  for entry in report_rows:
+    employee = entry["employee"]
+    header_text = employee.name
+    if employee.role:
+      header_text += f" ({employee.role})"
+    elements.append(Paragraph(header_text, section_style))
+
+    table_data: list[list[Any]] = [
+      [
+        Paragraph("<b>Date</b>", header_style),
+        Paragraph("<b>Site</b>", header_style),
+        Paragraph("<b>Scheduled</b>", header_style),
+        Paragraph("<b>Clocked in</b>", header_style),
+        Paragraph("<b>Clocked out</b>", header_style),
+        Paragraph("<b>Scheduled hrs</b>", header_style),
+        Paragraph("<b>Worked hrs</b>", header_style),
+        Paragraph("<b>Difference</b>", header_style),
+      ]
+    ]
+
+    for row in entry["rows"]:
+      date_str = row["date"].strftime("%a %d %b %Y")
+      site_line = row["site_name"]
+      if row["site_address"]:
+        site_line += f"<br/><font size='8' color='#64748b'>{row['site_address']}</font>"
+      scheduled_window = f"{row['start_time'].strftime('%H:%M')} - {row['end_time'].strftime('%H:%M')}"
+      if row["crosses_midnight"]:
+        scheduled_window += " (+1 day)"
+
+      table_data.append(
+        [
+          Paragraph(date_str, cell_style),
+          Paragraph(site_line, cell_style),
+          Paragraph(scheduled_window, cell_style),
+          Paragraph(_format_clock(row["clock_in"], reference_day=row["date"]), cell_style),
+          Paragraph(_format_clock(row["clock_out"], reference_day=row["date"]), cell_style),
+          Paragraph(_format_hours(row["scheduled_delta"]), cell_style),
+          Paragraph(_format_hours(row["actual_delta"]), cell_style),
+          Paragraph(_format_hours(row["diff_delta"], signed=True), cell_style),
+        ]
+      )
+
+    totals_row = [
+      Paragraph("", cell_style),
+      Paragraph("", cell_style),
+      Paragraph("", cell_style),
+      Paragraph("", cell_style),
+      Paragraph("Totals", cell_style),
+      Paragraph(_format_hours(entry["scheduled_total"]), cell_style),
+      Paragraph(
+        _format_hours(entry["actual_total"] if entry["actual_count"] else None),
+        cell_style,
+      ),
+      Paragraph(
+        _format_hours(entry["diff_total"] if entry["diff_count"] else None, signed=True),
+        cell_style,
+      ),
+    ]
+    table_data.append(totals_row)
+
+    col_widths = [1.4 * inch, 2.1 * inch, 1.2 * inch, 1.0 * inch, 1.0 * inch, 1.0 * inch, 1.0 * inch, 1.0 * inch]
+
+    table = Table(table_data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
+    table.setStyle(
+      TableStyle(
+        [
+          ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f766e")),
+          ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+          ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+          ("VALIGN", (0, 0), (-1, -1), "TOP"),
+          ("FONTSIZE", (0, 0), (-1, 0), 10),
+          (
+            "ROWBACKGROUNDS",
+            (0, 1),
+            (-1, -2),
+            [colors.HexColor("#f8fafc"), colors.HexColor("#e2e8f0")],
+          ),
+          ("ROWBACKGROUNDS", (0, -1), (-1, -1), [colors.HexColor("#dbeafe")]),
+          ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5f5")),
+          ("LEFTPADDING", (0, 0), (-1, -1), 8),
+          ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+          ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+          ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ]
+      )
+    )
+    elements.append(table)
+    elements.append(Spacer(1, 16))
+
+  doc.build(elements)
+  buf.seek(0)
+  return buf
+
+
 def _generate_schedule_pdf(week_days, employees, matrix):
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -4237,6 +4872,8 @@ def schedule_dashboard():
                 day_values_raw = [part.strip() for part in fallback_days.split(",") if part.strip()]
             start_str = request.form.get("start_time")
             duration_hours_str = request.form.get("duration_hours")
+            instructions_raw = (request.form.get("instructions") or "").strip()
+            instructions_val = instructions_raw or None
             day_values: list[date] = []
             seen_days: set[date] = set()
             for day_str in day_values_raw:
@@ -4271,6 +4908,7 @@ def schedule_dashboard():
                     day=day_val,
                     start_time=start_val,
                     end_time=end_val,
+                    instructions=instructions_val,
                   )
                   db.add(shift)
                   created += 1
@@ -4307,6 +4945,14 @@ def schedule_dashboard():
             pdf_params["week"] = week_days[0].isoformat()
         pdf_url = url_for("schedule_pdf", **pdf_params)
 
+        hours_params = {
+          "start_date": week_days[0].isoformat(),
+          "end_date": week_days[-1].isoformat(),
+        }
+        if selected_employee_id:
+          hours_params["employee_id"] = selected_employee_id
+        hours_pdf_url = url_for("hours_pdf", **hours_params)
+
         schedule_html = render_template_string(
             SCHEDULE_TEMPLATE,
             employees=employees,
@@ -4320,6 +4966,7 @@ def schedule_dashboard():
             selected_employee_id=selected_employee_id,
             selected_employee=selected_employee,
             pdf_url=pdf_url,
+            hours_pdf_url=hours_pdf_url,
             active_page="schedule",
         )
         return schedule_html
@@ -4796,6 +5443,58 @@ def schedule_pdf():
         as_attachment=True,
         download_name=filename,
     )
+
+
+@app.route("/reports/hours.pdf")
+@login_required
+def hours_pdf():
+  if not REPORTLAB_AVAILABLE:
+    return jsonify({"error": "reportlab not installed"}), 503
+
+  start_str = request.args.get("start_date")
+  end_str = request.args.get("end_date")
+  employee_id = request.args.get("employee_id", type=int)
+
+  today = date.today()
+  if start_str:
+    try:
+      start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+    except ValueError:
+      return jsonify({"error": "Invalid start_date"}), 400
+  else:
+    start_date = today - timedelta(days=today.weekday())
+
+  if end_str:
+    try:
+      end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+    except ValueError:
+      return jsonify({"error": "Invalid end_date"}), 400
+  else:
+    end_date = start_date + timedelta(days=6)
+
+  if end_date < start_date:
+    start_date, end_date = end_date, start_date
+
+  db = SessionLocal()
+  try:
+    report_rows = _collect_hours_report(db, start_date, end_date, employee_id=employee_id)
+    if employee_id and not report_rows:
+      return jsonify({"error": "Employee not found"}), 404
+    pdf_buffer = _generate_hours_pdf(start_date, end_date, report_rows)
+  finally:
+    db.close()
+
+  filename = f"hours_{start_date.isoformat()}_{end_date.isoformat()}"
+  if employee_id:
+    filename += f"_employee_{employee_id}"
+  filename += ".pdf"
+
+  return send_file(
+    pdf_buffer,
+    mimetype="application/pdf",
+    as_attachment=True,
+    download_name=filename,
+  )
 
 
 @app.route("/", methods=["GET", "POST"])
