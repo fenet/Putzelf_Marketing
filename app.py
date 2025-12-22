@@ -845,458 +845,322 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Putzelf Marketing — My Jobs</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/logo.png">
   <style>
-    :root {
-      --night: #020617;
-      --card: #0f172a;
-      --accent: #0ea5e9;
-      --accent-secondary: #f97316;
-      --success: #16a34a;
-      --muted: #64748b;
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #020617; font-family: 'Inter', sans-serif; color: #e2e8f0; min-height: 100vh; display: flex; justify-content: center; }
+    a { color: inherit; }
+    .app-shell { width: min(520px, 100%); min-height: 100vh; display: flex; flex-direction: column; background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(2,6,23,0.95) 100%); box-shadow: 0 28px 80px rgba(2,6,23,0.55); position: relative; }
+    .app-header { position: sticky; top: 0; z-index: 20; padding: calc(env(safe-area-inset-top, 0px) + 1rem) 1.35rem 1rem; background: linear-gradient(180deg, rgba(8,47,73,0.92) 0%, rgba(15,23,42,0.92) 100%); backdrop-filter: blur(22px); border-bottom: 1px solid rgba(148,163,184,0.16); }
+    .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .brand-group { display: flex; align-items: center; gap: 0.75rem; }
+    .brand-mark { width: 2.75rem; height: 2.75rem; border-radius: 1rem; display: inline-flex; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 20%, #22d3ee, #0ea5e9 55%, #0f172a 100%); font-size: 1.5rem; }
+    .brand-text { display: grid; gap: 0.1rem; }
+    .brand-label { font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.82rem; color: rgba(226,232,240,0.9); }
+    .brand-sub { font-size: 0.76rem; color: rgba(148,163,184,0.9); letter-spacing: 0.04em; text-transform: uppercase; }
+    .logout-chip { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.55rem 1.05rem; border-radius: 999px; background: rgba(248,250,252,0.12); color: #f8fafc; text-decoration: none; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.05em; border: 1px solid rgba(148,163,184,0.26); transition: transform 0.16s ease, background 0.16s ease; }
+    .logout-chip:hover { transform: translateY(-1px); background: rgba(248,250,252,0.22); }
+    .date-line { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: center; }
+    .welcome { font-size: 1.05rem; font-weight: 600; letter-spacing: 0.01em; }
+    .date-chip { padding: 0.35rem 0.85rem; border-radius: 999px; background: rgba(2,132,199,0.2); border: 1px solid rgba(56,189,248,0.4); font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; color: #bae6fd; }
+    .app-content { flex: 1; overflow-y: auto; padding: 1.25rem 1.35rem calc(84px + env(safe-area-inset-bottom, 14px)); display: grid; gap: 1.6rem; }
+    .section { display: grid; gap: 1rem; }
+    .section-head { display: grid; gap: 0.4rem; }
+    .section-eyebrow { font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(148,163,184,0.78); }
+    .section-title { font-size: 1.35rem; font-weight: 700; margin: 0; }
+    .section-subtitle { margin: 0; color: rgba(203,213,225,0.85); font-size: 0.95rem; }
+    .flash-stack { display: grid; gap: 0.6rem; }
+    .flash-card { border-radius: 1rem; background: rgba(252,211,77,0.22); color: #0f172a; padding: 0.85rem 1rem; border: 1px solid rgba(250,204,21,0.35); font-weight: 600; }
+    .job-list { display: grid; gap: 1.1rem; }
+    .job-card { border-radius: 1.2rem; background: linear-gradient(160deg, rgba(14,165,233,0.24), rgba(15,118,110,0.26)); border: 1px solid rgba(125,211,252,0.28); box-shadow: inset 0 0 0 1px rgba(14,165,233,0.12); padding: 1.25rem; display: grid; gap: 0.95rem; }
+    .job-card--complete { background: linear-gradient(160deg, rgba(34,197,94,0.22), rgba(15,118,110,0.28)); border-color: rgba(74,222,128,0.35); }
+    .job-head { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: space-between; align-items: baseline; }
+    .job-title { font-size: 1.18rem; font-weight: 600; letter-spacing: 0.015em; }
+    .status-pill { padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; border: 1px solid rgba(148,163,184,0.3); color: #f8fafc; background: rgba(15,23,42,0.4); }
+    .status-pill[data-state="Scheduled"] { border-color: rgba(56,189,248,0.45); background: rgba(14,165,233,0.25); color: #bae6fd; }
+    .status-pill[data-state="In progress"] { border-color: rgba(253,186,116,0.55); background: rgba(249,115,22,0.28); color: #fed7aa; }
+    .status-pill[data-state="Completed"] { border-color: rgba(74,222,128,0.55); background: rgba(34,197,94,0.26); color: #bbf7d0; }
+    .job-meta { display: grid; gap: 0.5rem; font-size: 0.95rem; color: rgba(226,232,240,0.88); }
+    .meta-label { font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(148,163,184,0.78); margin-bottom: 0.25rem; }
+    .meta-chip-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .meta-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; border: 1px solid rgba(125,211,252,0.4); background: rgba(14,165,233,0.2); color: #bae6fd; }
+    .meta-chip--accent { border-color: rgba(74,222,128,0.4); background: rgba(34,197,94,0.2); color: #bbf7d0; }
+    .checkpoint-row { display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.85rem; color: rgba(226,232,240,0.78); }
+    .map-link { color: #67e8f9; font-weight: 600; text-decoration: none; }
+    .map-link:hover { text-decoration: underline; }
+    .job-actions { display: grid; gap: 0.75rem; }
+    @media (min-width: 420px) {
+      .job-actions { grid-template-columns: repeat(2, minmax(0,1fr)); }
     }
-    body {
-      background: radial-gradient(circle at top,#38bdf8 0%,#0ea5e9 24%,#1e293b 58%,#020617 100%);
-      min-height: 100vh;
-      color: #e2e8f0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: clamp(1rem, 3vw + 0.5rem, 2.5rem);
-      font-family: 'Inter', sans-serif;
-      font-size: 1.05rem;
-    }
-    .wrapper {
-      width: min(880px, 100%);
-      backdrop-filter: blur(14px);
-      background: rgba(15,23,42,0.88);
-      border: 1px solid rgba(148,163,184,0.25);
-      border-radius: 1.2rem;
-      padding: clamp(1.5rem, 3vw + 1rem, 2.2rem);
-      box-shadow: 0 25px 65px rgba(15,23,42,0.45);
-      display: flex;
-      flex-direction: column;
-      gap: 1.4rem;
-    }
-    .top-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-    .top-brand {
-      display: flex;
-      align-items: center;
-      gap: 0.8rem;
-    }
-    .brand-mark {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 2.6rem;
-      height: 2.6rem;
-      border-radius: 0.9rem;
-      background: linear-gradient(135deg, rgba(14,165,233,0.4), rgba(56,189,248,0.6));
-      font-size: 1.3rem;
-    }
-    .brand-title {
-      font-weight: 600;
-      letter-spacing: 0.02em;
-    }
-    .brand-sub {
-      font-size: 0.82rem;
-      color: rgba(226,232,240,0.7);
-    }
-    .logout-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.65rem 1.15rem;
-      border-radius: 999px;
-      background: rgba(248,250,252,0.14);
-      color: #f8fafc;
-      text-decoration: none;
-      font-weight: 600;
-      letter-spacing: 0.03em;
-      transition: transform 0.18s ease, background 0.18s ease;
-    }
-    .logout-link:hover { transform: translateY(-1px); background: rgba(248,250,252,0.24); }
-    .hero {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-      margin-bottom: 1.5rem;
-    }
-    .hero h1 {
-      font-size: clamp(1.6rem, 3vw, 2.4rem);
-      font-weight: 700;
-      margin: 0;
-    }
-    .hero p {
-      margin: 0;
-      color: rgba(226,232,240,0.85);
-    }
-    .alerts {
-      margin-bottom: 1rem;
-    }
-    .shift-card {
-      background: linear-gradient(135deg, rgba(14,165,233,0.18), rgba(14,116,144,0.25));
-      border-radius: 1.15rem;
-      padding: 1.4rem 1.6rem;
-      border: 1px solid rgba(125,211,252,0.35);
-      box-shadow: inset 0 0 0 1px rgba(14,165,233,0.15);
-      display: grid;
-      gap: 1rem;
-    }
-    .shift-card + .shift-card { margin-top: 1.3rem; }
-    .shift-header { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: baseline; justify-content: space-between; }
-    .shift-title { font-size: 1.25rem; font-weight: 600; letter-spacing: 0.01em; }
-    .badge-soft { padding: 0.35rem 0.85rem; border-radius: 999px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.09em; }
-    .badge-scheduled { background: rgba(14,165,233,0.22); color: #bae6fd; border: 1px solid rgba(14,165,233,0.5); }
-    .badge-progress { background: rgba(249,115,22,0.18); color: #fed7aa; border: 1px solid rgba(253,186,116,0.45); }
-    .badge-complete { background: rgba(22,163,74,0.18); color: #bbf7d0; border: 1px solid rgba(74,222,128,0.45); }
-    .details-grid { display: grid; gap: 0.5rem; font-size: 0.95rem; }
-    .detail-label { color: rgba(226,232,240,0.75); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.12em; }
-    .detail-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.35rem; }
-    .detail-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      background: rgba(14,165,233,0.14);
-      color: #bae6fd;
-      border: 1px solid rgba(125,211,252,0.35);
-      padding: 0.35rem 0.7rem;
-      border-radius: 999px;
-      font-size: 0.78rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
-    .detail-chip--actual { background: rgba(34,197,94,0.18); border-color: rgba(74,222,128,0.4); color: #bbf7d0; }
-    .detail-checkpoints { display: flex; flex-wrap: wrap; gap: 1.1rem; color: rgba(203,213,225,0.9); font-size: 0.88rem; margin-top: 0.35rem; }
-    .link-map { color: #a5f3fc; font-weight: 600; text-decoration: none; }
-    .link-map:hover { text-decoration: underline; }
-    .action-deck { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
-    .action-form button {
-      width: 100%;
-      border: none;
-      border-radius: 0.95rem;
-      font-size: 1.12rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      transition: transform 0.18s ease, box-shadow 0.18s ease;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.6rem;
-      padding: 1rem 1.2rem;
-    }
-    .action-form button .btn-icon { font-size: 1.35rem; line-height: 1; }
-    .action-form button:hover { transform: translateY(-2px); box-shadow: 0 15px 28px rgba(0,0,0,0.18); }
-    .btn-clock { background: linear-gradient(135deg,#38bdf8,#0ea5e9); color: #0f172a; }
-    .btn-upload-before { background: linear-gradient(135deg,rgba(56,189,248,0.2),rgba(14,165,233,0.4)); color:#e0f2fe; border:1px solid rgba(56,189,248,0.45); }
-    .btn-upload-before:hover { box-shadow: 0 18px 32px rgba(14,165,233,0.25); }
-    .btn-upload-after { background: linear-gradient(135deg,rgba(187,247,208,0.25),rgba(34,197,94,0.45)); color:#ecfdf5; border:1px solid rgba(34,197,94,0.45); }
-    .btn-upload-after:hover { box-shadow: 0 18px 32px rgba(34,197,94,0.28); }
-    .btn-done { background: linear-gradient(135deg,#22c55e,#14b8a6); color: #022c22; position: relative; overflow: hidden; }
-    .photo-preview img {
-      width: 100%;
-      max-width: 220px;
-      border-radius: 0.75rem;
-      border: 2px solid rgba(148,163,184,0.35);
-    }
-    .photo-preview { display: flex; flex-wrap: wrap; gap: 1rem; }
-    .timeline-stack { display: grid; gap: 0.9rem; }
-    .timeline-collapse {
-      border-radius: 1rem;
-      border: 1px solid rgba(148,163,184,0.28);
-      background: rgba(15,23,42,0.6);
-      overflow: hidden;
-    }
-    .timeline-collapse summary {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 0.6rem;
-      padding: 0.95rem 1.1rem;
-      cursor: pointer;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #e2e8f0;
-    }
-    .timeline-collapse summary::-webkit-details-marker { display: none; }
-    .timeline-count {
-      font-size: 0.82rem;
-      color: #bae6fd;
-      background: rgba(14,165,233,0.18);
-      border: 1px solid rgba(125,211,252,0.35);
-      border-radius: 999px;
-      padding: 0.18rem 0.65rem;
-      letter-spacing: 0.08em;
-    }
-    .timeline-content { padding: 0.75rem 1.1rem 1.1rem; display: grid; gap: 0.75rem; }
-    .timeline-card {
-      border-radius: 0.9rem;
-      border: 1px solid rgba(71,85,105,0.35);
-      background: rgba(15,23,42,0.55);
-      padding: 0.85rem 0.95rem;
-      display: grid;
-      gap: 0.45rem;
-    }
-    .timeline-primary { font-weight: 600; font-size: 1.05rem; color: #f8fafc; }
-    .timeline-meta { font-size: 0.9rem; color: rgba(226,232,240,0.78); }
-    .timeline-note { font-size: 0.86rem; color: rgba(203,213,225,0.78); }
-    .timeline-status { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; color: #cbd5f5; }
-    .timeline-empty { font-size: 0.85rem; color: rgba(148,163,184,0.88); }
-    .empty-state {
-      background: rgba(2,6,23,0.7);
-      border: 1px dashed rgba(148,163,184,0.4);
-      border-radius: 1rem;
-      padding: 2.4rem 1.6rem;
-      text-align: center;
-      color: rgba(203,213,225,0.8);
-    }
-    .confetti-overlay {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      overflow: hidden;
-    }
-    .confetti-piece {
-      position: absolute;
-      width: 12px;
-      height: 18px;
-      border-radius: 4px;
-      opacity: 0;
-      animation: confetti-fall 1.05s ease-out forwards;
-    }
-    .confetti-message {
-      position: relative;
-      font-size: clamp(1.5rem, 4vw, 2.2rem);
-      font-weight: 700;
-      color: #f1f5f9;
-      text-shadow: 0 8px 18px rgba(15,23,42,0.62);
-      animation: pop-in 0.5s ease-out forwards;
-      opacity: 0;
-    }
-    @keyframes confetti-fall {
-      0% { transform: translate3d(var(--x-start), -20vh, 0) rotate(0deg); opacity: 0; }
-      15% { opacity: 1; }
-      100% { transform: translate3d(var(--x-end), 110vh, 0) rotate(var(--rotate)); opacity: 0; }
-    }
-    @keyframes pop-in {
-      0% { opacity: 0; transform: scale(0.82); }
-      60% { opacity: 1; transform: scale(1.05); }
-      100% { opacity: 1; transform: scale(1); }
-    }
-    @media (max-width: 720px) {
-      body { padding: 0.85rem; display: block; }
-      .wrapper { padding: 1.3rem; border-radius: 1.05rem; }
-      .hero { margin-bottom: 1.1rem; }
-      .action-form button { font-size: 1.02rem; padding: 0.95rem 1rem; gap: 0.5rem; }
-      .action-deck { grid-template-columns: 1fr; }
-      .timeline-collapse summary { padding: 0.85rem 0.95rem; }
-    }
-    @media (max-width: 540px) {
-      .top-brand { width: 100%; justify-content: space-between; }
-      .brand-sub { font-size: 0.75rem; }
-      .logout-link { width: 100%; justify-content: center; }
-      .timeline-content { padding: 0.65rem 0.85rem 0.95rem; }
-      .timeline-card { padding: 0.75rem 0.8rem; }
+    .job-actions form, .job-actions label { width: 100%; }
+    .action-button, .upload-tile { width: 100%; border: none; border-radius: 1rem; padding: 1rem 1.1rem; font-size: 1.05rem; font-weight: 600; letter-spacing: 0.04em; display: inline-flex; justify-content: center; align-items: center; gap: 0.55rem; cursor: pointer; transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease; text-align: center; }
+    .action-button:disabled { opacity: 0.55; cursor: default; }
+    .action-button:not(:disabled):hover, .upload-tile:hover { transform: translateY(-2px); box-shadow: 0 18px 32px rgba(2,6,23,0.35); }
+    .btn-clock { background: linear-gradient(135deg, #38bdf8, #0ea5e9); color: #041725; }
+    .btn-complete { background: linear-gradient(135deg, #22c55e, #14b8a6); color: #022c22; }
+    .upload-tile { background: linear-gradient(135deg, rgba(14,165,233,0.18), rgba(14,116,144,0.35)); border: 1px dashed rgba(125,211,252,0.4); color: #e0f2fe; position: relative; }
+    .upload-tile[data-type="after"] { background: linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.35)); border-color: rgba(74,222,128,0.4); color: #ecfdf5; }
+    .upload-tile input[type="file"] { display: none; }
+    .photo-grid { display: flex; flex-wrap: wrap; gap: 0.9rem; }
+    .photo-item { display: grid; gap: 0.4rem; }
+    .photo-item img { width: 160px; max-width: 44vw; border-radius: 0.8rem; border: 2px solid rgba(148,163,184,0.35); object-fit: cover; }
+    .timeline { display: grid; gap: 0.8rem; }
+    .timeline-card { border-radius: 1rem; border: 1px solid rgba(71,85,105,0.35); background: rgba(15,23,42,0.6); padding: 0.95rem 1rem; display: grid; gap: 0.45rem; }
+    .timeline-card h3 { font-size: 1rem; margin: 0; font-weight: 600; }
+    .timeline-meta { font-size: 0.88rem; color: rgba(226,232,240,0.78); }
+    .empty-state { border-radius: 1rem; border: 1px dashed rgba(148,163,184,0.35); background: rgba(2,6,23,0.75); padding: 2.2rem 1.4rem; text-align: center; color: rgba(203,213,225,0.85); }
+    .bottom-nav { position: sticky; bottom: 0; z-index: 30; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; padding: 0.55rem 1rem calc(env(safe-area-inset-bottom, 12px) + 0.55rem); background: rgba(7,22,39,0.92); border-top: 1px solid rgba(148,163,184,0.18); backdrop-filter: blur(18px); }
+    .nav-link { display: grid; gap: 0.15rem; justify-items: center; padding: 0.45rem 0.35rem; border-radius: 0.85rem; text-decoration: none; color: rgba(226,232,240,0.75); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600; transition: background 0.16s ease, color 0.16s ease; }
+    .nav-link .icon { font-size: 1.15rem; }
+    .nav-link.active { background: rgba(56,189,248,0.2); color: #f8fafc; border: 1px solid rgba(56,189,248,0.4); }
+    @media (min-width: 880px) {
+      body { background: radial-gradient(circle at top, #38bdf8 0%, #0ea5e9 25%, #1e293b 60%, #020617 100%); padding: 2rem 0; }
+      .app-shell { border-radius: 1.6rem; overflow: hidden; }
     }
   </style>
 </head>
 <body>
-  <main class="wrapper">
-    <header class="top-bar">
-      <div class="top-brand">
-        <span class="brand-mark" aria-hidden="true">🧽</span>
-        <div>
-          <div class="brand-title">Crew Dashboard</div>
-          <div class="brand-sub">Stay on top of every site</div>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand-row">
+        <div class="brand-group">
+          <span class="brand-mark" aria-hidden="true">🧽</span>
+          <div class="brand-text">
+            <span class="brand-label">Crew dashboard</span>
+            <span class="brand-sub">Putzelf Marketing</span>
+          </div>
         </div>
+        <a class="logout-chip" href="{{ url_for('logout') }}">Sign out</a>
       </div>
-      <a href="{{ url_for('logout') }}" class="logout-link">Log out</a>
+      <div class="date-line">
+        <span class="welcome">Hi {{ employee_name }}!</span>
+        <span class="date-chip">{{ today_label }}</span>
+      </div>
     </header>
-
-    <div class="hero">
-      <h1>Hey {{ employee_name }} 👋</h1>
-      <p>{{ today_label }} · {{ friendly_message }}</p>
-    </div>
-
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <div class="alerts">
-          {% for message in messages %}
-            <div class="alert alert-light text-dark border-0 shadow-sm" role="alert">{{ message }}</div>
-          {% endfor %}
+    <main class="app-content" id="content">
+      <section id="today" class="section">
+        <div class="section-head">
+          <span class="section-eyebrow">Today</span>
+          <h1 class="section-title">Your missions</h1>
+          <p class="section-subtitle">{{ friendly_message }}</p>
         </div>
-      {% endif %}
-    {% endwith %}
-
-    {% if shifts %}
-      {% for shift in shifts %}
-        <section class="shift-card">
-          <div class="shift-header">
-            <div>
-              <div class="shift-title">{{ shift.site_name }}</div>
-              <div class="text-uppercase" style="font-size:0.8rem; letter-spacing:0.1em; color:rgba(226,232,240,0.7);">{{ shift.time_window }}</div>
-            </div>
-            <span class="badge-soft {{ shift.status_badge }}">{{ shift.status_label }}</span>
-          </div>
-
-          <div class="details-grid">
-            <div>
-              <div class="detail-label">Address</div>
-              <div>{{ shift.address }}</div>
-              {% if shift.map_url %}
-                <a class="link-map" href="{{ shift.map_url }}" target="_blank" rel="noopener">Open in Google Maps →</a>
-              {% endif %}
-            </div>
-            <div>
-              <div class="detail-label">Instructions</div>
-              <div>{{ shift.instructions }}</div>
-            </div>
-            <div>
-              <div class="detail-label">Duration</div>
-              <div class="detail-chips">
-                <span class="detail-chip">Scheduled · {{ shift.scheduled_duration }}</span>
-                {% if shift.has_actual_duration %}
-                  <span class="detail-chip detail-chip--actual">Actual · {{ shift.actual_duration }}</span>
-                {% endif %}
-              </div>
-            </div>
-            <div>
-              <div class="detail-label">Checkpoints</div>
-              <div class="detail-checkpoints">
-                <span>Clock-in: {{ shift.clock_in_display }}</span>
-                <span>Clock-out: {{ shift.clock_out_display }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="action-deck">
-            <form class="action-form geo-form" method="post" action="{{ shift.clock_in_url }}" data-action="clock-in" data-requires-geo="true">
-              <input type="hidden" name="lat" value="">
-              <input type="hidden" name="lng" value="">
-              <button type="submit" class="btn-clock" {% if shift.clocked_in %}disabled{% endif %}>{{ shift.clocked_in and 'Clocked in ✔' or 'Clock in' }}</button>
-            </form>
-
-            <form class="action-form" method="post" action="{{ shift.upload_url }}" enctype="multipart/form-data">
-              <input type="hidden" name="photo_type" value="before">
-              <label class="btn-upload-before" style="display:block; cursor:pointer;">
-                <span class="btn-icon" aria-hidden="true">📸</span>
-                <span>{% if shift.before_photo_url %}Replace before photo{% else %}Upload before photo{% endif %}</span>
-                <input type="file" name="photo" accept="image/*" style="display:none;" onchange="this.form.submit()">
-              </label>
-            </form>
-
-            <form class="action-form" method="post" action="{{ shift.upload_url }}" enctype="multipart/form-data">
-              <input type="hidden" name="photo_type" value="after">
-              <label class="btn-upload-after" style="display:block; cursor:pointer;">
-                <span class="btn-icon" aria-hidden="true">✨</span>
-                <span>{% if shift.after_photo_url %}Replace after photo{% else %}Upload after photo{% endif %}</span>
-                <input type="file" name="photo" accept="image/*" style="display:none;" onchange="this.form.submit()">
-              </label>
-            </form>
-
-            <form class="action-form geo-form celebrate-form" method="post" action="{{ shift.complete_url }}" data-action="complete" data-requires-geo="true">
-              <input type="hidden" name="lat" value="">
-              <input type="hidden" name="lng" value="">
-              <button type="submit" class="btn-done" {% if shift.clocked_out %}disabled{% endif %}>{{ shift.clocked_out and 'Completed 🎉' or 'Done!' }}</button>
-            </form>
-          </div>
-
-          {% if shift.before_photo_url or shift.after_photo_url %}
-            <div class="photo-preview">
-              {% if shift.before_photo_url %}
-                <div>
-                  <div class="detail-label" style="margin-bottom:0.4rem;">Before</div>
-                  <img src="{{ shift.before_photo_url }}" alt="Before photo for {{ shift.site_name }}">
-                </div>
-              {% endif %}
-              {% if shift.after_photo_url %}
-                <div>
-                  <div class="detail-label" style="margin-bottom:0.4rem;">After</div>
-                  <img src="{{ shift.after_photo_url }}" alt="After photo for {{ shift.site_name }}">
-                </div>
-              {% endif %}
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="flash-stack">
+              {% for message in messages %}
+                <div class="flash-card">{{ message }}</div>
+              {% endfor %}
             </div>
           {% endif %}
-        </section>
-      {% endfor %}
-    {% else %}
-      <div class="empty-state">
-        <h2 class="h5 text-light">You’re all set!</h2>
-        <p>No shifts scheduled for today. Check back later or reach out to your manager if you were expecting a job.</p>
-      </div>
-    {% endif %}
+        {% endwith %}
+        {% if shifts %}
+          <div class="job-list">
+            {% for shift in shifts %}
+              <article class="job-card {% if shift.clocked_out %}job-card--complete{% endif %}">
+                <div class="job-head">
+                  <div>
+                    <div class="job-title">{{ shift.site_name }}</div>
+                    <div class="timeline-meta">{{ shift.time_window }}</div>
+                  </div>
+                  <span class="status-pill" data-state="{{ shift.status_label }}">{{ shift.status_label }}</span>
+                </div>
+                <div class="job-meta">
+                  <div>
+                    <div class="meta-label">Location</div>
+                    <div>{{ shift.address }}</div>
+                    {% if shift.map_url %}
+                      <a class="map-link" href="{{ shift.map_url }}" target="_blank" rel="noopener">Open in Maps</a>
+                    {% endif %}
+                  </div>
+                  <div>
+                    <div class="meta-label">Instructions</div>
+                    <div>{{ shift.instructions }}</div>
+                  </div>
+                  <div>
+                    <div class="meta-label">Duration</div>
+                    <div class="meta-chip-row">
+                      <span class="meta-chip">Scheduled · {{ shift.scheduled_duration }}</span>
+                      {% if shift.has_actual_duration %}
+                        <span class="meta-chip meta-chip--accent">Actual · {{ shift.actual_duration }}</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                  <div>
+                    <div class="meta-label">Checkpoints</div>
+                    <div class="checkpoint-row">
+                      <span>Clock-in: {{ shift.clock_in_display }}</span>
+                      <span>Clock-out: {{ shift.clock_out_display }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="job-actions">
+                  <form class="geo-form" method="post" action="{{ shift.clock_in_url }}" data-action="clock-in" data-requires-geo="true">
+                    <input type="hidden" name="lat" value="">
+                    <input type="hidden" name="lng" value="">
+                    <button type="submit" class="action-button btn-clock" {% if shift.clocked_in %}disabled{% endif %}>
+                      {% if shift.clocked_in %}Clocked in ✔{% else %}Clock in{% endif %}
+                    </button>
+                  </form>
+                  <form method="post" action="{{ shift.upload_url }}" enctype="multipart/form-data">
+                    <input type="hidden" name="photo_type" value="before">
+                    <label class="upload-tile" data-type="before">
+                      <span class="icon" aria-hidden="true">📸</span>
+                      <span>{% if shift.before_photo_url %}Replace before photo{% else %}Upload before photo{% endif %}</span>
+                      <input type="file" name="photo" accept="image/*" onchange="this.form.submit()">
+                    </label>
+                  </form>
+                  <form method="post" action="{{ shift.upload_url }}" enctype="multipart/form-data">
+                    <input type="hidden" name="photo_type" value="after">
+                    <label class="upload-tile" data-type="after">
+                      <span class="icon" aria-hidden="true">✨</span>
+                      <span>{% if shift.after_photo_url %}Replace after photo{% else %}Upload after photo{% endif %}</span>
+                      <input type="file" name="photo" accept="image/*" onchange="this.form.submit()">
+                    </label>
+                  </form>
+                  <form class="geo-form celebrate-form" method="post" action="{{ shift.complete_url }}" data-action="complete" data-requires-geo="true">
+                    <input type="hidden" name="lat" value="">
+                    <input type="hidden" name="lng" value="">
+                    <button type="submit" class="action-button btn-complete" {% if shift.clocked_out %}disabled{% endif %}>
+                      {% if shift.clocked_out %}Completed 🎉{% else %}Mark complete{% endif %}
+                    </button>
+                  </form>
+                </div>
+                {% if shift.before_photo_url or shift.after_photo_url %}
+                  <div class="photo-grid">
+                    {% if shift.before_photo_url %}
+                      <div class="photo-item">
+                        <div class="meta-label">Before</div>
+                        <img src="{{ shift.before_photo_url }}" alt="Before photo for {{ shift.site_name }}">
+                      </div>
+                    {% endif %}
+                    {% if shift.after_photo_url %}
+                      <div class="photo-item">
+                        <div class="meta-label">After</div>
+                        <img src="{{ shift.after_photo_url }}" alt="After photo for {{ shift.site_name }}">
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <h2 class="h5 text-light mb-2">You’re all clear ✨</h2>
+            <p class="mb-0">No shifts scheduled for today. Check back later or reach out to your manager if you were expecting a mission.</p>
+          </div>
+        {% endif %}
+      </section>
 
-    <section class="timeline-stack">
-      <details class="timeline-collapse">
-        <summary>
-          <span>Upcoming jobs</span>
-          <span class="timeline-count">{{ upcoming_jobs|length }}</span>
-        </summary>
-        <div class="timeline-content">
+      <section id="upcoming" class="section">
+        <div class="section-head">
+          <span class="section-eyebrow">Next</span>
+          <h2 class="section-title">Upcoming jobs</h2>
+        </div>
+        <div class="timeline">
           {% if upcoming_jobs %}
             {% for job in upcoming_jobs %}
               <article class="timeline-card">
-                <div class="timeline-primary">{{ job.site_name }}</div>
+                <h3>{{ job.site_name }}</h3>
                 <div class="timeline-meta">{{ job.day_label }} · {{ job.time_window }}</div>
                 {% if job.address %}
-                  <div class="timeline-note">{{ job.address }}</div>
+                  <div class="timeline-meta">{{ job.address }}</div>
                 {% endif %}
                 {% if job.instructions %}
-                  <div class="timeline-note">{{ job.instructions }}</div>
+                  <div class="timeline-meta">{{ job.instructions }}</div>
                 {% endif %}
-                <div class="timeline-status">{{ job.status_label }}</div>
+                <span class="status-pill" data-state="{{ job.status_label }}">{{ job.status_label }}</span>
               </article>
             {% endfor %}
           {% else %}
-            <div class="timeline-empty">No upcoming jobs yet.</div>
+            <div class="empty-state">No upcoming jobs yet.</div>
           {% endif %}
         </div>
-      </details>
+      </section>
 
-      <details class="timeline-collapse">
-        <summary>
-          <span>Previous jobs</span>
-          <span class="timeline-count">{{ history|length }}</span>
-        </summary>
-        <div class="timeline-content">
+      <section id="history" class="section">
+        <div class="section-head">
+          <span class="section-eyebrow">History</span>
+          <h2 class="section-title">Recent missions</h2>
+        </div>
+        <div class="timeline">
           {% if history %}
             {% for item in history %}
               <article class="timeline-card">
-                <div class="timeline-primary">{{ item.site_name }}</div>
+                <h3>{{ item.site_name }}</h3>
                 <div class="timeline-meta">{{ item.day_label }} · {{ item.time_window }}</div>
-                <div class="detail-chips">
-                  <span class="detail-chip">Scheduled · {{ item.scheduled_duration }}</span>
+                <div class="meta-chip-row">
+                  <span class="meta-chip">Scheduled · {{ item.scheduled_duration }}</span>
                   {% if item.has_actual_duration %}
-                    <span class="detail-chip detail-chip--actual">Actual · {{ item.actual_duration }}</span>
+                    <span class="meta-chip meta-chip--accent">Actual · {{ item.actual_duration }}</span>
                   {% endif %}
                 </div>
-                <div class="timeline-status">{{ item.status_label }}</div>
+                <span class="status-pill" data-state="{{ item.status_label }}">{{ item.status_label }}</span>
                 {% if item.instructions %}
-                  <div class="timeline-note">{{ item.instructions }}</div>
+                  <div class="timeline-meta">{{ item.instructions }}</div>
                 {% endif %}
               </article>
             {% endfor %}
           {% else %}
-            <div class="timeline-empty">No previous jobs logged yet.</div>
+            <div class="empty-state">No missions logged yet.</div>
           {% endif %}
         </div>
-      </details>
-    </section>
-  </main>
+      </section>
+    </main>
 
+    <nav class="bottom-nav">
+      <a class="nav-link active" href="#today" data-target="today">
+        <span class="icon" aria-hidden="true">🗓</span>
+        <span>Today</span>
+      </a>
+      <a class="nav-link" href="#upcoming" data-target="upcoming">
+        <span class="icon" aria-hidden="true">⏭</span>
+        <span>Next</span>
+      </a>
+      <a class="nav-link" href="#history" data-target="history">
+        <span class="icon" aria-hidden="true">📜</span>
+        <span>History</span>
+      </a>
+    </nav>
+  </div>
+
+  <script>
+    (function() {
+      const navLinks = Array.from(document.querySelectorAll('.bottom-nav .nav-link'));
+      const sections = navLinks.map(link => document.getElementById(link.dataset.target));
+      const content = document.getElementById('content');
+
+      const setActive = (targetId) => {
+        navLinks.forEach(link => {
+          link.classList.toggle('active', link.dataset.target === targetId);
+        });
+      };
+
+      navLinks.forEach(link => {
+        link.addEventListener('click', () => setActive(link.dataset.target));
+      });
+
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              setActive(entry.target.id);
+            }
+          });
+        }, { root: content, threshold: 0.4 });
+        sections.forEach(section => section && observer.observe(section));
+      }
+    })();
+  </script>
   <script>
     (function() {
       const gatherGeo = (form) => {
@@ -1359,6 +1223,20 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
       });
     })();
   </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/employee-sw.js').catch(() => {});
+      });
+    }
+  </script>
+  <style>
+    .confetti-overlay { position: fixed; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; z-index: 9999; overflow: hidden; }
+    .confetti-piece { position: absolute; width: 12px; height: 18px; border-radius: 4px; opacity: 0; animation: confetti-fall 1.05s ease-out forwards; }
+    .confetti-message { position: relative; font-size: clamp(1.5rem, 4vw, 2.2rem); font-weight: 700; color: #f1f5f9; text-shadow: 0 8px 18px rgba(15,23,42,0.62); animation: pop-in 0.5s ease-out forwards; opacity: 0; }
+    @keyframes confetti-fall { 0% { transform: translate3d(var(--x-start), -20vh, 0) rotate(0deg); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate3d(var(--x-end), 110vh, 0) rotate(var(--rotate)); opacity: 0; } }
+    @keyframes pop-in { 0% { opacity: 0; transform: scale(0.82); } 60% { opacity: 1; transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
+  </style>
 </body>
 </html>
 """
