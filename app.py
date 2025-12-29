@@ -1,3 +1,4 @@
+import math
 import re
 import io
 import csv
@@ -52,7 +53,7 @@ ADMIN_TEMPLATE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Putzelf Marketing — Admin Overview</title>
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="/static/logo.png">
@@ -60,33 +61,69 @@ ADMIN_TEMPLATE = """
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    :root { --accent: #0f766e; }
-    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; font-size:1.05rem; }
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-danger: linear-gradient(135deg,#f87171 0%,#ef4444 50%,#dc2626 100%);
+      --btn-grad-danger-hover: linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);
+      --btn-grad-info: linear-gradient(135deg,#38bdf8 0%,#0ea5e9 50%,#2563eb 100%);
+      --btn-grad-info-hover: linear-gradient(135deg,#0ea5e9 0%,#2563eb 50%,#1d4ed8 100%);
+      --btn-grad-success: linear-gradient(135deg,#22c55e 0%,#16a34a 50%,#15803d 100%);
+      --btn-grad-success-hover: linear-gradient(135deg,#16a34a 0%,#15803d 50%,#166534 100%);
+      --btn-grad-light: linear-gradient(135deg,#ffffff 0%,#f1f5f9 100%);
+      --btn-grad-light-hover: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+    }
+    body { background:#f1f5f9; color:#0f172a; font-size:1.05rem; }
     body.mobile-nav-open { overflow:hidden; }
-    body.mobile-nav-open { overflow: hidden; }
-    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); }
-    .sidebar { background:rgba(2,6,23,0.82); border-right:1px solid rgba(148,163,184,0.25); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; }
-    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#6b7280; }
-    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#e5e7eb; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
-    .nav-pill.active, .nav-pill:hover { background:rgba(15,118,110,0.22); border-color:rgba(45,212,191,0.4); color:#ecfeff; }
+    body.mobile-nav-open { overflow:hidden; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); background:#ffffff; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; color:#0f172a; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill.active, .nav-pill:hover { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
     .nav-text { display:inline; }
-    .nav-pill-logout { margin-top:0.3rem; background:rgba(248,250,252,0.12); border-color:rgba(148,163,184,0.35); color:#f8fafc; }
-    .nav-pill-logout:hover { background:rgba(248,250,252,0.18); border-color:rgba(248,250,252,0.3); color:#ffffff; }
-    .main-shell { padding:1.75rem; }
-    .badge-soft { border-radius:999px; border:1px solid rgba(148,163,184,0.45); color:#9ca3af; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; }
+    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; }
+    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .main-shell { padding:1.75rem; background:#ffffff; }
+    .badge-soft { border-radius:999px; border:1px solid #d6d3f0; color:#6366f1; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
     .metrics-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; }
-    .metric-card { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.7); background:rgba(15,23,42,0.85); padding:1rem; }
-    .metric-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#94a3b8; margin-bottom:0.35rem; }
-    .metric-value { font-size:2rem; font-weight:600; color:#f8fafc; margin-bottom:0.1rem; }
-    .metric-sub { font-size:0.85rem; color:#94a3b8; }
-    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
+    .metric-card { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1rem; box-shadow:0 12px 24px rgba(15,23,42,0.08); }
+    .metric-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#475569; margin-bottom:0.35rem; }
+    .metric-value { font-size:2rem; font-weight:600; color:#0f172a; margin-bottom:0.1rem; }
+    .metric-sub { font-size:0.85rem; color:#64748b; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
     .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
-    .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.7); background:rgba(15,23,42,0.78); padding:1.2rem; height:100%; }
-    .list-entry { border-bottom:1px solid rgba(148,163,184,0.18); padding:0.6rem 0; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 14px 26px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-outline-light { background-image:var(--btn-grad-light); color:#0f172a; }
+    .btn-outline-light:hover { background-image:var(--btn-grad-light-hover); color:#0f172a; }
+    .btn-outline-info,
+    .btn-info { background-image:var(--btn-grad-info); color:#ffffff; box-shadow:0 12px 24px rgba(14,165,233,0.25); }
+    .btn-outline-info:hover,
+    .btn-info:hover { background-image:var(--btn-grad-info-hover); color:#ffffff; }
+    .btn-outline-danger,
+    .btn-danger { background-image:var(--btn-grad-danger); color:#ffffff; box-shadow:0 12px 24px rgba(220,38,38,0.25); }
+    .btn-outline-danger:hover,
+    .btn-danger:hover { background-image:var(--btn-grad-danger-hover); color:#ffffff; }
+    .btn-success { background-image:var(--btn-grad-success); color:#ffffff; box-shadow:0 12px 24px rgba(34,197,94,0.25); }
+    .btn-success:hover { background-image:var(--btn-grad-success-hover); color:#ffffff; }
+    .btn-link { background:none; box-shadow:none; color:#0f766e; }
+    .btn-link:hover { color:#0c615b; }
+    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.2rem; height:100%; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .list-entry { border-bottom:1px solid #e2e8f0; padding:0.6rem 0; }
     .list-entry:last-child { border-bottom:none; }
-    .list-title { font-weight:600; color:#f1f5f9; }
-    .list-sub { font-size:0.85rem; color:#94a3b8; }
-    .placeholder { color:#64748b; font-size:0.85rem; }
+    .list-title { font-weight:600; color:#0f172a; }
+    .list-sub { font-size:0.85rem; color:#64748b; }
+    .placeholder { color:#94a3b8; font-size:0.85rem; }
     .mobile-nav-toggle { display:none; }
     .mobile-nav-backdrop { display:none; }
     @media(max-width:992px){ .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{ display:none;} }
@@ -102,13 +139,13 @@ ADMIN_TEMPLATE = """
         display: flex;
         transform: translateX(-100%);
         transition: transform 0.2s ease;
-        box-shadow: 0 16px 40px rgba(2, 6, 23, 0.6);
+        box-shadow: 0 24px 48px rgba(15,23,42,0.12);
       }
       body.mobile-nav-open .sidebar { transform: translateX(0); }
       .mobile-nav-backdrop {
         position: fixed;
         inset: 0;
-        background: rgba(15, 23, 42, 0.62);
+        background: rgba(15, 23, 42, 0.35);
         z-index: 1040;
       }
       body.mobile-nav-open .mobile-nav-backdrop { display: block; }
@@ -117,14 +154,15 @@ ADMIN_TEMPLATE = """
         align-items: center;
         gap: 0.4rem;
         border-radius: 0.75rem;
-        border: 1px solid rgba(148,163,184,0.4);
-        background: rgba(2, 6, 23, 0.85);
-        color: #e5e7eb;
+        border: 0;
+        background-image: var(--btn-grad-accent);
+        color: #ffffff;
         padding: 0.45rem 0.85rem;
         font-size: 0.95rem;
         margin-bottom: 1rem;
+        box-shadow: 0 12px 24px rgba(15,118,110,0.25);
       }
-      .mobile-nav-toggle:focus { outline: 2px solid rgba(45,212,191,0.6); outline-offset: 2px; }
+      .mobile-nav-toggle:focus { outline: 2px solid rgba(15,118,110,0.4); outline-offset: 2px; }
     }
   </style>
 </head>
@@ -142,7 +180,7 @@ ADMIN_TEMPLATE = """
       <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
-    <main class="main-shell text-light">
+    <main class="main-shell">
       <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -156,7 +194,7 @@ ADMIN_TEMPLATE = """
 
       <header class="mb-4">
         <div class="badge-soft mb-2">Operations overview</div>
-        <h1 class="h4 text-light mb-1">This week at a glance</h1>
+        <h1 class="h4 text-dark mb-1">This week at a glance</h1>
         <p class="text-secondary mb-0">{{ today_label }} · Week {{ week_label }}</p>
       </header>
 
@@ -202,7 +240,7 @@ ADMIN_TEMPLATE = """
             {% else %}
               <p class="placeholder mb-0">No employees registered yet.</p>
             {% endif %}
-            <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-light mt-3">Manage employees</a>
+            <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-primary mt-3">Manage employees</a>
           </div>
         </div>
         <div class="col-12 col-lg-6">
@@ -218,7 +256,7 @@ ADMIN_TEMPLATE = """
             {% else %}
               <p class="placeholder mb-0">No sites have been added yet.</p>
             {% endif %}
-            <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-outline-light mt-3">Manage sites</a>
+            <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-outline-primary mt-3">Manage sites</a>
           </div>
         </div>
       </section>
@@ -242,7 +280,7 @@ ADMIN_TEMPLATE = """
             {% else %}
               <p class="placeholder mb-0">No shifts scheduled yet. Add some from the schedule view.</p>
             {% endif %}
-            <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-light mt-3">Go to schedule</a>
+            <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-primary mt-3">Go to schedule</a>
           </div>
         </div>
         <div class="col-12 col-lg-5">
@@ -258,7 +296,7 @@ ADMIN_TEMPLATE = """
             {% else %}
               <p class="placeholder mb-0">All sites are covered for the current week.</p>
             {% endif %}
-            <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-outline-light mt-3">Assign coverage</a>
+            <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-outline-primary mt-3">Assign coverage</a>
           </div>
         </div>
       </section>
@@ -317,7 +355,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Putzelf Marketing — Employees</title>
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="/static/logo.png">
@@ -325,50 +363,87 @@ ADMIN_EMPLOYEES_TEMPLATE = """
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; font-size:1.05rem; }
-    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); }
-    .sidebar { background:rgba(2,6,23,0.82); border-right:1px solid rgba(148,163,184,0.25); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; }
-    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#6b7280; }
-    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#e5e7eb; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
-    .nav-pill.active, .nav-pill:hover { background:rgba(15,118,110,0.22); border-color:rgba(45,212,191,0.4); color:#ecfeff; }
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-danger: linear-gradient(135deg,#f87171 0%,#ef4444 50%,#dc2626 100%);
+      --btn-grad-danger-hover: linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);
+      --btn-grad-info: linear-gradient(135deg,#38bdf8 0%,#0ea5e9 50%,#2563eb 100%);
+      --btn-grad-info-hover: linear-gradient(135deg,#0ea5e9 0%,#2563eb 50%,#1d4ed8 100%);
+      --btn-grad-success: linear-gradient(135deg,#22c55e 0%,#16a34a 50%,#15803d 100%);
+      --btn-grad-success-hover: linear-gradient(135deg,#16a34a 0%,#15803d 50%,#166534 100%);
+      --btn-grad-light: linear-gradient(135deg,#ffffff 0%,#f1f5f9 100%);
+      --btn-grad-light-hover: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+    }
+    body { background:#f1f5f9; color:#0f172a; font-size:1.05rem; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); background:#ffffff; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; color:#0f172a; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill.active, .nav-pill:hover { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
     .nav-text { display:inline; }
-    .nav-pill-logout { margin-top:0.3rem; background:rgba(248,250,252,0.12); border-color:rgba(148,163,184,0.35); color:#f8fafc; }
-    .nav-pill-logout:hover { background:rgba(248,250,252,0.18); border-color:rgba(248,250,252,0.3); color:#ffffff; }
-    .main-shell { padding:1.75rem; }
-    .badge-soft { border-radius:999px; border:1px solid rgba(148,163,184,0.45); color:#9ca3af; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; }
-    .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.7); background:rgba(15,23,42,0.78); padding:1.25rem; }
-    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#94a3b8; }
-    .little-card { border-radius:0.85rem; border:1px solid rgba(51,65,85,0.65); background:rgba(2,6,23,0.75); }
-    .credential-box { border-radius:0.85rem; border:1px solid rgba(125,211,252,0.35); background:rgba(14,116,144,0.18); padding:1rem; }
+    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; }
+    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .main-shell { padding:1.75rem; background:#ffffff; }
+    .badge-soft { border-radius:999px; border:1px solid #d6d3f0; color:#6366f1; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
+    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.25rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#475569; }
+    .little-card { border-radius:0.85rem; border:1px solid #e2e8f0; background:#f8fafc; }
+    .credential-box { border-radius:0.85rem; border:1px solid #cbd5f5; background:#f8fafc; padding:1rem; }
     .credential-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:0.75rem; }
-    .credential-label { font-size:0.72rem; letter-spacing:0.12em; text-transform:uppercase; color:#94a3b8; }
-    .credential-value { font-size:1rem; font-weight:600; color:#f8fafc; }
-    .credential-note { font-size:0.78rem; color:#bae6fd; }
+    .credential-label { font-size:0.72rem; letter-spacing:0.12em; text-transform:uppercase; color:#64748b; }
+    .credential-value { font-size:1rem; font-weight:600; color:#0f172a; }
+    .credential-note { font-size:0.78rem; color:#0f766e; }
     .credential-actions { display:flex; flex-wrap:wrap; gap:0.5rem; }
     .employee-action-buttons { display:flex; flex-wrap:wrap; gap:0.5rem; justify-content:flex-end; }
     .employee-action-buttons .btn { flex:1 1 120px; }
     @media(max-width:768px){ .employee-action-buttons { justify-content:flex-start; } .employee-action-buttons .btn { flex:1 1 100%; } }
-    .assignment-section { border-radius:0.75rem; border:1px dashed rgba(148,163,184,0.3); background:rgba(15,23,42,0.55); padding:0.85rem; }
-    .assignment-collapse { margin:0; border-radius:0.6rem; overflow:hidden; background:rgba(15,23,42,0.35); border:1px solid rgba(71,85,105,0.3); }
+    .assignment-section { border-radius:0.75rem; border:1px dashed #cbd5f5; background:#f8fafc; padding:0.85rem; }
+    .assignment-collapse { margin:0; border-radius:0.6rem; overflow:hidden; background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 8px 16px rgba(15,23,42,0.05); }
     .assignment-collapse + .assignment-collapse { margin-top:0.65rem; }
-    .assignment-collapse summary { cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:0.75rem 0.85rem; font-weight:600; color:#e2e8f0; user-select:none; }
+    .assignment-collapse summary { cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:0.75rem 0.85rem; font-weight:600; color:#0f172a; user-select:none; }
     .assignment-collapse summary::-webkit-details-marker { display:none; }
-    .assignment-count { font-size:0.82rem; letter-spacing:0.08em; text-transform:uppercase; color:#94a3b8; }
+    .assignment-count { font-size:0.82rem; letter-spacing:0.08em; text-transform:uppercase; color:#64748b; }
     .assignment-list { margin:0; padding:0.15rem 0.85rem 0.8rem; list-style:none; display:grid; gap:0.6rem; }
-    .assignment-list li { padding:0.6rem 0.55rem 0.55rem; border-radius:0.6rem; border:1px solid rgba(71,85,105,0.35); background:rgba(15,23,42,0.45); }
-    .assignment-primary { font-weight:600; color:#f8fafc; }
-    .assignment-meta { font-size:0.85rem; color:#cbd5f5; }
+    .assignment-list li { padding:0.6rem 0.55rem 0.55rem; border-radius:0.6rem; border:1px solid #e2e8f0; background:#ffffff; }
+    .assignment-primary { font-weight:600; color:#0f172a; }
+    .assignment-meta { font-size:0.85rem; color:#64748b; }
     .assignment-status { font-size:0.78rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.08em; margin-top:0.2rem; }
-    .credential-edit { border:1px dashed rgba(148,163,184,0.35); border-radius:0.75rem; padding:1rem; background:rgba(15,23,42,0.55); }
-    .placeholder { color:#64748b; font-size:0.85rem; }
+    .credential-edit { border:1px dashed #cbd5f5; border-radius:0.75rem; padding:1rem; background:#ffffff; }
+    .placeholder { color:#94a3b8; font-size:0.85rem; }
     .mobile-nav-toggle { display:none; }
     .mobile-nav-backdrop { display:none; }
     .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-bottom:1.5rem; }
-    .stat-card { border-radius:0.85rem; border:1px solid rgba(45,212,191,0.25); background:rgba(15,118,110,0.1); padding:1rem; }
-    .stat-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#94a3b8; margin-bottom:0.35rem; }
-    .stat-value { font-size:1.6rem; font-weight:600; color:#f8fafc; }
-    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
+    .stat-card { border-radius:0.85rem; border:1px solid #e2e8f0; background:#ffffff; padding:1rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .stat-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#475569; margin-bottom:0.35rem; }
+    .stat-value { font-size:1.6rem; font-weight:600; color:#0f172a; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
     .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 14px 26px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-outline-light { background-image:var(--btn-grad-light); color:#0f172a; }
+    .btn-outline-light:hover { background-image:var(--btn-grad-light-hover); color:#0f172a; }
+    .btn-outline-info,
+    .btn-info { background-image:var(--btn-grad-info); color:#ffffff; box-shadow:0 12px 24px rgba(14,165,233,0.25); }
+    .btn-outline-info:hover,
+    .btn-info:hover { background-image:var(--btn-grad-info-hover); color:#ffffff; }
+    .btn-outline-danger,
+    .btn-danger { background-image:var(--btn-grad-danger); color:#ffffff; box-shadow:0 12px 24px rgba(220,38,38,0.25); }
+    .btn-outline-danger:hover,
+    .btn-danger:hover { background-image:var(--btn-grad-danger-hover); color:#ffffff; }
+    .btn-success { background-image:var(--btn-grad-success); color:#ffffff; box-shadow:0 12px 24px rgba(34,197,94,0.25); }
+    .btn-success:hover { background-image:var(--btn-grad-success-hover); color:#ffffff; }
+    .btn-link { background:none; box-shadow:none; color:#0f766e; }
+    .btn-link:hover { color:#0c615b; }
     @media(max-width:992px){
       .app-shell{ grid-template-columns:minmax(0,1fr);} 
       .sidebar{
@@ -382,13 +457,13 @@ ADMIN_EMPLOYEES_TEMPLATE = """
         display:flex;
         transform:translateX(-100%);
         transition:transform 0.2s ease;
-        box-shadow:0 16px 40px rgba(2,6,23,0.6);
+        box-shadow:0 24px 48px rgba(15,23,42,0.12);
       }
       body.mobile-nav-open .sidebar{ transform:translateX(0); }
       .mobile-nav-backdrop{
         position:fixed;
         inset:0;
-        background:rgba(15,23,42,0.62);
+        background:rgba(15,23,42,0.35);
         z-index:1040;
       }
       body.mobile-nav-open .mobile-nav-backdrop{ display:block; }
@@ -397,14 +472,15 @@ ADMIN_EMPLOYEES_TEMPLATE = """
         align-items:center;
         gap:0.4rem;
         border-radius:0.75rem;
-        border:1px solid rgba(148,163,184,0.4);
-        background:rgba(2,6,23,0.85);
-        color:#e5e7eb;
+        border:0;
+        background-image:var(--btn-grad-accent);
+        color:#ffffff;
         padding:0.45rem 0.85rem;
         font-size:0.95rem;
         margin-bottom:1rem;
+        box-shadow:0 12px 24px rgba(15,118,110,0.25);
       }
-      .mobile-nav-toggle:focus{ outline:2px solid rgba(45,212,191,0.6); outline-offset:2px; }
+      .mobile-nav-toggle:focus{ outline:2px solid rgba(15,118,110,0.4); outline-offset:2px; }
     }
   </style>
 </head>
@@ -422,7 +498,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
       <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
-    <main class="main-shell text-light">
+    <main class="main-shell">
       <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -436,8 +512,15 @@ ADMIN_EMPLOYEES_TEMPLATE = """
 
       <header class="mb-4">
         <div class="badge-soft mb-2">Team directory</div>
-        <h1 class="h4 text-light mb-1">Manage employees</h1>
-        <p class="text-secondary mb-0">{{ filtered_employees }} shown · {{ total_employees }} total · {{ today_shifts }} shifts today</p>
+        <h1 class="h4 text-dark mb-1">Manage employees</h1>
+        <p class="text-secondary mb-0">
+          {% if filtered_employees %}
+            Showing {{ page_employees }} of {{ filtered_employees }} matching
+          {% else %}
+            No employees match the current filters
+          {% endif %}
+          · {{ total_employees }} total · {{ today_shifts }} shifts today
+        </p>
       </header>
 
       <section class="stats-grid">
@@ -446,8 +529,8 @@ ADMIN_EMPLOYEES_TEMPLATE = """
           <div class="stat-value">{{ total_employees }}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Listed here</div>
-          <div class="stat-value">{{ filtered_employees }}</div>
+          <div class="stat-label">Showing now</div>
+          <div class="stat-value">{{ page_employees }}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">On schedule today</div>
@@ -465,7 +548,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
             <label class="form-label" for="employee_search">Search employees</label>
             <div class="input-group input-group-sm">
               <input type="text" class="form-control" id="employee_search" name="q" value="{{ search_q or '' }}" placeholder="Search by name or role">
-              <button class="btn btn-outline-light" type="submit">Search</button>
+              <button class="btn btn-outline-primary" type="submit">Search</button>
             </div>
           </div>
           <div class="col-sm-4">
@@ -486,7 +569,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
               </div>
               <div class="col-12">
                 <label class="form-label" for="new_employee_role">Role</label>
-                <input type="text" class="form-control form-control-sm" id="new_employee_role" name="role" placeholder="e.g. Field technician">
+                <input type="text" class="form-control form-control-sm" id="new_employee_role" name="role" value="Cleaner">
               </div>
               <div class="col-12">
                 <button type="submit" class="btn btn-sm btn-primary w-100">Add employee</button>
@@ -501,6 +584,10 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                   <div class="little-card p-3">
                     <form method="post" class="row g-2 align-items-end">
                       <input type="hidden" name="id" value="{{ emp.id }}">
+                      <input type="hidden" name="redirect_page" value="{{ page }}">
+                      {% if search_q %}
+                        <input type="hidden" name="redirect_q" value="{{ search_q }}">
+                      {% endif %}
                       <div class="col-md-5 col-12">
                         <label class="form-label">Name</label>
                         <input type="text" class="form-control form-control-sm" name="name" value="{{ emp.name }}" required>
@@ -514,7 +601,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                         <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ emp.name }}?')">Delete</button>
                       </div>
                     </form>
-                    <div class="small text-secondary mt-2">Shifts scheduled: <span class="text-light">{{ shift_counts.get(emp.id, 0) }}</span></div>
+                    <div class="small text-secondary mt-2">Shifts scheduled: <span class="text-primary">{{ shift_counts.get(emp.id, 0) }}</span></div>
 
                     {% set snippet = (credential_snippets|default({})).get(emp.id|string) %}
                     {% set code_display = snippet.code if snippet and snippet.code else (emp.login_code or 'Pending') %}
@@ -555,6 +642,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                         {% if search_q %}
                           <input type="hidden" name="redirect_q" value="{{ search_q }}">
                         {% endif %}
+                        <input type="hidden" name="redirect_page" value="{{ page }}">
                         <button type="submit" class="btn btn-sm btn-outline-info">Share new PIN</button>
                       </form>
                       {% if pin_display %}
@@ -571,6 +659,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                         {% if search_q %}
                           <input type="hidden" name="redirect_q" value="{{ search_q }}">
                         {% endif %}
+                        <input type="hidden" name="redirect_page" value="{{ page }}">
                         <div class="col-md-4 col-12">
                           <label class="form-label">Login email</label>
                           <input type="email" class="form-control form-control-sm" name="login_email" value="{{ emp.login_email or '' }}" placeholder="Optional email">
@@ -635,6 +724,42 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                   </div>
                 {% endfor %}
               </div>
+              {% if total_pages > 1 %}
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-4">
+                  <span class="text-secondary small">Page {{ page }} of {{ total_pages }}</span>
+                  <div class="btn-group" role="group" aria-label="Employee pagination">
+                    {% if has_prev %}
+                      {% if search_q %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=prev_page, q=search_q) }}">Previous</a>
+                      {% else %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=prev_page) }}">Previous</a>
+                      {% endif %}
+                    {% else %}
+                      <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Previous</span>
+                    {% endif %}
+                    {% for page_num in range(1, total_pages + 1) %}
+                      {% if page_num == page %}
+                        <span class="btn btn-sm btn-primary disabled" aria-current="page">{{ page_num }}</span>
+                      {% else %}
+                        {% if search_q %}
+                          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=page_num, q=search_q) }}">{{ page_num }}</a>
+                        {% else %}
+                          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=page_num) }}">{{ page_num }}</a>
+                        {% endif %}
+                      {% endif %}
+                    {% endfor %}
+                    {% if has_next %}
+                      {% if search_q %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=next_page, q=search_q) }}">Next</a>
+                      {% else %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=next_page) }}">Next</a>
+                      {% endif %}
+                    {% else %}
+                      <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Next</span>
+                    {% endif %}
+                  </div>
+                </div>
+              {% endif %}
             {% else %}
             <div class="card-surface">
               <p class="placeholder mb-0">No employees match this filter. Try broadening your search.</p>
@@ -728,7 +853,7 @@ ADMIN_SITES_TEMPLATE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Putzelf Marketing — Site Library</title>
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="/static/logo.png">
@@ -736,23 +861,64 @@ ADMIN_SITES_TEMPLATE = """
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    body { background: radial-gradient(circle at top left,#0f172a 0%, #020617 45%, #020617 100%); color:#e5e7eb; font-size:1.05rem; }
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-danger: linear-gradient(135deg,#f87171 0%,#ef4444 50%,#dc2626 100%);
+      --btn-grad-danger-hover: linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);
+      --btn-grad-info: linear-gradient(135deg,#38bdf8 0%,#0ea5e9 50%,#2563eb 100%);
+      --btn-grad-info-hover: linear-gradient(135deg,#0ea5e9 0%,#2563eb 50%,#1d4ed8 100%);
+      --btn-grad-success: linear-gradient(135deg,#22c55e 0%,#16a34a 50%,#15803d 100%);
+      --btn-grad-success-hover: linear-gradient(135deg,#16a34a 0%,#15803d 50%,#166534 100%);
+      --btn-grad-light: linear-gradient(135deg,#ffffff 0%,#f1f5f9 100%);
+      --btn-grad-light-hover: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+    }
+    body { background:#f1f5f9; color:#0f172a; font-size:1.05rem; }
     body.mobile-nav-open { overflow:hidden; }
-    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition:grid-template-columns 0.2s ease; }
-    .sidebar { background:rgba(2,6,23,0.82); border-right:1px solid rgba(148,163,184,0.25); padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; }
-    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#6b7280; }
-    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#e5e7eb; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
-    .nav-pill.active, .nav-pill:hover { background:rgba(15,118,110,0.22); border-color:rgba(45,212,191,0.4); color:#ecfeff; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition:grid-template-columns 0.2s ease; background:#ffffff; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; color:#0f172a; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill.active, .nav-pill:hover { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
     .nav-text { display:inline; }
-    .main-shell { padding:1.75rem; }
-    .badge-soft { border-radius:999px; border:1px solid rgba(148,163,184,0.45); color:#9ca3af; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; }
-    .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.7); background:rgba(15,23,42,0.78); padding:1.25rem; }
-    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#94a3b8; }
-    .little-card { border-radius:0.85rem; border:1px solid rgba(51,65,85,0.65); background:rgba(2,6,23,0.75); }
-    .placeholder { color:#64748b; font-size:0.85rem; }
-    .table thead th { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#94a3b8; }
-    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
+    .badge-soft { border-radius:999px; border:1px solid #d6d3f0; color:#6366f1; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
+    .main-shell { padding:1.75rem; background:#ffffff; }
+    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.25rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#475569; }
+    .little-card { border-radius:0.85rem; border:1px solid #e2e8f0; background:#f8fafc; }
+    .placeholder { color:#94a3b8; font-size:0.85rem; }
+    .table thead th { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#475569; background:#f1f5f9; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
     .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 14px 26px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-outline-light { background-image:var(--btn-grad-light); color:#0f172a; }
+    .btn-outline-light:hover { background-image:var(--btn-grad-light-hover); color:#0f172a; }
+    .btn-outline-info,
+    .btn-info { background-image:var(--btn-grad-info); color:#ffffff; box-shadow:0 12px 24px rgba(14,165,233,0.25); }
+    .btn-outline-info:hover,
+    .btn-info:hover { background-image:var(--btn-grad-info-hover); color:#ffffff; }
+    .btn-outline-danger,
+    .btn-danger { background-image:var(--btn-grad-danger); color:#ffffff; box-shadow:0 12px 24px rgba(220,38,38,0.25); }
+    .btn-outline-danger:hover,
+    .btn-danger:hover { background-image:var(--btn-grad-danger-hover); color:#ffffff; }
+    .btn-success { background-image:var(--btn-grad-success); color:#ffffff; box-shadow:0 12px 24px rgba(34,197,94,0.25); }
+    .btn-success:hover { background-image:var(--btn-grad-success-hover); color:#ffffff; }
+    .btn-link { background:none; box-shadow:none; color:#0f766e; }
+    .btn-link:hover { color:#0c615b; }
+    .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+    .stat-card { border-radius:0.85rem; border:1px solid #e2e8f0; background:#ffffff; padding:1rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .stat-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#475569; margin-bottom:0.35rem; }
+    .stat-value { font-size:1.6rem; font-weight:600; color:#0f172a; }
     .mobile-nav-toggle { display:none; }
     .mobile-nav-backdrop { display:none; }
     @media(max-width:992px){
@@ -768,13 +934,13 @@ ADMIN_SITES_TEMPLATE = """
         display:flex;
         transform:translateX(-100%);
         transition:transform 0.2s ease;
-        box-shadow:0 16px 40px rgba(2,6,23,0.6);
+        box-shadow:0 24px 48px rgba(15,23,42,0.12);
       }
       body.mobile-nav-open .sidebar{ transform:translateX(0); }
       .mobile-nav-backdrop{
         position:fixed;
         inset:0;
-        background:rgba(15,23,42,0.62);
+        background:rgba(15,23,42,0.35);
         z-index:1040;
       }
       body.mobile-nav-open .mobile-nav-backdrop{ display:block; }
@@ -783,14 +949,15 @@ ADMIN_SITES_TEMPLATE = """
         align-items:center;
         gap:0.4rem;
         border-radius:0.75rem;
-        border:1px solid rgba(148,163,184,0.4);
-        background:rgba(2,6,23,0.85);
-        color:#e5e7eb;
+        border:0;
+        background-image:var(--btn-grad-accent);
+        color:#ffffff;
         padding:0.45rem 0.85rem;
         font-size:0.95rem;
         margin-bottom:1rem;
+        box-shadow:0 12px 24px rgba(15,118,110,0.25);
       }
-      .mobile-nav-toggle:focus{ outline:2px solid rgba(45,212,191,0.6); outline-offset:2px; }
+      .mobile-nav-toggle:focus{ outline:2px solid rgba(15,118,110,0.4); outline-offset:2px; }
     }
   </style>
 </head>
@@ -808,7 +975,7 @@ ADMIN_SITES_TEMPLATE = """
       <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
-    <main class="main-shell text-light">
+    <main class="main-shell">
       <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -824,20 +991,42 @@ ADMIN_SITES_TEMPLATE = """
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
         <div>
           <div class="badge-soft mb-2">Location library</div>
-          <h1 class="h3 mb-1 text-light">Manage client sites</h1>
-          <p class="text-secondary mb-0">{{ filtered_sites }} shown · {{ total_sites }} total sites</p>
+          <h1 class="h3 mb-1 text-dark">Manage client sites</h1>
+          <p class="text-secondary mb-0">
+            {% if filtered_sites %}
+              Showing {{ page_sites }} of {{ filtered_sites }} matching
+            {% else %}
+              No sites match the current filters
+            {% endif %}
+            · {{ total_sites }} total sites
+          </p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-light">Back to overview</a>
-          <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-light">Open schedule</a>
+          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Back to overview</a>
+          <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-primary">Open schedule</a>
         </div>
       </div>
+      {% set unassigned_sites = total_sites - covered_sites if total_sites > covered_sites else 0 %}
+      <section class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total sites</div>
+          <div class="stat-value">{{ total_sites }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Sites with shifts this week</div>
+          <div class="stat-value">{{ covered_sites }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Unassigned sites</div>
+          <div class="stat-value">{{ unassigned_sites }}</div>
+        </div>
+      </section>
       <form method="get" class="row g-2 align-items-end mb-4">
         <div class="col-sm-8">
           <label class="form-label" for="site_search">Search sites</label>
           <div class="input-group input-group-sm">
             <input type="text" class="form-control" id="site_search" name="q" value="{{ search_q or '' }}" placeholder="Search by name or address">
-            <button class="btn btn-outline-light" type="submit">Search</button>
+            <button class="btn btn-outline-primary" type="submit">Search</button>
           </div>
         </div>
         <div class="col-sm-4">
@@ -864,14 +1053,6 @@ ADMIN_SITES_TEMPLATE = """
               </div>
             </form>
           </div>
-          <div class="card-surface">
-            <h2 class="h6 text-uppercase text-secondary mb-3">Snapshot</h2>
-            <ul class="list-unstyled mb-0 small text-secondary">
-              <li class="mb-1">Total sites: <span class="text-light">{{ total_sites }}</span></li>
-              <li class="mb-1">Sites with shifts this week: <span class="text-light">{{ covered_sites }}</span></li>
-              <li>Unassigned sites: <span class="text-light">{{ total_sites - covered_sites }}</span></li>
-            </ul>
-          </div>
         </div>
         <div class="col-12 col-lg-8">
           {% if sites %}
@@ -883,7 +1064,11 @@ ADMIN_SITES_TEMPLATE = """
               <form id="bulk-site-update" method="post" class="table-responsive" style="max-height:260px;">
                 <input type="hidden" name="entity" value="site_bulk">
                 <input type="hidden" name="action" value="bulk_update">
-                <table class="table table-sm table-dark align-middle mb-0">
+                {% if search_q %}
+                  <input type="hidden" name="redirect_q" value="{{ search_q }}">
+                {% endif %}
+                <input type="hidden" name="redirect_page" value="{{ page }}">
+                <table class="table table-sm table-striped align-middle mb-0">
                   <thead>
                     <tr>
                       <th scope="col">Name</th>
@@ -911,6 +1096,10 @@ ADMIN_SITES_TEMPLATE = """
                 <form method="post" class="little-card p-3">
                   <input type="hidden" name="entity" value="site">
                   <input type="hidden" name="id" value="{{ site.id }}">
+                  {% if search_q %}
+                    <input type="hidden" name="redirect_q" value="{{ search_q }}">
+                  {% endif %}
+                  <input type="hidden" name="redirect_page" value="{{ page }}">
                   <div class="row g-2 align-items-end">
                     <div class="col-md-5 col-12">
                       <label class="form-label">Name</label>
@@ -920,15 +1109,53 @@ ADMIN_SITES_TEMPLATE = """
                       <label class="form-label">Address</label>
                       <input type="text" name="address" value="{{ site.address or '' }}" class="form-control form-control-sm" required>
                     </div>
-                    <div class="col-md-2 col-12 d-flex justify-content-end gap-2">
-                      <button type="submit" name="action" value="update" class="btn btn-sm btn-success">Save</button>
-                      <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ site.name }}?')">Delete</button>
+                    <div class="col-md-2 col-12">
+                      <div class="d-grid gap-2">
+                        <button type="submit" name="action" value="update" class="btn btn-sm btn-success">Save</button>
+                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ site.name }}?')">Delete</button>
+                      </div>
                     </div>
                   </div>
-                  <div class="small text-secondary mt-2">Shifts scheduled: <span class="text-light">{{ shift_counts.get(site.id, 0) }}</span></div>
+                  <div class="small text-secondary mt-2">Shifts scheduled: <span class="text-primary">{{ shift_counts.get(site.id, 0) }}</span></div>
                 </form>
               {% endfor %}
             </div>
+            {% if total_pages > 1 %}
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-4">
+                <span class="text-secondary small">Page {{ page }} of {{ total_pages }}</span>
+                <div class="btn-group" role="group" aria-label="Site pagination">
+                  {% if has_prev %}
+                    {% if search_q %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=prev_page, q=search_q) }}">Previous</a>
+                    {% else %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=prev_page) }}">Previous</a>
+                    {% endif %}
+                  {% else %}
+                    <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Previous</span>
+                  {% endif %}
+                  {% for page_num in range(1, total_pages + 1) %}
+                    {% if page_num == page %}
+                      <span class="btn btn-sm btn-primary disabled" aria-current="page">{{ page_num }}</span>
+                    {% else %}
+                      {% if search_q %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=page_num, q=search_q) }}">{{ page_num }}</a>
+                      {% else %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=page_num) }}">{{ page_num }}</a>
+                      {% endif %}
+                    {% endif %}
+                  {% endfor %}
+                  {% if has_next %}
+                    {% if search_q %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=next_page, q=search_q) }}">Next</a>
+                    {% else %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=next_page) }}">Next</a>
+                    {% endif %}
+                  {% else %}
+                    <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Next</span>
+                  {% endif %}
+                </div>
+              </div>
+            {% endif %}
           {% else %}
             <div class="card-surface">
               <p class="placeholder mb-0">No sites match this filter. Add locations or adjust your search.</p>
@@ -989,22 +1216,29 @@ LOGIN_TEMPLATE = """
   <title>Putzelf Marketing — Login</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+    }
     body {
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%);
-      color: #e5e7eb;
+      background: #f1f5f9;
+      color: #0f172a;
       font-size: 1.05rem;
     }
     .login-card {
       width: min(440px, 95vw);
-      background: radial-gradient(circle at top left,#020617 0%, #020617 40%, #020617 100%);
-      border: 1px solid rgba(51, 65, 85, 0.9);
-      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.95);
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
       border-radius: 16px;
-      padding: 1.5rem;
+      padding: 2rem;
     }
     .brand {
       display: flex;
@@ -1015,17 +1249,19 @@ LOGIN_TEMPLATE = """
     .brand-logo {
       width: 44px; height: 44px;
       border-radius: 12px;
-      background: radial-gradient(circle at 10% 0, #22c55e 0%, #0ea5e9 45%, #1d4ed8 100%);
+      background: linear-gradient(135deg,#0f766e,#0ea5e9);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
     }
     .brand-logo img { max-width: 78%; max-height: 78%; object-fit: contain; }
-    .brand-title { font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; font-size: 0.95rem; }
-    .brand-sub { font-size: 0.82rem; color: #9ca3af; }
-    .small-note { font-size:0.85rem; color:#9ca3af; }
-    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
+    .brand-title { font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; font-size: 0.95rem; color:#0f172a; }
+    .brand-sub { font-size: 0.82rem; color: #64748b; }
+    .small-note { font-size:0.85rem; color:#64748b; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); transition:transform 0.15s ease, box-shadow 0.15s ease; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 18px 34px rgba(15,118,110,0.32); background-image:var(--btn-grad-accent-hover); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
     .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
   </style>
 </head>
@@ -1040,7 +1276,7 @@ LOGIN_TEMPLATE = """
         <div class="brand-sub">Secure access</div>
       </div>
     </div>
-    <h1 class="h5 text-light mb-3">Sign in</h1>
+    <h1 class="h5 text-dark mb-3">Sign in</h1>
     <form method="post" class="needs-validation" novalidate>
       <input type="hidden" name="next" value="{{ next_value or request.args.get('next','') }}">
       <div class="mb-3">
@@ -1055,7 +1291,7 @@ LOGIN_TEMPLATE = """
         <div class="alert alert-danger py-2" role="alert">{{ error }}</div>
       {% endif %}
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <button class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">Login</button>
+        <button class="btn btn-sm btn-primary">Login</button>
         <span class="small-note">Admins use their username and password. Employees use their work email or login code plus PIN.</span>
       </div>
     </form>
@@ -1102,49 +1338,49 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="/static/logo.png">
   <style>
-    :root { color-scheme: dark; }
+    :root { color-scheme: light; }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
-    body { margin: 0; background: #020617; font-family: 'Inter', sans-serif; color: #e2e8f0; min-height: 100vh; display: flex; justify-content: center; }
-    a { color: inherit; }
-    .app-shell { width: min(520px, 100%); min-height: 100vh; display: flex; flex-direction: column; background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(2,6,23,0.95) 100%); box-shadow: 0 28px 80px rgba(2,6,23,0.55); position: relative; }
-    .app-header { position: sticky; top: 0; z-index: 20; padding: calc(env(safe-area-inset-top, 0px) + 1rem) 1.35rem 1rem; background: linear-gradient(180deg, rgba(8,47,73,0.92) 0%, rgba(15,23,42,0.92) 100%); backdrop-filter: blur(22px); border-bottom: 1px solid rgba(148,163,184,0.16); }
+    body { margin: 0; background: #f1f5f9; font-family: 'Inter', sans-serif; color: #0f172a; min-height: 100vh; display: flex; justify-content: center; }
+    a { color: #0f766e; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .app-shell { width: min(520px, 100%); min-height: 100vh; display: flex; flex-direction: column; background: #ffffff; box-shadow: 0 28px 80px rgba(15,23,42,0.12); position: relative; }
+    .app-header { position: sticky; top: 0; z-index: 20; padding: calc(env(safe-area-inset-top, 0px) + 1rem) 1.35rem 1rem; background: rgba(255,255,255,0.95); backdrop-filter: blur(16px); border-bottom: 1px solid #e2e8f0; }
     .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
     .brand-group { display: flex; align-items: center; gap: 0.75rem; }
-    .brand-mark { width: 2.75rem; height: 2.75rem; border-radius: 1rem; display: inline-flex; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 20%, #22d3ee, #0ea5e9 55%, #0f172a 100%); font-size: 1.5rem; }
+    .brand-mark { width: 2.75rem; height: 2.75rem; border-radius: 1rem; display: inline-flex; align-items: center; justify-content: center; background: #0f766e; font-size: 1.5rem; color: #ffffff; }
     .brand-text { display: grid; gap: 0.1rem; }
-    .brand-label { font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.82rem; color: rgba(226,232,240,0.9); }
-    .brand-sub { font-size: 0.76rem; color: rgba(148,163,184,0.9); letter-spacing: 0.04em; text-transform: uppercase; }
-    .logout-chip { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.55rem 1.05rem; border-radius: 999px; background: rgba(248,250,252,0.12); color: #f8fafc; text-decoration: none; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.05em; border: 1px solid rgba(148,163,184,0.26); transition: transform 0.16s ease, background 0.16s ease; }
-    .logout-chip:hover { transform: translateY(-1px); background: rgba(248,250,252,0.22); }
+    .brand-label { font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.82rem; color: #0f172a; }
+    .brand-sub { font-size: 0.76rem; color: #475569; letter-spacing: 0.04em; text-transform: uppercase; }
+    .logout-chip { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.55rem 1.05rem; border-radius: 999px; background: #f1f5f9; color: #0f172a; text-decoration: none; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.05em; border: 1px solid #cbd5f5; transition: transform 0.16s ease, background 0.16s ease; }
+    .logout-chip:hover { transform: translateY(-1px); background: #e0f2fe; }
     .date-line { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: center; }
-    .welcome { font-size: 1.05rem; font-weight: 600; letter-spacing: 0.01em; }
-    .date-chip { padding: 0.35rem 0.85rem; border-radius: 999px; background: rgba(2,132,199,0.2); border: 1px solid rgba(56,189,248,0.4); font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; color: #bae6fd; }
-    .app-content { flex: 1; overflow-y: auto; padding: 1.25rem 1.35rem calc(84px + env(safe-area-inset-bottom, 14px)); display: grid; gap: 1.6rem; }
+    .welcome { font-size: 1.05rem; font-weight: 600; letter-spacing: 0.01em; color: #0f172a; }
+    .date-chip { padding: 0.35rem 0.85rem; border-radius: 999px; background: #ecfdf5; border: 1px solid #a7f3d0; font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; color: #047857; }
+    .app-content { flex: 1; overflow-y: auto; padding: 1.25rem 1.35rem calc(84px + env(safe-area-inset-bottom, 14px)); display: grid; gap: 1.6rem; background: #f8fafc; }
     .section { display: grid; gap: 1rem; }
     .section-head { display: grid; gap: 0.4rem; }
-    .section-eyebrow { font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(148,163,184,0.78); }
-    .section-title { font-size: 1.35rem; font-weight: 700; margin: 0; }
-    .section-subtitle { margin: 0; color: rgba(203,213,225,0.85); font-size: 0.95rem; }
+    .section-eyebrow { font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: #64748b; }
+    .section-title { font-size: 1.35rem; font-weight: 700; margin: 0; color: #0f172a; }
+    .section-subtitle { margin: 0; color: #475569; font-size: 0.95rem; }
     .flash-stack { display: grid; gap: 0.6rem; }
-    .flash-card { border-radius: 1rem; background: rgba(252,211,77,0.22); color: #0f172a; padding: 0.85rem 1rem; border: 1px solid rgba(250,204,21,0.35); font-weight: 600; }
+    .flash-card { border-radius: 1rem; background: #fef9c3; color: #854d0e; padding: 0.85rem 1rem; border: 1px solid #facc15; font-weight: 600; }
     .job-list { display: grid; gap: 1.1rem; }
-    .job-card { border-radius: 1.2rem; background: linear-gradient(160deg, rgba(14,165,233,0.24), rgba(15,118,110,0.26)); border: 1px solid rgba(125,211,252,0.28); box-shadow: inset 0 0 0 1px rgba(14,165,233,0.12); padding: 1.25rem; display: grid; gap: 0.95rem; }
-    .job-card--complete { background: linear-gradient(160deg, rgba(34,197,94,0.22), rgba(15,118,110,0.28)); border-color: rgba(74,222,128,0.35); }
+    .job-card { border-radius: 1.2rem; background: #ffffff; border: 1px solid #e2e8f0; box-shadow: 0 12px 28px rgba(15,23,42,0.08); padding: 1.25rem; display: grid; gap: 0.95rem; }
+    .job-card--complete { background: #ecfdf5; border-color: #bbf7d0; box-shadow: 0 12px 28px rgba(15,118,110,0.12); }
     .job-head { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: space-between; align-items: baseline; }
-    .job-title { font-size: 1.18rem; font-weight: 600; letter-spacing: 0.015em; }
-    .status-pill { padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; border: 1px solid rgba(148,163,184,0.3); color: #f8fafc; background: rgba(15,23,42,0.4); }
-    .status-pill[data-state="Scheduled"] { border-color: rgba(56,189,248,0.45); background: rgba(14,165,233,0.25); color: #bae6fd; }
-    .status-pill[data-state="In progress"] { border-color: rgba(253,186,116,0.55); background: rgba(249,115,22,0.28); color: #fed7aa; }
-    .status-pill[data-state="Completed"] { border-color: rgba(74,222,128,0.55); background: rgba(34,197,94,0.26); color: #bbf7d0; }
-    .job-meta { display: grid; gap: 0.5rem; font-size: 0.95rem; color: rgba(226,232,240,0.88); }
-    .meta-label { font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(148,163,184,0.78); margin-bottom: 0.25rem; }
+    .job-title { font-size: 1.18rem; font-weight: 600; letter-spacing: 0.015em; color: #0f172a; }
+    .status-pill { padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; border: 1px solid #cbd5f5; color: #0f172a; background: #f8fafc; }
+    .status-pill[data-state="Scheduled"] { border-color: #38bdf8; background: #e0f2fe; color: #0369a1; }
+    .status-pill[data-state="In progress"] { border-color: #fb923c; background: #ffedd5; color: #9a3412; }
+    .status-pill[data-state="Completed"] { border-color: #4ade80; background: #dcfce7; color: #166534; }
+    .job-meta { display: grid; gap: 0.5rem; font-size: 0.95rem; color: #0f172a; }
+    .meta-label { font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: #64748b; margin-bottom: 0.25rem; }
     .meta-chip-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-    .meta-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; border: 1px solid rgba(125,211,252,0.4); background: rgba(14,165,233,0.2); color: #bae6fd; }
-    .meta-chip--accent { border-color: rgba(74,222,128,0.4); background: rgba(34,197,94,0.2); color: #bbf7d0; }
-    .checkpoint-row { display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.85rem; color: rgba(226,232,240,0.78); }
-    .map-link { color: #67e8f9; font-weight: 600; text-decoration: none; }
-    .map-link:hover { text-decoration: underline; }
+    .meta-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; border: 1px solid #bae6fd; background: #f0f9ff; color: #0369a1; }
+    .meta-chip--accent { border-color: #bbf7d0; background: #ecfdf5; color: #047857; }
+    .checkpoint-row { display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.85rem; color: #475569; }
+    .map-link { color: #0f766e; font-weight: 600; }
     .job-actions { display: grid; gap: 0.75rem; }
     @media (min-width: 420px) {
       .job-actions { grid-template-columns: repeat(2, minmax(0,1fr)); }
@@ -1152,26 +1388,26 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
     .job-actions form, .job-actions label { width: 100%; }
     .action-button, .upload-tile { width: 100%; border: none; border-radius: 1rem; padding: 1rem 1.1rem; font-size: 1.05rem; font-weight: 600; letter-spacing: 0.04em; display: inline-flex; justify-content: center; align-items: center; gap: 0.55rem; cursor: pointer; transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease; text-align: center; }
     .action-button:disabled { opacity: 0.55; cursor: default; }
-    .action-button:not(:disabled):hover, .upload-tile:hover { transform: translateY(-2px); box-shadow: 0 18px 32px rgba(2,6,23,0.35); }
+    .action-button:not(:disabled):hover, .upload-tile:hover { transform: translateY(-2px); box-shadow: 0 18px 32px rgba(15,23,42,0.18); }
     .btn-clock { background: linear-gradient(135deg, #38bdf8, #0ea5e9); color: #041725; }
     .btn-complete { background: linear-gradient(135deg, #22c55e, #14b8a6); color: #022c22; }
-    .upload-tile { background: linear-gradient(135deg, rgba(14,165,233,0.18), rgba(14,116,144,0.35)); border: 1px dashed rgba(125,211,252,0.4); color: #e0f2fe; position: relative; }
-    .upload-tile[data-type="after"] { background: linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.35)); border-color: rgba(74,222,128,0.4); color: #ecfdf5; }
+    .upload-tile { background: #f0f9ff; border: 1px dashed #bae6fd; color: #0f172a; position: relative; }
+    .upload-tile[data-type="after"] { background: #ecfdf5; border-color: #bbf7d0; color: #0f172a; }
     .upload-tile input[type="file"] { display: none; }
     .photo-grid { display: flex; flex-wrap: wrap; gap: 0.9rem; }
     .photo-item { display: grid; gap: 0.4rem; }
-    .photo-item img { width: 160px; max-width: 44vw; border-radius: 0.8rem; border: 2px solid rgba(148,163,184,0.35); object-fit: cover; }
+    .photo-item img { width: 160px; max-width: 44vw; border-radius: 0.8rem; border: 2px solid #cbd5f5; object-fit: cover; }
     .timeline { display: grid; gap: 0.8rem; }
-    .timeline-card { border-radius: 1rem; border: 1px solid rgba(71,85,105,0.35); background: rgba(15,23,42,0.6); padding: 0.95rem 1rem; display: grid; gap: 0.45rem; }
-    .timeline-card h3 { font-size: 1rem; margin: 0; font-weight: 600; }
-    .timeline-meta { font-size: 0.88rem; color: rgba(226,232,240,0.78); }
-    .empty-state { border-radius: 1rem; border: 1px dashed rgba(148,163,184,0.35); background: rgba(2,6,23,0.75); padding: 2.2rem 1.4rem; text-align: center; color: rgba(203,213,225,0.85); }
-    .bottom-nav { position: sticky; bottom: 0; z-index: 30; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; padding: 0.55rem 1rem calc(env(safe-area-inset-bottom, 12px) + 0.55rem); background: rgba(7,22,39,0.92); border-top: 1px solid rgba(148,163,184,0.18); backdrop-filter: blur(18px); }
-    .nav-link { display: grid; gap: 0.15rem; justify-items: center; padding: 0.45rem 0.35rem; border-radius: 0.85rem; text-decoration: none; color: rgba(226,232,240,0.75); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600; transition: background 0.16s ease, color 0.16s ease; }
+    .timeline-card { border-radius: 1rem; border: 1px solid #e2e8f0; background: #ffffff; padding: 0.95rem 1rem; display: grid; gap: 0.45rem; box-shadow: 0 10px 24px rgba(15,23,42,0.08); }
+    .timeline-card h3 { font-size: 1rem; margin: 0; font-weight: 600; color: #0f172a; }
+    .timeline-meta { font-size: 0.88rem; color: #475569; }
+    .empty-state { border-radius: 1rem; border: 1px dashed #cbd5f5; background: #ffffff; padding: 2.2rem 1.4rem; text-align: center; color: #64748b; }
+    .bottom-nav { position: sticky; bottom: 0; z-index: 30; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; padding: 0.55rem 1rem calc(env(safe-area-inset-bottom, 12px) + 0.55rem); background: rgba(255,255,255,0.95); border-top: 1px solid #e2e8f0; backdrop-filter: blur(16px); }
+    .nav-link { display: grid; gap: 0.15rem; justify-items: center; padding: 0.45rem 0.35rem; border-radius: 0.85rem; text-decoration: none; color: #475569; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600; transition: background 0.16s ease, color 0.16s ease; }
     .nav-link .icon { font-size: 1.15rem; }
-    .nav-link.active { background: rgba(56,189,248,0.2); color: #f8fafc; border: 1px solid rgba(56,189,248,0.4); }
+    .nav-link.active { background: #e0f2fe; color: #0f172a; border: 1px solid #bae6fd; }
     @media (min-width: 880px) {
-      body { background: radial-gradient(circle at top, #38bdf8 0%, #0ea5e9 25%, #1e293b 60%, #020617 100%); padding: 2rem 0; }
+      body { padding: 2rem 0; }
       .app-shell { border-radius: 1.6rem; overflow: hidden; }
     }
   </style>
@@ -1303,7 +1539,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
           </div>
         {% else %}
           <div class="empty-state">
-            <h2 class="h5 text-light mb-2">You’re all clear ✨</h2>
+            <h2 class="h5 text-dark mb-2">You’re all clear ✨</h2>
             <p class="mb-0">No shifts scheduled for today. Check back later or reach out to your manager if you were expecting a mission.</p>
           </div>
         {% endif %}
@@ -1496,38 +1732,62 @@ LEADS_TEMPLATE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Putzelf Marketing — Lead-Center</title>
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="/static/logo.png">
   <link rel="manifest" href="/static/admin-manifest.json">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    :root { --bs-primary: #0f766e; }
-    body { min-height: 100vh; background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%); color:#e5e7eb; font-size:1.05rem; }
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-danger: linear-gradient(135deg,#f87171 0%,#ef4444 50%,#dc2626 100%);
+      --btn-grad-danger-hover: linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);
+      --btn-grad-light: linear-gradient(135deg,#ffffff 0%,#f1f5f9 100%);
+      --btn-grad-light-hover: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+    }
+    body { min-height: 100vh; background: #f1f5f9; color:#0f172a; font-size:1.05rem; }
     body.mobile-nav-open { overflow:hidden; }
-    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition: grid-template-columns 0.2s ease; }
-    .sidebar { background: radial-gradient(circle at top,#020617 0%, #020617 45%, #020617 100%); border-right:1px solid rgba(148,163,184,0.3); color:#e5e7eb; display:flex; flex-direction:column; padding:1.5rem 1.25rem; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition: grid-template-columns 0.2s ease; background:#ffffff; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; color:#0f172a; display:flex; flex-direction:column; padding:1.5rem 1.25rem; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; }
     .sidebar-brand { display:flex; align-items:center; gap:0.75rem; }
-    .sidebar-logo { height:40px; width:40px; border-radius:12px; background:radial-gradient(circle at 10% 0, #22c55e 0%, #0ea5e9 45%, #1d4ed8 100%); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .sidebar-logo { height:40px; width:40px; border-radius:12px; background:linear-gradient(135deg,#0f766e,#0ea5e9); display:flex; align-items:center; justify-content:center; overflow:hidden; }
     .sidebar-logo img { max-width:80%; max-height:80%; object-fit:contain; }
-    .sidebar-title { font-weight:600; letter-spacing:0.03em; font-size:0.95rem; text-transform:uppercase; color:#e5e7eb; }
-    .sidebar-sub { font-size:0.78rem; color:#9ca3af; }
-    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#6b7280; margin-bottom:0.4rem; }
-    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#e5e7eb; display:flex; align-items:center; gap:0.5rem; text-decoration:none; border:1px solid transparent; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
-    .nav-pill.active { background:rgba(15,118,110,0.2); border-color:rgba(45,212,191,0.4); color:#ecfeff; }
-    .nav-pill:hover { background:rgba(15,23,42,0.9); border-color:rgba(148,163,184,0.5); color:#f9fafb; }
-    .nav-pill-icon { width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:rgba(15,23,42,0.9); color:#a5b4fc; font-size:0.9rem; }
+    .sidebar-title { font-weight:600; letter-spacing:0.03em; font-size:0.95rem; text-transform:uppercase; color:#0f172a; }
+    .sidebar-sub { font-size:0.78rem; color:#475569; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#64748b; margin-bottom:0.4rem; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; display:flex; align-items:center; gap:0.5rem; text-decoration:none; border:1px solid transparent; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill.active,
+    .nav-pill:hover { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
+    .nav-pill-icon { width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:#ecfdf5; color:#0f766e; font-size:0.9rem; }
     .nav-text { display:inline; }
-    .nav-pill-logout { margin-top:0.3rem; background:rgba(248,250,252,0.12); border-color:rgba(148,163,184,0.35); color:#f8fafc; }
-    .nav-pill-logout:hover { background:rgba(248,250,252,0.18); border-color:rgba(248,250,252,0.3); color:#ffffff; }
-    .sidebar-footer { margin-top:auto; font-size:0.75rem; color:#6b7280; }
-    .main-shell { padding:1.25rem 1.5rem; }
-    .card-surface { border-radius:0.9rem; border:1px solid rgba(51,65,85,0.9); background:radial-gradient(circle at top left,#020617 0%, #020617 35%, #020617 100%); padding:1rem; }
-    .badge-soft { border-radius:999px; border:1px solid rgba(148,163,184,0.6); color:#9ca3af; padding:0.15rem 0.6rem; font-size:0.75rem; }
-    .small-note { font-size:0.82rem; color:#9ca3af; }
-    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
+    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .sidebar-footer { margin-top:auto; font-size:0.75rem; color:#64748b; }
+    .main-shell { padding:1.25rem 1.5rem; background:#ffffff; }
+    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1rem; box-shadow:0 12px 24px rgba(15,23,42,0.08); }
+    .badge-soft { border-radius:999px; border:1px solid #cbd5f5; color:#0f172a; padding:0.15rem 0.6rem; font-size:0.75rem; background:#e0f2fe; }
+    .small-note { font-size:0.82rem; color:#64748b; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; box-shadow:0 10px 20px rgba(15,23,42,0.08); transition:transform 0.15s ease, box-shadow 0.15s ease; }
     .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 16px 28px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-outline-danger,
+    .btn-danger { background-image:var(--btn-grad-danger); color:#ffffff; box-shadow:0 12px 24px rgba(220,38,38,0.25); }
+    .btn-outline-danger:hover,
+    .btn-danger:hover { background-image:var(--btn-grad-danger-hover); color:#ffffff; }
+    .btn-link { background:none; box-shadow:none; color:#0f766e; }
+    .btn-link:hover { color:#0c615b; }
     .sidebar-collapsed .app-shell { grid-template-columns: 72px minmax(0, 1fr); }
     .sidebar-collapsed .sidebar { width: 72px; padding: 1.1rem 0.6rem; }
     .sidebar-collapsed .nav-text,
@@ -1539,12 +1799,12 @@ LEADS_TEMPLATE = """
     .sidebar-collapsed .nav-pill-icon { margin: 0 auto; }
     .sidebar-collapsed .sidebar-logo { margin: 0 auto; }
     .kanban { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; }
-    .kanban-column { border:1px solid rgba(51,65,85,0.9); border-radius:0.9rem; background:rgba(15,23,42,0.7); padding:0.75rem; min-height:240px; }
-    .kanban-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem; color:#e5e7eb; font-weight:600; font-size:0.95rem; }
-    .lead-card { border:1px solid rgba(148,163,184,0.3); border-radius:0.7rem; padding:0.65rem; background:rgba(2,6,23,0.7); color:#e5e7eb; margin-bottom:0.5rem; cursor:grab; }
+    .kanban-column { border:1px solid #e2e8f0; border-radius:0.9rem; background:#f8fafc; padding:0.75rem; min-height:240px; box-shadow:0 8px 16px rgba(15,23,42,0.08); }
+    .kanban-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem; color:#0f172a; font-weight:600; font-size:0.95rem; }
+    .lead-card { border:1px solid #cbd5f5; border-radius:0.7rem; padding:0.65rem; background:#ffffff; color:#0f172a; margin-bottom:0.5rem; cursor:grab; box-shadow:0 4px 12px rgba(15,23,42,0.08); }
     .lead-card.dragging { opacity:0.6; }
-    .kanban-column.drop-target { border-color:#22d3ee; box-shadow:inset 0 0 0 1px #22d3ee; }
-    .lead-meta { font-size:0.8rem; color:#9ca3af; }
+    .kanban-column.drop-target { border-color:#0f766e; box-shadow:inset 0 0 0 2px rgba(15,118,110,0.35); }
+    .lead-meta { font-size:0.8rem; color:#64748b; }
     .mobile-nav-toggle { display:none; }
     .mobile-nav-backdrop { display:none; }
     @media (max-width: 992px) {
@@ -1560,13 +1820,13 @@ LEADS_TEMPLATE = """
         display: flex;
         transform: translateX(-100%);
         transition: transform 0.2s ease;
-        box-shadow: 0 16px 40px rgba(2, 6, 23, 0.6);
+        box-shadow: 0 24px 48px rgba(15,23,42,0.18);
       }
       body.mobile-nav-open .sidebar { transform: translateX(0); }
       .mobile-nav-backdrop {
         position: fixed;
         inset: 0;
-        background: rgba(15, 23, 42, 0.62);
+        background: rgba(15, 23, 42, 0.35);
         z-index: 1040;
       }
       body.mobile-nav-open .mobile-nav-backdrop { display: block; }
@@ -1575,14 +1835,15 @@ LEADS_TEMPLATE = """
         align-items: center;
         gap: 0.4rem;
         border-radius: 0.75rem;
-        border: 1px solid rgba(148,163,184,0.4);
-        background: rgba(2, 6, 23, 0.85);
-        color: #e5e7eb;
+        border: 0;
+        background-image: var(--btn-grad-accent);
+        color: #ffffff;
         padding: 0.45rem 0.85rem;
         font-size: 0.95rem;
         margin-bottom: 1rem;
+        box-shadow: 0 12px 24px rgba(15,118,110,0.25);
       }
-      .mobile-nav-toggle:focus { outline: 2px solid rgba(45,212,191,0.6); outline-offset: 2px; }
+      .mobile-nav-toggle:focus { outline: 2px solid rgba(15,118,110,0.4); outline-offset: 2px; }
     }
   </style>
 </head>
@@ -1637,12 +1898,12 @@ LEADS_TEMPLATE = """
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
           <div class="badge-soft mb-2">Leads</div>
-          <h1 class="h4 mb-1 text-light">Lead-Center</h1>
+          <h1 class="h4 mb-1 text-dark">Lead-Center</h1>
           <p class="small-note mb-0">Manage leads through New → Qualified → Contacted → Converted.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-light">☰</button>
-          <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary text-light">Logout</a>
+          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-primary">☰</button>
+          <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Logout</a>
         </div>
       </div>
       <div class="row g-3 mb-3">
@@ -1679,7 +1940,7 @@ LEADS_TEMPLATE = """
                   {% endfor %}
                 </select>
               </div>
-              <button type="submit" class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">Save lead</button>
+              <button type="submit" class="btn btn-sm btn-primary">Save lead</button>
             </form>
           </div>
         </div>
@@ -1712,8 +1973,8 @@ LEADS_TEMPLATE = """
               </div>
               <div class="ms-auto d-flex gap-2">
                 <form id="filters-form" method="get" class="d-flex gap-2">
-                  <button class="btn btn-sm btn-outline-light" type="submit">Apply</button>
-                  <a href="{{ url_for('leads_dashboard') }}" class="btn btn-sm btn-outline-secondary text-light">Clear</a>
+                  <button class="btn btn-sm btn-outline-primary" type="submit">Apply</button>
+                  <a href="{{ url_for('leads_dashboard') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
                 </form>
               </div>
             </div>
@@ -1735,7 +1996,7 @@ LEADS_TEMPLATE = """
                           <div class="text-end">
                             <span class="small-note d-block">{{ lead.created_at.strftime('%d.%m.%Y') }}</span>
                             <div class="btn-group btn-group-sm mt-1" role="group" aria-label="Lead actions">
-                              <button type="button" class="btn btn-outline-light btn-sm py-0 lead-edit" data-bs-toggle="modal" data-bs-target="#leadModal" title="Edit lead">
+                              <button type="button" class="btn btn-outline-primary btn-sm py-0 lead-edit" data-bs-toggle="modal" data-bs-target="#leadModal" title="Edit lead">
                                 ✎
                               </button>
                               <button type="button" class="btn btn-outline-danger btn-sm py-0 lead-delete" data-lead-id="{{ lead.id }}" title="Delete lead">
@@ -1770,15 +2031,15 @@ LEADS_TEMPLATE = """
       </form>
       <div class="modal fade" id="leadModal" tabindex="-1" aria-labelledby="leadModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content bg-dark text-light border border-secondary">
+          <div class="modal-content border border-light-subtle">
             <form id="lead-edit-form" method="post" action="{{ url_for('leads_dashboard') }}" class="needs-validation" novalidate>
               <input type="hidden" name="action" value="update">
               <input type="hidden" name="id" id="lead-edit-id">
-              <div class="modal-header border-secondary">
+              <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title" id="leadModalLabel">Edit lead</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
-              <div class="modal-body">
+              <div class="modal-body pb-0">
                 <div class="mb-2">
                   <label for="lead-edit-name" class="form-label small-note text-uppercase">Name</label>
                   <input type="text" class="form-control form-control-sm" id="lead-edit-name" name="name" required>
@@ -1808,9 +2069,9 @@ LEADS_TEMPLATE = """
                   </select>
                 </div>
               </div>
-              <div class="modal-footer border-secondary d-flex justify-content-between">
+              <div class="modal-footer border-0 d-flex justify-content-between">
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">Save changes</button>
+                <button type="submit" class="btn btn-sm btn-primary">Save changes</button>
               </div>
             </form>
           </div>
@@ -2005,260 +2266,88 @@ HTML_TEMPLATE = """
   <title>Putzelf Marketing — URL Contact Crawler</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    :root { --bs-primary: #0f766e; }
-    body {
-      min-height: 100vh;
-      background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%);
-      color: #0f172a;
-      font-size: 1.05rem;
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-info: linear-gradient(135deg,#38bdf8 0%,#0ea5e9 50%,#2563eb 100%);
+      --btn-grad-info-hover: linear-gradient(135deg,#0ea5e9 0%,#2563eb 50%,#1d4ed8 100%);
+      --btn-grad-light: linear-gradient(135deg,#ffffff 0%,#f8fafc 100%);
+      --btn-grad-light-hover: linear-gradient(135deg,#f1f5f9 0%,#e2e8f0 100%);
     }
-    .app-shell {
-      min-height: 100vh;
-      display: grid;
-      grid-template-columns: 260px minmax(0, 1fr);
-      background: transparent;
-      transition: grid-template-columns 0.2s ease;
-      color: #e5e7eb;
-      font-size: 1.05rem;
-    .sidebar {
-      background: radial-gradient(circle at top,#020617 0%, #020617 45%, #020617 100%);
-      border-right: 1px solid rgba(148, 163, 184, 0.3);
-      color: #e5e7eb;
-      display: flex;
-      flex-direction: column;
-    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; }
-      padding: 1.5rem 1.25rem;
-      gap: 1.5rem;
-      width: 260px;
-      transition: width 0.2s ease, padding 0.2s ease;
-    }
-    .sidebar-brand {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .sidebar-logo {
-      height: 40px;
-      width: 40px;
-      border-radius: 12px;
-      background: radial-gradient(circle at 10% 0, #22c55e 0%, #0ea5e9 45%, #1d4ed8 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-    .sidebar-logo img {
-      max-width: 80%;
-      max-height: 80%;
-      object-fit: contain;
-    }
-    .sidebar-title {
-      font-weight: 600;
-      letter-spacing: 0.03em;
-      font-size: 0.95rem;
-      text-transform: uppercase;
-      color: #e5e7eb;
-    }
-    .sidebar-sub {
-      font-size: 0.78rem;
-      color: #9ca3af;
-    }
-    .sidebar-section-title {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: #6b7280;
-      margin-bottom: 0.4rem;
-    }
-    .nav-pill {
-      border-radius: 0.75rem;
-      padding: 0.45rem 0.75rem;
-      font-size: 0.9rem;
-      color: #e5e7eb;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      text-decoration: none;
-      border: 1px solid transparent;
-      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-    }
-    .nav-pill.active {
-      background: rgba(15, 118, 110, 0.2);
-      border-color: rgba(45, 212, 191, 0.4);
-      color: #ecfeff;
-    }
-    .nav-pill:hover {
-      background: rgba(15, 23, 42, 0.9);
-      border-color: rgba(148, 163, 184, 0.5);
-      color: #f9fafb;
-    }
-    .nav-pill-icon {
-      width: 24px;
-      height: 24px;
-      border-radius: 999px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(15, 23, 42, 0.9);
-      color: #a5b4fc;
-      font-size: 0.9rem;
-    }
-    .sidebar-footer {
-      margin-top: auto;
-      font-size: 0.75rem;
-      color: #6b7280;
-    }
-    .main-shell {
-      background: radial-gradient(circle at top,#020617 0%, #020617 40%, #020617 100%);
-      padding: 1.25rem 1.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    .topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-    }
-    .topbar-title {
-      color: #f9fafb;
-      font-weight: 500;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-      font-size: 0.8rem;
-    }
-    .topbar-heading {
-      color: #e5e7eb;
-      margin: 0.1rem 0 0.15rem;
-      font-size: 1.25rem;
-      font-weight: 600;
-    }
-    .topbar-subtitle {
-      color: #9ca3af;
-      font-size: 0.85rem;
-      max-width: 460px;
-    }
-    .sidebar-collapsed .app-shell { grid-template-columns: 72px minmax(0, 1fr); }
-    .sidebar-collapsed .sidebar { width: 72px; padding: 1.1rem 0.6rem; }
+    body { background:#f1f5f9; color:#0f172a; font-size:1.05rem; min-height:100vh; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); background:#ffffff; transition:grid-template-columns 0.2s ease; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; color:#0f172a; display:flex; flex-direction:column; padding:1.5rem 1.25rem; gap:1.5rem; width:260px; transition:width 0.2s ease, padding 0.2s ease; }
+    .sidebar-brand { display:flex; align-items:center; gap:0.75rem; }
+    .sidebar-logo { height:40px; width:40px; border-radius:12px; background:radial-gradient(circle at 10% 0, #22c55e 0%, #0ea5e9 45%, #1d4ed8 100%); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .sidebar-logo img { max-width:80%; max-height:80%; object-fit:contain; }
+    .sidebar-title { font-weight:600; letter-spacing:0.03em; font-size:0.95rem; text-transform:uppercase; color:#0f172a; }
+    .sidebar-sub { font-size:0.78rem; color:#475569; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; margin-bottom:0.4rem; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; display:flex; align-items:center; gap:0.5rem; text-decoration:none; border:1px solid transparent; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill:hover, .nav-pill.active { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
+    .nav-pill-icon { width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:#ecfdf5; color:#0f766e; font-size:0.9rem; }
+    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .sidebar-footer { margin-top:auto; font-size:0.75rem; color:#475569; }
+    .main-shell { background:#ffffff; padding:1.6rem 1.75rem; display:flex; flex-direction:column; gap:1rem; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+    .topbar-title { color:#64748b; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; font-size:0.78rem; }
+    .topbar-heading { color:#0f172a; margin:0.05rem 0 0.2rem; font-size:1.4rem; font-weight:600; }
+    .topbar-subtitle { color:#475569; font-size:0.9rem; max-width:480px; }
+    .topbar-chip { font-size:0.72rem; padding:0.2rem 0.55rem; border-radius:999px; border:1px solid rgba(15,118,110,0.35); color:#0f766e; background:#ecfdf5; text-transform:uppercase; letter-spacing:0.08em; }
+    .topbar-user { display:flex; align-items:center; gap:0.75rem; color:#0f172a; }
+    .user-avatar { width:32px; height:32px; border-radius:999px; background:radial-gradient(circle at 10% 0, #0ea5e9 0%, #6366f1 60%, #4f46e5 100%); display:inline-flex; align-items:center; justify-content:center; font-size:0.9rem; font-weight:600; color:#ffffff; }
+    .user-meta { font-size:0.8rem; text-align:right; }
+    .user-meta span { display:block; }
+    .user-meta span:first-child { color:#0f172a; font-weight:600; }
+    .user-meta span:nth-child(2) { color:#0f766e; }
+    .user-meta span:last-child { color:#64748b; }
+    .content-shell { margin-top:0.25rem; border-radius:1rem; background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 24px 48px rgba(15,23,42,0.08); padding:1.25rem 1.35rem 1.4rem; display:flex; flex-direction:column; gap:1.1rem; }
+    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.15rem; color:#0f172a; box-shadow:0 12px 24px rgba(15,23,42,0.06); }
+    .card-header-line { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-bottom:0.9rem; }
+    .card-title { font-size:0.95rem; font-weight:600; color:#0f172a; }
+    .card-subtitle { font-size:0.82rem; color:#64748b; margin-bottom:0; }
+    .badge-soft { border-radius:999px; border:1px solid #cbd5f5; color:#4c51bf; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
+    .btn { font-size:1rem; padding:0.65rem 1.1rem; border-radius:0.75rem; min-height:2.7rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; box-shadow:0 10px 20px rgba(15,23,42,0.08); transition:transform 0.15s ease, box-shadow 0.15s ease; }
+    .btn-sm { font-size:0.92rem; padding:0.5rem 0.9rem; border-radius:0.7rem; min-height:2.4rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 16px 28px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-link { background:none; box-shadow:none; color:#0f766e; }
+    .btn-link:hover { color:#0c615b; }
+    .small-note { font-size:0.82rem; color:#64748b; }
+    .divider-label { text-transform:uppercase; font-size:0.72rem; letter-spacing:0.08em; color:#94a3b8; }
+    .chat-bubble { border-radius:0.75rem; background:#f8fafc; padding:0.65rem 0.8rem; font-size:0.86rem; border:1px dashed #cbd5f5; color:#475569; }
+    .assistant-badge { font-size:0.78rem; padding:0.15rem 0.6rem; border-radius:999px; background:#eef2ff; color:#4c51bf; border:1px solid #cbd5f5; }
+    .chat-output { white-space:pre-wrap; font-size:0.86rem; color:#0f172a; background:#f8fafc; border:1px solid #e2e8f0; border-radius:0.75rem; }
+    .sidebar-collapsed .app-shell { grid-template-columns:72px minmax(0,1fr); }
+    .sidebar-collapsed .sidebar { width:72px; padding:1.1rem 0.6rem; }
     .sidebar-collapsed .nav-text,
     .sidebar-collapsed .sidebar-title,
     .sidebar-collapsed .sidebar-sub,
     .sidebar-collapsed .sidebar-section-title,
-    .sidebar-collapsed .sidebar-footer { display: none; }
-    .sidebar-collapsed .nav-pill { justify-content: center; padding: 0.45rem; }
-    .sidebar-collapsed .nav-pill-icon { margin: 0 auto; }
-    .sidebar-collapsed .sidebar-logo { margin: 0 auto; }
-    .topbar-chip {
-      font-size: 0.72rem;
-      padding: 0.2rem 0.55rem;
-      border-radius: 999px;
-      border: 1px solid rgba(45, 212, 191, 0.5);
-      color: #a5f3fc;
-      background: rgba(8, 47, 73, 0.85);
-    }
-    .topbar-user {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      color: #e5e7eb;
-    }
-    .user-avatar {
-      width: 32px;
-      height: 32px;
-      border-radius: 999px;
-      background: radial-gradient(circle at 10% 0, #0ea5e9 0%, #6366f1 60%, #4f46e5 100%);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: #e5e7eb;
-    }
-    .user-meta { font-size: 0.8rem; }
-    .user-meta span { display: block; }
-    .user-meta span:first-child { color: #e5e7eb; }
-    .user-meta span:last-child { color: #6b7280; }
-    .content-shell {
-      margin-top: 0.25rem;
-      border-radius: 1rem;
-      background: radial-gradient(circle at top,#020617 0%, #020617 18%, #020617 45%, #020617 100%);
-      border: 1px solid rgba(31, 41, 55, 0.9);
-      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.95);
-      padding: 1.1rem 1.1rem 1.3rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    .card-surface {
-      border-radius: 0.9rem;
-      border: 1px solid rgba(51, 65, 85, 0.9);
-      background: radial-gradient(circle at top left,#020617 0%, #020617 35%, #020617 100%);
-      padding: 1rem;
-      color: #e5e7eb;
-    }
-    .card-header-line {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-      margin-bottom: 0.75rem;
-    }
-    .card-title { font-size: 0.95rem; font-weight: 500; color: #e5e7eb; }
-    .card-subtitle { font-size: 0.8rem; color: #9ca3af; margin-bottom: 0.3rem; }
-    .badge-soft {
-      border-radius: 999px;
-      border: 1px solid rgba(148, 163, 184, 0.6);
-      color: #9ca3af;
-      padding: 0.15rem 0.6rem;
-      font-size: 0.75rem;
-    }
-    .btn {
-      font-size: 1rem;
-      padding: 0.65rem 1.1rem;
-      border-radius: 0.75rem;
-      min-height: 2.75rem;
-    }
-    .btn-sm {
-      font-size: 0.95rem;
-      padding: 0.55rem 0.95rem;
-      border-radius: 0.7rem;
-      min-height: 2.5rem;
-    }
-    .small-note { font-size:0.82rem; color:#9ca3af; }
-    .divider-label {
-      text-transform:uppercase;
-      font-size:0.7rem;
-      letter-spacing:0.08em;
-      color:#6b7280;
-    }
-    .chat-bubble {
-      border-radius:10px;
-      background:#020617;
-      padding:0.65rem 0.8rem;
-      font-size:0.86rem;
-      border:1px dashed rgba(55,65,81,0.9);
-      color:#9ca3af;
-    }
-    .assistant-badge {
-      font-size:0.78rem;
-      padding:0.15rem 0.6rem;
-      border-radius:999px;
-      background:rgba(37,99,235,0.18);
-      color:#bfdbfe;
-      border:1px solid rgba(59,130,246,0.4);
-    }
-    .chat-output { white-space:pre-wrap; font-size:0.86rem; color:#e5e7eb; }
+    .sidebar-collapsed .sidebar-footer { display:none; }
+    .sidebar-collapsed .nav-pill { justify-content:center; padding:0.45rem; }
+    .sidebar-collapsed .nav-pill-icon { margin:0 auto; }
+    .sidebar-collapsed .sidebar-logo { margin:0 auto; }
     @media (max-width: 992px) {
-      .app-shell { grid-template-columns: minmax(0, 1fr); }
-      .sidebar { display: none; }
-      .main-shell { padding: 1rem; }
+      .app-shell { grid-template-columns:minmax(0,1fr); }
+      .sidebar { display:none; }
+      .main-shell { padding:1.25rem; }
+      .content-shell { padding:1rem; }
     }
     @media (max-width: 640px) {
-      .content-shell { padding: 0.85rem; }
+      .topbar { flex-direction:column; align-items:flex-start; }
+      .topbar-user { align-self:stretch; justify-content:space-between; }
     }
-   
-        
   </style>
 </head>
 <body>
@@ -2320,11 +2409,11 @@ HTML_TEMPLATE = """
           </p>
         </div>
         <div class="topbar-user">
-          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-light">☰</button>
+          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-secondary">☰</button>
           <div class="text-end user-meta">
             <span>Prospecting workspace</span>
             <span>{{ 'GPT connected' if gpt_enabled else 'GPT not configured' }}</span>
-            <span><a href="{{ url_for('logout') }}" class="link-light small-note text-decoration-none">Logout</a></span>
+            <span><a href="{{ url_for('logout') }}" class="link-secondary small-note text-decoration-none">Logout</a></span>
           </div>
           <div class="user-avatar">PM</div>
         </div>
@@ -2353,7 +2442,7 @@ HTML_TEMPLATE = """
                   <input type="number" class="form-control form-control-sm" id="max_pages" name="max_pages" min="1" max="200" value="100" required>
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                  <button id="submit-btn" type="submit" class="btn btn-sm btn-primary" style="background-color:#0f766e; border-color:#0f766e;">
+                  <button id="submit-btn" type="submit" class="btn btn-sm btn-primary">
                     <span id="btn-spinner" class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
                     Crawl &amp; download PDF
                   </button>
@@ -2401,7 +2490,7 @@ HTML_TEMPLATE = """
                   <div id="gpt-status" class="small-note" aria-live="polite"></div>
                 </div>
                 <div class="divider-label mb-2">GPT response</div>
-                <div id="gpt-output" class="chat-output border rounded-3 p-2 flex-grow-1" style="min-height:120px; max-height:260px; overflow:auto; border-color:rgba(55,65,81,0.95); background:#020617;"></div>
+                <div id="gpt-output" class="chat-output border rounded-3 p-2 flex-grow-1" style="min-height:120px; max-height:260px; overflow:auto;"></div>
               </form>
             </div>
           </div>
@@ -2541,433 +2630,112 @@ SCHEDULE_TEMPLATE = """
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
   <style>
-    :root { --bs-primary: #0f766e; }
-    body {
-      min-height: 100vh;
-      background: radial-gradient(circle at top left,#0f172a 0%, #020617 40%, #020617 100%);
-      color: #0f172a;
-      font-size: 1.05rem;
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-success: linear-gradient(135deg,#22c55e 0%,#16a34a 50%,#15803d 100%);
+      --btn-grad-success-hover: linear-gradient(135deg,#16a34a 0%,#15803d 50%,#166534 100%);
+      --btn-grad-danger: linear-gradient(135deg,#f87171 0%,#ef4444 50%,#dc2626 100%);
+      --btn-grad-danger-hover: linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);
     }
-    .app-shell {
-      min-height: 100vh;
-      display: grid;
-      grid-template-columns: 260px minmax(0, 1fr);
-      transition: grid-template-columns 0.2s ease;
-    }
-    .sidebar {
-      background: radial-gradient(circle at top,#020617 0%, #020617 45%, #020617 100%);
-      border-right: 1px solid rgba(148, 163, 184, 0.3);
-      color: #e5e7eb;
-      display: flex;
-      flex-direction: column;
-      padding: 1.5rem 1.25rem;
-      gap: 1.5rem;
-      width: 260px;
-      transition: width 0.2s ease, padding 0.2s ease;
-    }
-    .sidebar-brand {
-      display: flex;
-      alignments: center;
-      gap: 0.75rem;
-    }
-    .sidebar-logo {
-      height: 40px;
-      width: 40px;
-      border-radius: 12px;
-      background: radial-gradient(circle at 10% 0, #22c55e 0%, #0ea5e9 45%, #1d4ed8 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-    .sidebar-logo img {
-      max-width: 80%;
-      max-height: 80%;
-      object-fit: contain;
-    }
-    .sidebar-title {
-      font-weight: 600;
-      letter-spacing: 0.03em;
-      font-size: 0.95rem;
-      text-transform: uppercase;
-      color: #e5e7eb;
-    }
-    .sidebar-sub {
-      font-size: 0.78rem;
-      color: #9ca3af;
-    }
-    .sidebar-section-title {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: #6b7280;
-      margin-bottom: 0.4rem;
-    }
-    .nav-text { display: inline; }
-    .nav-pill {
-      border-radius: 0.75rem;
-      padding: 0.45rem 0.75rem;
-      font-size: 0.9rem;
-      color: #e5e7eb;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      text-decoration: none;
-      border: 1px solid transparent;
-      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-    }
-    .nav-pill.active {
-      background: rgba(15, 118, 110, 0.2);
-      border-color: rgba(45, 212, 191, 0.4);
-      color: #ecfeff;
-    }
-    .nav-pill:hover {
-      background: rgba(15, 23, 42, 0.9);
-      border-color: rgba(148, 163, 184, 0.5);
-      color: #f9fafb;
-    }
-    .nav-pill-icon {
-      width: 24px;
-      height: 24px;
-      border-radius: 999px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(15, 23, 42, 0.9);
-      color: #a5b4fc;
-      font-size: 0.9rem;
-    }
-    .nav-pill-logout { margin-top: 0.3rem; background: rgba(248, 250, 252, 0.12); border-color: rgba(148, 163, 184, 0.35); color: #f8fafc; }
-    .nav-pill-logout:hover { background: rgba(248, 250, 252, 0.18); border-color: rgba(248, 250, 252, 0.3); color: #ffffff; }
-    .sidebar-footer {
-      margin-top: auto;
-      font-size: 0.75rem;
-      color: #6b7280;
-    }
-    .main-shell {
-      background: radial-gradient(circle at top,#020617 0%, #020617 40%, #020617 100%);
-      padding: 1.25rem 1.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    .topbar-title {
-      color: #f9fafb;
-      font-weight: 500;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-      font-size: 0.8rem;
-    }
-    .topbar-heading {
-      color: #e5e7eb;
-      margin: 0.1rem 0 0.15rem;
-      font-size: 1.25rem;
-      font-weight: 600;
-    }
-    .topbar-subtitle {
-      color: #9ca3af;
-      font-size: 0.85rem;
-      max-width: 520px;
-    }
-    .content-shell {
-      margin-top: 0.25rem;
-      border-radius: 1.15rem;
-      background: radial-gradient(circle at top,#020617 0%, #020617 18%, #020617 45%, #020617 100%);
-      border: 1px solid rgba(31, 41, 55, 0.85);
-      box-shadow: 0 30px 90px rgba(8, 11, 22, 0.88);
-      padding: 1.35rem 1.35rem 1.6rem;
-      color: #e5e7eb;
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-    }
-    .section-card {
-      background: rgba(2, 6, 23, 0.92);
-      border: 1px solid rgba(46, 62, 94, 0.7);
-      border-radius: 1rem;
-      padding: 1.5rem;
-      box-shadow: 0 16px 40px rgba(8, 11, 22, 0.55);
-    }
-    .page-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 1.5rem;
-      margin-bottom: 0.5rem;
-    }
-    .page-header-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      flex-wrap: wrap;
-    }
-    .btn { font-size: 1rem; padding: 0.65rem 1.15rem; border-radius: 0.75rem; min-height: 2.75rem; }
-    .btn-sm { font-size: 0.95rem; padding: 0.55rem 0.95rem; border-radius: 0.7rem; min-height: 2.5rem; }
-    .btn-icon {
-      width: 34px;
-      height: 34px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      border-radius: 0.65rem;
-    }
-    .section-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 1.25rem;
-    }
-    .section-kicker {
-      font-size: 0.68rem;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: #38bdf8;
-      margin-bottom: 0.4rem;
-    }
-    .section-title {
-      font-size: 1.35rem;
-      font-weight: 600;
-      color: #f8fafc;
-      margin-bottom: 0.35rem;
-    }
-    .section-subtitle {
-      font-size: 0.9rem;
-      color: #94a3b8;
-      max-width: 560px;
-      margin-bottom: 0;
-    }
-    .section-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      flex-wrap: wrap;
-    }
-    .insight-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 1.1rem;
-    }
-    .insight-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.35rem 0.65rem;
-      border-radius: 999px;
-      border: 1px solid rgba(45, 212, 191, 0.45);
-      background: rgba(15, 118, 110, 0.12);
-      color: #5eead4;
-      font-size: 0.72rem;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    .filter-toolbar {
-      display: grid;
-      gap: 0.75rem;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      background: rgba(15, 23, 42, 0.75);
-      border: 1px solid rgba(30, 41, 59, 0.9);
-      border-radius: 0.85rem;
-      padding: 1rem;
-      margin-bottom: 1.25rem;
-    }
-    .filter-toolbar .form-label {
-      font-size: 0.7rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: #64748b;
-      margin-bottom: 0.35rem;
-    }
+    body { background:#f1f5f9; color:#0f172a; font-size:1.05rem; min-height:100vh; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition:grid-template-columns 0.2s ease; background:#ffffff; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; color:#0f172a; display:flex; flex-direction:column; padding:1.5rem 1.25rem; gap:1.5rem; width:260px; transition:width 0.2s ease, padding 0.2s ease; }
+    .sidebar-brand { display:flex; align-items:center; gap:0.75rem; }
+    .sidebar-logo { height:40px; width:40px; border-radius:12px; background:radial-gradient(circle at 10% 0, #22c55e 0%, #0ea5e9 45%, #1d4ed8 100%); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .sidebar-logo img { max-width:80%; max-height:80%; object-fit:contain; }
+    .sidebar-title { font-weight:600; letter-spacing:0.03em; font-size:0.95rem; text-transform:uppercase; color:#0f172a; }
+    .sidebar-sub { font-size:0.78rem; color:#475569; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; margin-bottom:0.4rem; }
+    .nav-text { display:inline; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; display:flex; align-items:center; gap:0.5rem; text-decoration:none; border:1px solid transparent; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill:hover, .nav-pill.active { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
+    .nav-pill-icon { width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:#ecfdf5; color:#0f766e; font-size:0.9rem; }
+    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .sidebar-footer { margin-top:auto; font-size:0.75rem; color:#475569; }
+    .main-shell { background:#ffffff; padding:1.6rem 1.75rem; display:flex; flex-direction:column; gap:1.5rem; }
+    .page-header { display:flex; align-items:flex-start; justify-content:space-between; gap:1.5rem; margin-bottom:0.5rem; }
+    .page-header-actions { display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.7rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; box-shadow:0 10px 20px rgba(15,23,42,0.08); transition:transform 0.15s ease, box-shadow 0.15s ease; }
+    .btn-sm { font-size:0.92rem; padding:0.5rem 0.9rem; border-radius:0.7rem; min-height:2.4rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 16px 28px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-icon { width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; padding:0; border-radius:0.65rem; }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-success { background-image:var(--btn-grad-success); color:#ffffff; box-shadow:0 12px 24px rgba(34,197,94,0.25); }
+    .btn-success:hover { background-image:var(--btn-grad-success-hover); color:#ffffff; }
+    .btn-danger { background-image:var(--btn-grad-danger); color:#ffffff; box-shadow:0 12px 24px rgba(220,38,38,0.25); }
+    .btn-danger:hover { background-image:var(--btn-grad-danger-hover); color:#ffffff; }
+    .page-header a.btn-outline-secondary { color:#0f172a; }
+    .content-shell { margin-top:0.25rem; border-radius:1.15rem; background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 24px 48px rgba(15,23,42,0.08); padding:1.35rem 1.35rem 1.6rem; color:#0f172a; display:flex; flex-direction:column; gap:1.5rem; }
+    .section-card { background:#ffffff; border:1px solid #e2e8f0; border-radius:1rem; padding:1.5rem; box-shadow:0 16px 32px rgba(15,23,42,0.08); }
+    .section-header { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1.25rem; }
+    .section-kicker { font-size:0.68rem; letter-spacing:0.14em; text-transform:uppercase; color:#0f766e; margin-bottom:0.4rem; }
+    .section-title { font-size:1.35rem; font-weight:600; color:#0f172a; margin-bottom:0.35rem; }
+    .section-subtitle { font-size:0.9rem; color:#475569; max-width:560px; margin-bottom:0; }
+    .section-actions { display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; }
+    .insight-badges { display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1.1rem; }
+    .insight-badge { display:inline-flex; align-items:center; gap:0.4rem; padding:0.35rem 0.65rem; border-radius:999px; border:1px solid #cbd5f5; background:#ecfdf5; color:#0f766e; font-size:0.72rem; letter-spacing:0.04em; text-transform:uppercase; }
+    .filter-toolbar { display:grid; gap:0.75rem; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); background:#f8fafc; border:1px solid #e2e8f0; border-radius:0.85rem; padding:1rem; margin-bottom:1.25rem; }
+    .filter-toolbar .form-label { font-size:0.7rem; letter-spacing:0.1em; text-transform:uppercase; color:#64748b; margin-bottom:0.35rem; }
     .filter-toolbar .form-select,
-    .filter-toolbar input[type="date"] {
-      background: rgba(8, 11, 22, 0.85);
-      border: 1px solid rgba(51, 65, 85, 0.8);
-      color: #e5e7eb;
-      font-size: 0.82rem;
-    }
+    .filter-toolbar input[type="date"] { background:#ffffff; border:1px solid #cbd5f5; color:#0f172a; font-size:0.82rem; border-radius:0.6rem; }
     .filter-toolbar .form-select:focus,
-    .filter-toolbar input[type="date"]:focus {
-      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15);
-      border-color: rgba(45, 212, 191, 0.55);
-    }
-    .table-wrapper {
-      background: rgba(8, 11, 22, 0.75);
-      border: 1px solid rgba(30, 41, 59, 0.9);
-      border-radius: 0.85rem;
-      overflow: hidden;
-    }
-    .table-scroll {
-      max-height: 460px;
-      overflow: auto;
-    }
-    .schedule-table {
-      margin-bottom: 0;
-      color: #e2e8f0;
-    }
+    .filter-toolbar input[type="date"]:focus { box-shadow:0 0 0 3px rgba(15,118,110,0.15); border-color:#0f766e; }
+    .table-wrapper { background:#ffffff; border:1px solid #e2e8f0; border-radius:0.85rem; overflow:hidden; }
+    .table-scroll { max-height:460px; overflow:auto; }
+    .schedule-table { margin-bottom:0; color:#0f172a; }
     .schedule-table th,
-    .schedule-table td {
-      font-size: 0.82rem;
-      vertical-align: top;
-      border-color: rgba(39, 51, 75, 0.85);
-    }
-    .schedule-table th {
-      background: rgba(8, 13, 25, 0.95);
-      color: #94a3b8;
-      position: sticky;
-      top: 0;
-      z-index: 5;
-    }
-    .schedule-table tbody tr:nth-child(odd) {
-      background: rgba(12, 17, 31, 0.65);
-    }
-    .schedule-table tbody tr:nth-child(even) {
-      background: rgba(7, 11, 22, 0.45);
-    }
-    .shift-pill {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.18rem 0.55rem;
-      border-radius: 999px;
-      background: linear-gradient(135deg, rgba(20, 184, 166, 0.18), rgba(14, 165, 233, 0.22));
-      border: 1px solid rgba(56, 189, 248, 0.55);
-      color: #f0f9ff;
-      font-size: 0.74rem;
-      margin-bottom: 0.25rem;
-      white-space: nowrap;
-    }
-    .free-pill {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.18rem 0.55rem;
-      border-radius: 999px;
-      border: 1px dashed rgba(71, 85, 105, 0.7);
-      color: #64748b;
-      font-size: 0.74rem;
-    }
-    .form-card .section-subtitle {
-      max-width: 600px;
-    }
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1rem;
-      margin-bottom: 1.1rem;
-    }
-    .form-grid .form-field {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-    .form-field-span {
-      grid-column: 1 / -1;
-    }
+    .schedule-table td { font-size:0.82rem; vertical-align:top; border-color:#e2e8f0; }
+    .schedule-table th { background:#f1f5f9; color:#475569; position:sticky; top:0; z-index:5; }
+    .schedule-table tbody tr:nth-child(odd) { background:#ffffff; }
+    .schedule-table tbody tr:nth-child(even) { background:#f8fafc; }
+    .shift-pill { display:inline-flex; align-items:center; padding:0.18rem 0.6rem; border-radius:999px; background:#ecfdf5; border:1px solid #16a34a26; color:#0f766e; font-size:0.74rem; margin-bottom:0.25rem; white-space:nowrap; }
+    .free-pill { display:inline-flex; align-items:center; padding:0.18rem 0.6rem; border-radius:999px; border:1px dashed #cbd5f5; color:#94a3b8; font-size:0.74rem; }
+    .form-card .section-subtitle { max-width:600px; }
+    .form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.1rem; }
+    .form-grid .form-field { display:flex; flex-direction:column; gap:0.35rem; }
+    .form-field-span { grid-column:1 / -1; }
     .form-grid .form-select,
     .form-grid input[type="text"],
     .form-grid input[type="time"],
     .form-grid input[type="number"],
-    .form-grid textarea {
-      background: rgba(8, 11, 22, 0.85);
-      border: 1px solid rgba(51, 65, 85, 0.8);
-      color: #e5e7eb;
-    }
-    #day-picker {
-      background: rgba(8, 11, 22, 0.85);
-      border: 1px solid rgba(51, 65, 85, 0.8);
-      color: #e5e7eb;
-    }
+    .form-grid textarea { background:#ffffff; border:1px solid #cbd5f5; color:#0f172a; border-radius:0.6rem; }
+    #day-picker { background:#ffffff; border:1px solid #cbd5f5; color:#0f172a; border-radius:0.6rem; }
     #day-picker:focus,
     .form-grid .form-select:focus,
     .form-grid input:focus,
-    .form-grid textarea:focus {
-      border-color: rgba(45, 212, 191, 0.55);
-      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
-    }
-    .selected-days {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-    }
-    .day-chip {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.18rem 0.55rem;
-      border-radius: 999px;
-      background: rgba(15, 118, 110, 0.18);
-      border: 1px solid rgba(45, 212, 191, 0.4);
-      color: #a5f3fc;
-      font-size: 0.72rem;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    .form-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-    .tip-callout {
-      margin-top: 1.25rem;
-      border-radius: 0.85rem;
-      background: rgba(15, 23, 42, 0.65);
-      border: 1px dashed rgba(56, 189, 248, 0.45);
-      padding: 0.9rem 1rem;
-      color: #94a3b8;
-      font-size: 0.85rem;
-    }
-    .tag-muted {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-      font-size: 0.75rem;
-      color: #94a3b8;
-    }
-    .btn-primary {
-      background: linear-gradient(135deg, #14b8a6, #0ea5e9);
-      border: 1px solid rgba(14, 165, 233, 0.45);
-      color: #02131b;
-      font-weight: 600;
-      box-shadow: 0 12px 20px rgba(8, 47, 73, 0.35);
-    }
-    .btn-primary:hover {
-      background: linear-gradient(135deg, #0ea5e9, #818cf8);
-      border-color: rgba(129, 140, 248, 0.55);
-      color: #010b12;
-      transform: translateY(-1px);
-    }
-    .btn-outline-light {
-      border: 1px solid rgba(226, 232, 240, 0.25);
-      color: #e2e8f0;
-    }
-    .btn-outline-light:hover {
-      background: rgba(148, 163, 184, 0.12);
-      color: #f8fafc;
-    }
-    .btn-outline-secondary {
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      color: #94a3b8;
-    }
-    .btn-outline-secondary:hover {
-      background: rgba(148, 163, 184, 0.15);
-      color: #f8fafc;
-    }
-    .small-note { font-size:0.82rem; color:#94a3b8; }
-    .sidebar-collapsed .app-shell { grid-template-columns: 72px minmax(0, 1fr); }
-    .sidebar-collapsed .sidebar { width: 72px; padding: 1.1rem 0.6rem; }
+    .form-grid textarea:focus { border-color:#0f766e; box-shadow:0 0 0 3px rgba(15,118,110,0.15); }
+    .selected-days { display:flex; flex-wrap:wrap; gap:0.35rem; }
+    .day-chip { display:inline-flex; align-items:center; padding:0.18rem 0.6rem; border-radius:999px; background:#ecfdf5; border:1px solid #cbd5f5; color:#0f766e; font-size:0.72rem; letter-spacing:0.04em; text-transform:uppercase; }
+    .form-actions { display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap; }
+    .tip-callout { margin-top:1.25rem; border-radius:0.85rem; background:#f1f5f9; border:1px dashed #cbd5f5; padding:0.9rem 1rem; color:#475569; font-size:0.85rem; }
+    .tag-muted { display:inline-flex; align-items:center; gap:0.3rem; font-size:0.75rem; color:#94a3b8; }
+    .small-note { font-size:0.82rem; color:#64748b; }
+    .sidebar-collapsed .app-shell { grid-template-columns:72px minmax(0,1fr); }
+    .sidebar-collapsed .sidebar { width:72px; padding:1.1rem 0.6rem; }
     .sidebar-collapsed .nav-text,
     .sidebar-collapsed .sidebar-title,
     .sidebar-collapsed .sidebar-sub,
     .sidebar-collapsed .sidebar-section-title,
-    .sidebar-collapsed .sidebar-footer { display: none; }
-    .sidebar-collapsed .nav-pill { justify-content: center; padding: 0.45rem; }
-    .sidebar-collapsed .nav-pill-icon { margin: 0 auto; }
-    .sidebar-collapsed .sidebar-logo { margin: 0 auto; }
+    .sidebar-collapsed .sidebar-footer { display:none; }
+    .sidebar-collapsed .nav-pill { justify-content:center; padding:0.45rem; }
+    .sidebar-collapsed .nav-pill-icon { margin:0 auto; }
+    .sidebar-collapsed .sidebar-logo { margin:0 auto; }
     @media (max-width: 992px) {
-      .app-shell { grid-template-columns: minmax(0, 1fr); }
-      .sidebar { display: none; }
-      .main-shell { padding: 1rem; }
-      .content-shell { padding: 1rem; }
+      .app-shell { grid-template-columns:minmax(0,1fr); }
+      .sidebar { display:none; }
+      .main-shell { padding:1.25rem; }
+      .content-shell { padding:1rem; }
     }
   </style>
 </head>
@@ -3030,8 +2798,8 @@ SCHEDULE_TEMPLATE = """
           </p>
         </div>
         <div class="page-header-actions">
-          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-light btn-icon" title="Toggle navigation">☰</button>
-          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-light">Admin panel</a>
+          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-secondary btn-icon" title="Toggle navigation">☰</button>
+          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Admin panel</a>
           <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Logout</a>
         </div>
       </header>
@@ -3048,7 +2816,7 @@ SCHEDULE_TEMPLATE = """
             <div class="section-actions">
               {% if reportlab_available %}
                 <a href="{{ pdf_url }}" class="btn btn-sm btn-primary">Schedule PDF</a>
-                <a href="{{ hours_pdf_url }}" class="btn btn-sm btn-outline-light">Hours report</a>
+                <a href="{{ hours_pdf_url }}" class="btn btn-sm btn-outline-secondary">Hours report</a>
               {% else %}
                 <span class="tag-muted">Install reportlab to export PDF</span>
               {% endif %}
@@ -3088,7 +2856,7 @@ SCHEDULE_TEMPLATE = """
           </form>
           <div class="table-wrapper">
             <div class="table-scroll">
-              <table class="table table-dark table-bordered table-sm align-middle schedule-table">
+              <table class="table table-bordered table-sm align-middle schedule-table">
                 <thead>
                   <tr>
                     <th scope="col">Employee</th>
@@ -3350,57 +3118,179 @@ else:
   _openai_key = os.getenv("OPENAI_API_KEY")
   openai_client = OpenAI(api_key=_openai_key) if _openai_key else None
 
+try:
+  import phonenumbers
+  from phonenumbers import PhoneNumberFormat
+except Exception:  # pragma: no cover - dependency optional
+  phonenumbers = None
+  PhoneNumberFormat = None
+  PHONENUMBERS_AVAILABLE = False
+else:
+  PHONENUMBERS_AVAILABLE = True
+
 
 # --- Business constants --------------------------------------------------------
+
+DEFAULT_PHONE_REGION = os.getenv("CRAWLER_DEFAULT_REGION", "US").upper()
 
 LEAD_STAGES = ["New Leads", "Qualified", "Contacted", "Converted"]
 
 EMAIL_REGEX = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.IGNORECASE)
-PHONE_TOKEN_REGEX = re.compile(r"\+?\d[\d\s().\/-]{6,}")
+PHONE_TOKEN_REGEX = re.compile(r"\+?\d[\d\s().\/\-]{6,20}")
 PHONE_LABEL_REGEX = re.compile(
   r"(?:tel|telefon|phone|mobil|handy|kontakt|contact|rufnummer|call)[:\s-]*([+0][\d\s().\/-]{5,})",
   re.IGNORECASE,
 )
 
 
-def normalize_phone(raw: str | None) -> str:
+def _looks_like_date_sequence(candidate: str, digits: str) -> bool:
+  if len(digits) not in (6, 8):
+    return False
+  compact_candidate = re.sub(r"\D", "", candidate)
+  if compact_candidate != digits:
+    return False
+  if len(digits) == 8:
+    for fmt in ("%Y%m%d", "%d%m%Y", "%m%d%Y"):
+      try:
+        parsed = datetime.strptime(digits, fmt)
+      except ValueError:
+        continue
+      if 1900 <= parsed.year <= 2100:
+        return True
+  elif len(digits) == 6:
+    for fmt in ("%y%m%d", "%d%m%y", "%m%d%y"):
+      try:
+        parsed = datetime.strptime(digits, fmt)
+      except ValueError:
+        continue
+      if 1930 <= parsed.year <= 2100:
+        return True
+  return False
+
+
+REGION_FROM_TLD = {
+  "US": "US",
+  "COM": "US",
+  "NET": "US",
+  "ORG": "US",
+  "CA": "CA",
+  "AU": "AU",
+  "NZ": "NZ",
+  "UK": "GB",
+  "GB": "GB",
+  "IE": "IE",
+  "DE": "DE",
+  "AT": "AT",
+  "CH": "CH",
+  "FR": "FR",
+  "ES": "ES",
+  "IT": "IT",
+  "NL": "NL",
+  "BE": "BE",
+  "SE": "SE",
+  "NO": "NO",
+  "DK": "DK",
+  "FI": "FI",
+  "PL": "PL",
+  "CZ": "CZ",
+  "SK": "SK",
+  "HU": "HU",
+  "PT": "PT",
+  "GR": "GR",
+  "RO": "RO",
+  "BG": "BG",
+  "HR": "HR",
+  "SI": "SI",
+  "LV": "LV",
+  "LT": "LT",
+  "EE": "EE",
+  "MX": "MX",
+  "BR": "BR",
+  "AR": "AR",
+  "CL": "CL",
+  "CO": "CO",
+  "PE": "PE",
+  "ZA": "ZA",
+  "IN": "IN",
+  "SG": "SG",
+  "MY": "MY",
+  "PH": "PH",
+  "TH": "TH",
+  "JP": "JP",
+  "KR": "KR",
+  "CN": "CN",
+  "HK": "HK",
+  "TW": "TW",
+}
+
+
+def _infer_region_from_netloc(netloc: str) -> str | None:
+  if not netloc:
+    return None
+  parts = netloc.lower().split(".")
+  if not parts:
+    return None
+  tld = parts[-1].upper()
+  return REGION_FROM_TLD.get(tld)
+
+
+def _parse_phone_candidate(raw: str | None, region: str | None = None) -> str | None:
   if not raw:
-    return ""
-  text = raw.strip()
-  if not text:
-    return ""
-  has_plus = text.startswith("+")
-  digits = re.sub(r"\D", "", text)
-  if not digits:
-    return ""
-  if has_plus:
+    return None
+  candidate = raw.strip().replace("\u00a0", " ")
+  if not candidate:
+    return None
+  if PHONENUMBERS_AVAILABLE:
+    region_code = None if candidate.startswith("+") else (region or DEFAULT_PHONE_REGION)
+    try:
+      parsed = phonenumbers.parse(candidate, region_code)
+    except phonenumbers.NumberParseException:
+      return None
+    if phonenumbers.is_possible_number(parsed) and phonenumbers.is_valid_number(parsed):
+      return phonenumbers.format_number(parsed, PhoneNumberFormat.E164)
+    return None
+
+  digits = re.sub(r"\D", "", candidate)
+  if not digits or len(digits) < 7 or len(digits) > 15:
+    return None
+  if _looks_like_date_sequence(candidate, digits):
+    return None
+  if len(set(digits)) == 1:
+    return None
+  if digits in {"0123456789", "1234567890", "9876543210", "0987654321"}:
+    return None
+
+  if candidate.startswith("+"):
     return "+" + digits
-  if text.startswith("00") and len(digits) > 2:
-    return "+" + digits.lstrip("0")
+  if candidate.startswith("00") and len(digits) > 2:
+    trimmed = digits.lstrip("0")
+    return "+" + trimmed if trimmed else None
   return digits
 
 
-def is_valid_phone(number: str | None) -> bool:
-  if not number:
-    return False
-  digits = re.sub(r"\D", "", number)
-  return len(digits) >= 7
+def normalize_phone(raw: str | None, region: str | None = None) -> str:
+  normalized = _parse_phone_candidate(raw, region=region)
+  return normalized or ""
 
 
-def find_labelled_phones(text: str | None) -> list[str]:
+def is_valid_phone(number: str | None, region: str | None = None) -> bool:
+  return bool(_parse_phone_candidate(number, region=region))
+
+
+def find_labelled_phones(text: str | None, region: str | None = None) -> list[str]:
   if not text:
     return []
   seen: set[str] = set()
   results: list[str] = []
   for match in PHONE_LABEL_REGEX.finditer(text):
-    normalized = normalize_phone(match.group(1))
-    if normalized and is_valid_phone(normalized) and normalized not in seen:
+    normalized = normalize_phone(match.group(1), region=region)
+    if normalized and normalized not in seen:
       seen.add(normalized)
       results.append(normalized)
   if not results:
     for match in PHONE_TOKEN_REGEX.finditer(text):
-      normalized = normalize_phone(match.group(0))
-      if normalized and is_valid_phone(normalized) and normalized not in seen:
+      normalized = normalize_phone(match.group(0), region=region)
+      if normalized and normalized not in seen:
         seen.add(normalized)
         results.append(normalized)
   return results
@@ -3681,6 +3571,7 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
     parsed_start = urlparse(start_url)
     base_domain = _normalize_netloc(parsed_start.netloc)
     start_segments = [s for s in parsed_start.path.split("/") if s]
+    phone_region = _infer_region_from_netloc(parsed_start.netloc) or DEFAULT_PHONE_REGION
 
     VISIBLE_TAGS = ["p", "span", "div", "li", "address", "td", "th"]
 
@@ -3735,8 +3626,8 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
             href = a["href"].strip()
             if href.lower().startswith("tel:"):
                 num = href.split("tel:")[1].split("?")[0].strip()
-                n = normalize_phone(num)
-                if is_valid_phone(n):
+                n = normalize_phone(num, region=phone_region)
+                if n:
                     phones.add(n)
 
         for tag_name in VISIBLE_TAGS:
@@ -3746,23 +3637,27 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
                     continue
                 if len(text) > 300:
                     continue
-                for n in find_labelled_phones(text):
+                for n in find_labelled_phones(text, region=phone_region):
                     phones.add(n)
 
         for tag in soup.find_all(attrs=True):
+            if tag.name in {"script", "style", "noscript", "svg"}:
+                continue
             for attr, val in tag.attrs.items():
                 if isinstance(val, str):
                     lower_attr = attr.lower()
+                    if lower_attr == "style":
+                        continue
                     if any(k in lower_attr for k in ("tel", "phone", "kontakt", "mobil", "fax")):
-                        n = normalize_phone(val)
-                        if is_valid_phone(n):
+                        n = normalize_phone(val, region=phone_region)
+                        if n:
                             phones.add(n)
                     else:
-                        for n in find_labelled_phones(val):
+                        for n in find_labelled_phones(val, region=phone_region):
                             phones.add(n)
                 elif isinstance(val, (list, tuple)):
                     for part in val:
-                        for n in find_labelled_phones(str(part)):
+                        for n in find_labelled_phones(str(part), region=phone_region):
                             phones.add(n)
 
         for a in soup.find_all("a", href=True):
@@ -3781,12 +3676,12 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
                 for e in EMAIL_REGEX.findall(html_js or ""):
                     emails.add(e)
                 for a in soup_js.find_all("a", href=True):
-                    href = a["href"].strip()
-                    if href.lower().startswith("tel:"):
-                        num = href.split("tel:")[1].split("?")[0].strip()
-                        n = normalize_phone(num)
-                        if is_valid_phone(n):
-                            phones.add(n)
+                  href = a["href"].strip()
+                  if href.lower().startswith("tel:"):
+                    num = href.split("tel:")[1].split("?")[0].strip()
+                    n = normalize_phone(num, region=phone_region)
+                    if n:
+                      phones.add(n)
                     elif href.lower().startswith("mailto:"):
                         addr = href.split("mailto:")[1].split("?")[0].strip()
                         if EMAIL_REGEX.match(addr):
@@ -3796,7 +3691,7 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
                         t = tag.get_text(" ", strip=True)
                         if not t or len(t) > 300:
                             continue
-                        for n in find_labelled_phones(t):
+                        for n in find_labelled_phones(t, region=phone_region):
                             phones.add(n)
 
         if emails or phones:
@@ -3847,26 +3742,32 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
     seen_emails = set()
     seen_phones = set()
     for url, grp in url_map.items():
-        emails = grp.get("emails", set())
-        phones = grp.get("phones", set())
+      emails = grp.get("emails", set())
+      phones = grp.get("phones", set())
 
-        if emails:
-            phone_sample = next(iter(phones)) if phones else ""
-            for email in emails:
-                e = email.lower().strip()
-                if not e or e in seen_emails:
-                    continue
-                seen_emails.add(e)
-            rows.append({"url": url, "email": email, "phone": phone_sample})
-        else:
-            for phone in phones:
-                p = normalize_phone(phone)
-                if not p or p in seen_phones:
-                    continue
-                if not is_valid_phone(p):
-                    continue
-                seen_phones.add(p)
-            rows.append({"url": url, "email": "", "phone": p})
+      normalized_phones: list[str] = []
+      for phone in phones:
+        p = normalize_phone(phone, region=phone_region)
+        if not p or p in seen_phones:
+          continue
+        seen_phones.add(p)
+        normalized_phones.append(p)
+
+      new_emails: list[str] = []
+      for email in emails:
+        e = email.lower().strip()
+        if not e or e in seen_emails:
+          continue
+        seen_emails.add(e)
+        new_emails.append(email)
+
+      if new_emails:
+        phone_sample = normalized_phones[0] if normalized_phones else ""
+        for email in new_emails:
+          rows.append({"url": url, "email": email, "phone": phone_sample})
+      else:
+        for phone in normalized_phones:
+          rows.append({"url": url, "email": "", "phone": phone})
 
     app.logger.info("Crawl finished: found %d contact rows", len(rows))
     return rows
@@ -4342,11 +4243,11 @@ def _generate_contacts_pdf(rows: list[dict[str, str]]):
 
     table_data = [["Email", "Phone"]]
     for row in rows:
-        email = (row.get("email") or "").strip() or "N/A"
-        phone = (row.get("phone") or "").strip() or "N/A"
+        email = (row.get("email") or "").strip() or "-"
+        phone = (row.get("phone") or "").strip() or "-"
         table_data.append([email, phone])
     if len(table_data) == 1:
-        table_data.append(["N/A", "N/A"])
+        table_data.append(["-", "-"])
 
     table = Table(table_data, colWidths=[doc.width * 0.6, doc.width * 0.4], hAlign="LEFT")
     table.setStyle(
@@ -5005,13 +4906,22 @@ def admin_employees():
       action = (request.form.get("action") or "create").strip().lower()
       emp_id = request.form.get("id")
       redirect_q = (request.form.get("redirect_q") or "").strip()
-      redirect_url = url_for("admin_employees", q=redirect_q) if redirect_q else url_for("admin_employees")
+      redirect_page_raw = (request.form.get("redirect_page") or "").strip()
+      redirect_page_val = None
+      if redirect_page_raw.isdigit():
+        redirect_page_val = max(int(redirect_page_raw), 1)
+      redirect_params: dict[str, int | str] = {}
+      if redirect_q:
+        redirect_params["q"] = redirect_q
+      if redirect_page_val and redirect_page_val > 1:
+        redirect_params["page"] = redirect_page_val
+      redirect_url = url_for("admin_employees", **redirect_params)
 
       if action == "create":
         name = (request.form.get("name") or "").strip()
         role = (request.form.get("role") or "").strip()
         if name:
-          employee = Employee(name=name, role=role or None)
+          employee = Employee(name=name, role=role or "Cleaner")
           db.add(employee)
           db.commit()
           existing_codes = _collect_existing_codes(db, exclude_id=employee.id)
@@ -5080,7 +4990,7 @@ def admin_employees():
             flash(f"Login details saved for {emp.name}.")
         return redirect(redirect_url)
 
-      return redirect(url_for("admin_employees"))
+      return redirect(redirect_url)
 
     credential_snippets = session.pop("credential_snippets", {})
     auto_generated = _generate_missing_employee_credentials(db)
@@ -5092,28 +5002,60 @@ def admin_employees():
           "pin": data.get("pin"),
         }
 
-    query = db.query(Employee)
+    base_query = db.query(Employee)
     if search_q:
       like = f"%{search_q}%"
-      query = query.filter(
+      base_query = base_query.filter(
         or_(
           Employee.name.ilike(like),
           Employee.role.ilike(like),
         )
       )
-    employees = query.order_by(Employee.name).all()
 
     total_employees = db.query(func.count(Employee.id)).scalar() or 0
-    filtered_employees = len(employees)
-    shift_counts = {
-      emp_id: count
-      for emp_id, count in db.query(Shift.employee_id, func.count(Shift.id))
-      .group_by(Shift.employee_id)
+    filtered_employees = base_query.count()
+
+    per_page = 3
+    page = request.args.get("page", default=1, type=int)
+    if page is None or page < 1:
+      page = 1
+    if filtered_employees == 0:
+      total_pages = 1
+      page = 1
+      offset = 0
+    else:
+      total_pages = max(1, math.ceil(filtered_employees / per_page))
+      if page > total_pages:
+        page = total_pages
+      offset = (page - 1) * per_page
+
+    employees = (
+      base_query
+      .order_by(Employee.id.desc())
+      .offset(offset)
+      .limit(per_page)
       .all()
-    }
-    employee_shift_groups = {}
+    )
+
+    page_employees = len(employees)
+    has_prev = page > 1 and filtered_employees > 0
+    has_next = page < total_pages and filtered_employees > 0
+    prev_page = page - 1 if has_prev else None
+    next_page = page + 1 if has_next else None
+
+    shift_counts: dict[int, int] = {}
+    employee_shift_groups: dict[int, dict[str, list[dict[str, str]]]] = {}
     employee_ids = [emp.id for emp in employees if emp.id]
     if employee_ids:
+      shift_counts = {
+        emp_id: count
+        for emp_id, count in (
+          db.query(Shift.employee_id, func.count(Shift.id))
+          .filter(Shift.employee_id.in_(employee_ids))
+          .group_by(Shift.employee_id)
+          .all()
+        )
+      }
       for emp_id in employee_ids:
         employee_shift_groups[emp_id] = {"upcoming": [], "history": []}
       shift_rows = (
@@ -5184,6 +5126,14 @@ def admin_employees():
       unassigned_employees=unassigned_employees,
       credential_snippets=credential_snippets,
       employee_shift_groups=employee_shift_groups,
+      page=page,
+      per_page=per_page,
+      total_pages=total_pages,
+      has_prev=has_prev,
+      has_next=has_next,
+      prev_page=prev_page,
+      next_page=next_page,
+      page_employees=page_employees,
     )
   finally:
     db.close()
@@ -5198,6 +5148,18 @@ def admin_sites():
     if request.method == "POST":
       entity = (request.form.get("entity") or "site").strip()
       action = (request.form.get("action") or "").strip().lower()
+      redirect_q = (request.form.get("redirect_q") or "").strip()
+      redirect_page_raw = (request.form.get("redirect_page") or "").strip()
+      redirect_page_val = None
+      if redirect_page_raw.isdigit():
+        redirect_page_val = max(int(redirect_page_raw), 1)
+      redirect_params: dict[str, int | str] = {}
+      effective_q = redirect_q or search_q
+      if effective_q:
+        redirect_params["q"] = effective_q
+      if redirect_page_val and redirect_page_val > 1:
+        redirect_params["page"] = redirect_page_val
+      redirect_url = url_for("admin_sites", **redirect_params)
       if entity == "site":
         site_id = request.form.get("id")
         if action == "create":
@@ -5251,9 +5213,7 @@ def admin_sites():
             site.address = a
         db.commit()
 
-      if search_q:
-        return redirect(url_for("admin_sites", q=search_q))
-      return redirect(url_for("admin_sites"))
+      return redirect(redirect_url)
 
     query = db.query(Site)
     if search_q:
@@ -5261,16 +5221,50 @@ def admin_sites():
       query = query.filter(
         or_(Site.name.ilike(like), Site.address.ilike(like))
       )
-    sites = query.order_by(Site.name).all()
+
+    filtered_sites = query.count()
+
+    per_page = 3
+    page = request.args.get("page", default=1, type=int)
+    if page is None or page < 1:
+      page = 1
+    if filtered_sites == 0:
+      total_pages = 1
+      page = 1
+      offset = 0
+    else:
+      total_pages = max(1, math.ceil(filtered_sites / per_page))
+      if page > total_pages:
+        page = total_pages
+      offset = (page - 1) * per_page
+
+    sites = (
+      query
+      .order_by(Site.id.desc())
+      .offset(offset)
+      .limit(per_page)
+      .all()
+    )
+
+    page_sites = len(sites)
+    has_prev = page > 1 and filtered_sites > 0
+    has_next = page < total_pages and filtered_sites > 0
+    prev_page = page - 1 if has_prev else None
+    next_page = page + 1 if has_next else None
 
     total_sites = db.query(func.count(Site.id)).scalar() or 0
-    filtered_sites = len(sites)
-    shift_counts = {
-      site_id: count
-      for site_id, count in db.query(Shift.site_id, func.count(Shift.id))
-      .group_by(Shift.site_id)
-      .all()
-    }
+    site_ids = [site.id for site in sites if site.id]
+    shift_counts: dict[int, int] = {}
+    if site_ids:
+      shift_counts = {
+        site_id: count
+        for site_id, count in (
+          db.query(Shift.site_id, func.count(Shift.id))
+          .filter(Shift.site_id.in_(site_ids))
+          .group_by(Shift.site_id)
+          .all()
+        )
+      }
     week_start = date.today() - timedelta(days=date.today().weekday())
     week_end = week_start + timedelta(days=7)
     covered_site_ids = {
@@ -5291,6 +5285,14 @@ def admin_sites():
       total_sites=total_sites,
       filtered_sites=filtered_sites,
       covered_sites=len(covered_site_ids),
+      page=page,
+      per_page=per_page,
+      total_pages=total_pages,
+      has_prev=has_prev,
+      has_next=has_next,
+      prev_page=prev_page,
+      next_page=next_page,
+      page_sites=page_sites,
     )
   finally:
     db.close()
