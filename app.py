@@ -2697,9 +2697,13 @@ SCHEDULE_TEMPLATE = """
     .schedule-table th,
     .schedule-table td { font-size:0.82rem; vertical-align:top; border-color:#e2e8f0; }
     .schedule-table th { background:#f1f5f9; color:#475569; position:sticky; top:0; z-index:5; }
+    .schedule-table th:first-child { position:sticky; left:0; z-index:10; background:#f1f5f9; }
+    .schedule-table td:first-child { position:sticky; left:0; z-index:3; background:inherit; }
     .schedule-table tbody tr:nth-child(odd) { background:#ffffff; }
     .schedule-table tbody tr:nth-child(even) { background:#f8fafc; }
-    .shift-pill { display:inline-flex; align-items:center; padding:0.18rem 0.6rem; border-radius:999px; background:#ecfdf5; border:1px solid #16a34a26; color:#0f766e; font-size:0.74rem; margin-bottom:0.25rem; white-space:nowrap; }
+    .shift-pill { display:inline-flex; align-items:center; gap:0.3rem; padding:0.18rem 0.6rem; border-radius:999px; background:#ecfdf5; border:1px solid #16a34a26; color:#0f766e; font-size:0.74rem; margin-bottom:0.25rem; white-space:nowrap; }
+    .shift-delete { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; background:#ef4444; color:#ffffff; font-size:0.85rem; line-height:1; text-decoration:none; opacity:0.7; transition:opacity 0.15s ease; }
+    .shift-delete:hover { opacity:1; color:#ffffff; }
     .free-pill { display:inline-flex; align-items:center; padding:0.18rem 0.6rem; border-radius:999px; border:1px dashed #cbd5f5; color:#94a3b8; font-size:0.74rem; }
     .form-card .section-subtitle { max-width:600px; }
     .form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.1rem; }
@@ -2879,8 +2883,11 @@ SCHEDULE_TEMPLATE = """
                         {% set cell = cells.get((emp.id, d)) %}
                         <td>
                           {% if cell %}
-                            {% for label in cell %}
-                              <div class="shift-pill">{{ label }}</div>
+                            {% for shift in cell %}
+                              <div class="shift-pill">
+                                {{ shift.label }}
+                                <a href="{{ url_for('delete_shift', shift_id=shift.id) }}" class="shift-delete" onclick="return confirm('Delete this shift?')" title="Delete shift">×</a>
+                              </div>
                             {% endfor %}
                           {% else %}
                             <span class="free-pill">Free</span>
@@ -3019,6 +3026,9 @@ SCHEDULE_TEMPLATE = """
         mode: 'multiple',
         dateFormat: 'Y-m-d',
         disableMobile: true,
+        locale: {
+          firstDayOfWeek: 1
+        },
         onChange(selectedDates, _dateStr, instance) {
           renderSelections(selectedDates, instance);
         },
@@ -3794,10 +3804,13 @@ def _load_schedule_context(db, week_days):
     matrix = {}
     for s in shifts:
         key = (s.employee_id, s.day)
-        label = f"{s.site.name} — {s.site.address or 'No address'} ({s.start_time.strftime('%H:%M')}–{s.end_time.strftime('%H:%M')})"
-        matrix.setdefault(key, []).append(label)
+        shift_info = {
+            'id': s.id,
+            'label': f"{s.site.name} — {s.site.address or 'No address'} ({s.start_time.strftime('%H:%M')}–{s.end_time.strftime('%H:%M')})"
+        }
+        matrix.setdefault(key, []).append(shift_info)
     for key in matrix:
-        matrix[key].sort()
+        matrix[key].sort(key=lambda x: x['label'])
     return employees, sites, matrix
 
 
@@ -4750,6 +4763,20 @@ def employee_complete_shift(shift_id: int):
     db.close()
 
   return redirect(url_for("employee_dashboard"))
+
+
+@app.route("/shift/delete/<int:shift_id>")
+@login_required
+def delete_shift(shift_id):
+    db = SessionLocal()
+    try:
+        shift = db.get(Shift, shift_id)
+        if shift:
+            db.delete(shift)
+            db.commit()
+        return redirect(request.referrer or url_for("schedule_dashboard"))
+    finally:
+        db.close()
 
 
 @app.route("/logout")
