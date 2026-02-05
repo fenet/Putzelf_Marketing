@@ -1,1 +1,10 @@
 .env
+schedule.db
+uploads/*
+!uploads/.gitkeep
+*.pyc
+__pycache__/
+.vscode/
+.idea/
+*.log
+backups/
