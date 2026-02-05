@@ -67,7 +67,7 @@ rm -rf "$TEMP_DATA_DIR"
 
 # Step 5: Install/update dependencies
 echo "📚 Installing dependencies..."
-pip install -r requirements.txt --quiet
+pip install -r requirements.txt --quiet 2>/dev/null || pip install -r requirements.txt --quiet --break-system-packages
 
 # Step 6: Restart application (uncomment the method you use)
 echo "🔄 Restarting application..."
