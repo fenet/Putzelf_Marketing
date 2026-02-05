@@ -48,14 +48,17 @@ git reset --hard origin/main
 # Step 4: Restore data
 echo "♻️  Restoring preserved data..."
 if [ -f "$TEMP_DATA_DIR/schedule.db" ]; then
+    rm -f "$DEPLOY_DIR/schedule.db"
     mv "$TEMP_DATA_DIR/schedule.db" "$DEPLOY_DIR/"
 fi
 if [ -d "$TEMP_DATA_DIR/uploads" ]; then
+    rm -rf "$DEPLOY_DIR/uploads"
     mv "$TEMP_DATA_DIR/uploads" "$DEPLOY_DIR/"
 else
     mkdir -p "$DEPLOY_DIR/uploads"
 fi
 if [ -f "$TEMP_DATA_DIR/.env" ]; then
+    rm -f "$DEPLOY_DIR/.env"
     mv "$TEMP_DATA_DIR/.env" "$DEPLOY_DIR/"
 fi
 
