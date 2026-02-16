@@ -4,6 +4,7 @@ import io
 import csv
 import logging
 import os
+import sys
 import secrets
 from collections import deque
 from datetime import datetime, date, timedelta
@@ -176,8 +177,13 @@ ADMIN_TEMPLATE = """
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Assign coverage</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">Invoices</span></a>
       <div class="sidebar-section-title">Account</div>
       <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
+      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
+    </aside>
+    <main class="main-shell">
+      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
     <main class="main-shell">
@@ -494,6 +500,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Assign coverage</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">Invoices</span></a>
       <div class="sidebar-section-title">Account</div>
       <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
@@ -971,6 +978,7 @@ ADMIN_SITES_TEMPLATE = """
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Assign coverage</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">Invoices</span></a>
       <div class="sidebar-section-title">Account</div>
       <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
@@ -1049,6 +1057,10 @@ ADMIN_SITES_TEMPLATE = """
                 <input type="text" class="form-control form-control-sm" id="new_site_address" name="address" placeholder="Street, city" required>
               </div>
               <div class="col-12">
+                <label class="form-label" for="new_site_hourly_rate">Hourly rate ($)</label>
+                <input type="number" class="form-control form-control-sm" id="new_site_hourly_rate" name="hourly_rate" step="0.01" min="0" value="50.00" required>
+              </div>
+              <div class="col-12">
                 <button type="submit" class="btn btn-sm btn-primary w-100">Add site</button>
               </div>
             </form>
@@ -1073,6 +1085,7 @@ ADMIN_SITES_TEMPLATE = """
                     <tr>
                       <th scope="col">Name</th>
                       <th scope="col">Address</th>
+                      <th scope="col">Hourly rate</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1084,6 +1097,9 @@ ADMIN_SITES_TEMPLATE = """
                         </td>
                         <td>
                           <input type="text" class="form-control form-control-sm" name="site_address" value="{{ site.address or '' }}" required>
+                        </td>
+                        <td>
+                          <input type="number" class="form-control form-control-sm" name="site_hourly_rate" value="{{ '%.2f'|format(site.hourly_rate or 0) }}" step="0.01" min="0" required>
                         </td>
                       </tr>
                     {% endfor %}
@@ -1101,13 +1117,17 @@ ADMIN_SITES_TEMPLATE = """
                   {% endif %}
                   <input type="hidden" name="redirect_page" value="{{ page }}">
                   <div class="row g-2 align-items-end">
-                    <div class="col-md-5 col-12">
+                    <div class="col-md-4 col-12">
                       <label class="form-label">Name</label>
                       <input type="text" name="name" value="{{ site.name }}" class="form-control form-control-sm" required>
                     </div>
-                    <div class="col-md-5 col-12">
+                    <div class="col-md-4 col-12">
                       <label class="form-label">Address</label>
                       <input type="text" name="address" value="{{ site.address or '' }}" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="col-md-2 col-12">
+                      <label class="form-label">Hourly rate ($)</label>
+                      <input type="number" name="hourly_rate" value="{{ '%.2f'|format(site.hourly_rate or 0) }}" class="form-control form-control-sm" step="0.01" min="0" required>
                     </div>
                     <div class="col-md-2 col-12">
                       <div class="d-grid gap-2">
@@ -1207,6 +1227,1403 @@ ADMIN_SITES_TEMPLATE = """
 </html>
 """
 
+INVOICE_LIST_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — Invoices</title>
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/logo.png">
+  <link rel="manifest" href="/static/admin-manifest.json">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-danger: linear-gradient(135deg,#f87171 0%,#ef4444 50%,#dc2626 100%);
+      --btn-grad-danger-hover: linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);
+      --btn-grad-info: linear-gradient(135deg,#38bdf8 0%,#0ea5e9 50%,#2563eb 100%);
+      --btn-grad-info-hover: linear-gradient(135deg,#0ea5e9 0%,#2563eb 50%,#1d4ed8 100%);
+      --btn-grad-success: linear-gradient(135deg,#22c55e 0%,#16a34a 50%,#15803d 100%);
+      --btn-grad-success-hover: linear-gradient(135deg,#16a34a 0%,#15803d 50%,#166534 100%);
+      --btn-grad-light: linear-gradient(135deg,#ffffff 0%,#f1f5f9 100%);
+      --btn-grad-light-hover: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+    }
+    body { background:#f1f5f9; color:#0f172a; font-size:1.05rem; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); background:#ffffff; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; color:#0f172a; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill.active, .nav-pill:hover { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
+    .nav-text { display:inline; }
+    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; }
+    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .main-shell { padding:1.75rem; background:#ffffff; }
+    .badge-soft { border-radius:999px; border:1px solid #d6d3f0; color:#6366f1; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
+    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.25rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#475569; }
+    .mobile-nav-toggle { display:none; }
+    .mobile-nav-backdrop { display:none; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 14px 26px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-outline-light { background-image:var(--btn-grad-light); color:#0f172a; }
+    .btn-outline-light:hover { background-image:var(--btn-grad-light-hover); color:#0f172a; }
+    .btn-outline-info,
+    .btn-info { background-image:var(--btn-grad-info); color:#ffffff; box-shadow:0 12px 24px rgba(14,165,233,0.25); }
+    .btn-outline-info:hover,
+    .btn-info:hover { background-image:var(--btn-grad-info-hover); color:#ffffff; }
+    .btn-outline-danger,
+    .btn-danger { background-image:var(--btn-grad-danger); color:#ffffff; box-shadow:0 12px 24px rgba(220,38,38,0.25); }
+    .btn-outline-danger:hover,
+    .btn-danger:hover { background-image:var(--btn-grad-danger-hover); color:#ffffff; }
+    .btn-success { background-image:var(--btn-grad-success); color:#ffffff; box-shadow:0 12px 24px rgba(34,197,94,0.25); }
+    .btn-success:hover { background-image:var(--btn-grad-success-hover); color:#ffffff; }
+    .btn-link { background:none; box-shadow:none; color:#0f766e; }
+    .btn-link:hover { color:#0c615b; }
+    .metric-card { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.5rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .metric-label { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#475569; margin-bottom:0.5rem; }
+    .metric-value { font-size:1.8rem; font-weight:700; color:#0f172a; }
+    .metric-sub { font-size:0.9rem; color:#64748b; margin-top:0.25rem; }
+    @media(max-width:992px){
+      .app-shell{ grid-template-columns:minmax(0,1fr);} 
+      .sidebar{
+        position:fixed;
+        top:0;
+        left:0;
+        height:100vh;
+        width:min(82vw,300px);
+        max-width:320px;
+        z-index:1050;
+        display:flex;
+        transform:translateX(-100%);
+        transition:transform 0.2s ease;
+        box-shadow:0 24px 48px rgba(15,23,42,0.12);
+      }
+      body.mobile-nav-open .sidebar{ transform:translateX(0); }
+      .mobile-nav-backdrop{
+        position:fixed;
+        inset:0;
+        background:rgba(15,23,42,0.35);
+        z-index:1040;
+      }
+      body.mobile-nav-open .mobile-nav-backdrop{ display:block; }
+      .mobile-nav-toggle{
+        display:inline-flex;
+        align-items:center;
+        gap:0.4rem;
+        border-radius:0.75rem;
+        border:0;
+        background-image:var(--btn-grad-accent);
+        color:#ffffff;
+        padding:0.45rem 0.85rem;
+        font-size:0.95rem;
+        margin-bottom:1rem;
+        box-shadow:0 12px 24px rgba(15,118,110,0.25);
+      }
+      .mobile-nav-toggle:focus{ outline:2px solid rgba(15,118,110,0.4); outline-offset:2px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="admin-sidebar" class="sidebar">
+      <div class="sidebar-section-title">Navigation</div>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
+      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
+      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
+      <div class="sidebar-section-title">Account</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
+      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
+    </aside>
+    <main class="main-shell">
+      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }} border-0 text-dark">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <header class="mb-4">
+        <div class="badge-soft mb-2">Billing & Invoicing</div>
+        <h1 class="h4 text-dark mb-1">Invoices</h1>
+        <p class="text-secondary mb-0">{{ invoices|length }} total invoices</p>
+      </header>
+
+      <div class="mb-3">
+        <a href="/admin/invoices/new" class="btn btn-primary">+ Create Invoice</a>
+        <a href="{{ url_for('admin_income_report') }}" class="btn btn-outline-primary">💰 Monthly Income</a>
+      </div>
+
+      <div class="card-surface mb-3">
+        <form method="POST" action="{{ url_for('admin_generate_monthly_invoices') }}" class="row g-2 align-items-end">
+          <div class="col-md-4">
+            <label for="month" class="form-label">Billing Month (optional)</label>
+            <input type="month" id="month" name="month" class="form-control" placeholder="YYYY-MM">
+          </div>
+          <div class="col-md-3">
+            <label for="tax_rate_auto" class="form-label">Tax Rate (%)</label>
+            <input type="number" id="tax_rate_auto" name="tax_rate" step="0.01" value="0" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label for="due_days_auto" class="form-label">Days Until Due</label>
+            <input type="number" id="due_days_auto" name="days_until_due" value="30" class="form-control">
+          </div>
+          <div class="col-md-2 d-grid">
+            <button type="submit" class="btn btn-outline-primary" onclick="return confirm('Generate monthly invoices now?');">Auto Generate</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card-surface mb-3">
+        <form method="GET" action="{{ url_for('admin_invoices') }}" class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label for="status" class="form-label">Status</label>
+            <select id="status" name="status" class="form-select">
+              <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+              <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>Draft</option>
+              <option value="sent" {% if status_filter == 'sent' %}selected{% endif %}>Sent</option>
+              <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>Paid</option>
+              <option value="overdue" {% if status_filter == 'overdue' %}selected{% endif %}>Overdue</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label for="created_from" class="form-label">Created From</label>
+            <input type="date" id="created_from" name="created_from" value="{{ created_from }}" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label for="created_to" class="form-label">Created To</label>
+            <input type="date" id="created_to" name="created_to" value="{{ created_to }}" class="form-control">
+          </div>
+          <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary w-100">Apply Filters</button>
+            <a href="{{ url_for('admin_invoices') }}" class="btn btn-outline-secondary">Reset</a>
+          </div>
+        </form>
+      </div>
+
+      {% if invoices %}
+      <div class="card-surface">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Invoice #</th>
+                <th>Site</th>
+                <th>Contact</th>
+                <th class="text-end">Hours</th>
+                <th class="text-end">Total</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for inv in invoices %}
+              <tr>
+                <td><strong>{{ short_invoice_number(inv.invoice_number) }}</strong></td>
+                <td>{{ inv.site.name }}</td>
+                <td>{{ inv.site_contact_name or 'N/A' }}</td>
+                <td class="text-end">{{ inv.total_hours }}</td>
+                <td class="text-end"><strong>${{ "%.2f"|format(inv.total_amount) }}</strong></td>
+                <td>
+                  {% if inv.status == 'draft' %}
+                    <span class="badge bg-warning text-dark">DRAFT</span>
+                  {% elif inv.status == 'sent' %}
+                    <span class="badge bg-info text-white">SENT</span>
+                  {% elif inv.status == 'paid' %}
+                    <span class="badge bg-success text-white">PAID</span>
+                  {% elif inv.status == 'overdue' %}
+                    <span class="badge bg-danger text-white">OVERDUE</span>
+                  {% endif %}
+                </td>
+                <td>{{ inv.created_at.strftime('%d %b %Y') }}</td>
+                <td class="text-end">
+                  <a href="/admin/invoices/{{ inv.id }}" class="btn btn-sm btn-outline-info" title="View" aria-label="View invoice">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  <a href="/admin/invoices/{{ inv.id }}/edit" class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit invoice">
+                    <i class="bi bi-pencil-square"></i>
+                  </a>
+                  <a href="/admin/invoices/{{ inv.id }}/pdf" class="btn btn-sm btn-outline-secondary" target="_blank" title="PDF" aria-label="Download PDF">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                  </a>
+                  <a href="/admin/invoices/{{ inv.id }}/delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this invoice?');" title="Delete" aria-label="Delete invoice">
+                    <i class="bi bi-trash"></i>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% else %}
+      <div class="card-surface">
+        {% if status_filter != 'all' or created_from or created_to %}
+        <p class="text-muted mb-0">No invoices match the selected filters.</p>
+        {% else %}
+        <p class="text-muted mb-0">No invoices yet. Create your first invoice above.</p>
+        {% endif %}
+      </div>
+      {% endif %}
+    </main>
+  </div>
+  <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const body = document.body;
+    const toggle = document.getElementById('mobile-nav-toggle');
+    const sidebar = document.getElementById('admin-sidebar');
+    const backdrop = document.getElementById('mobile-nav-backdrop');
+    if (toggle && sidebar && backdrop) {
+      const closeNav = () => {
+        body.classList.remove('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      };
+      const openNav = () => {
+        body.classList.add('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'true');
+      };
+      toggle.addEventListener('click', () => {
+        body.classList.contains('mobile-nav-open') ? closeNav() : openNav();
+      });
+      backdrop.addEventListener('click', closeNav);
+      sidebar.querySelectorAll('a').forEach(link => link.addEventListener('click', closeNav));
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
+"""
+
+INCOME_REPORT_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — Monthly Income Report</title>
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/logo.png">
+  <link rel="manifest" href="/static/admin-manifest.json">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-success: linear-gradient(135deg,#22c55e 0%,#16a34a 50%,#15803d 100%);
+      --btn-grad-success-hover: linear-gradient(135deg,#16a34a 0%,#15803d 50%,#166534 100%);
+    }
+    body { background:#f1f5f9; color:#0f172a; font-size:1.05rem; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); background:#ffffff; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; color:#0f172a; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill.active, .nav-pill:hover { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
+    .nav-text { display:inline; }
+    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; }
+    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .main-shell { padding:1.75rem; background:#ffffff; }
+    .badge-soft { border-radius:999px; border:1px solid #d6d3f0; color:#6366f1; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
+    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.25rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#475569; }
+    .mobile-nav-toggle { display:none; }
+    .mobile-nav-backdrop { display:none; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 14px 26px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-success { background-image:var(--btn-grad-success); color:#ffffff; box-shadow:0 12px 24px rgba(34,197,94,0.25); }
+    .btn-success:hover { background-image:var(--btn-grad-success-hover); color:#ffffff; }
+    .btn-link { background:none; box-shadow:none; color:#0f766e; }
+    .btn-link:hover { color:#0c615b; }
+    .month-card { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.5rem; margin-bottom:1.5rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .month-header { border-bottom:2px solid #e2e8f0; padding-bottom:1rem; margin-bottom:1rem; }
+    .month-title { font-size:1.3rem; font-weight:700; color:#0f172a; }
+    .income-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+    .summary-stat { border-radius:0.7rem; border:1px solid #cbd5f5; background:#f8fafc; padding:1rem; }
+    .summary-label { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#475569; margin-bottom:0.3rem; }
+    .summary-value { font-size:1.6rem; font-weight:700; color:#0f172a; }
+    .summary-sub { font-size:0.85rem; color:#64748b; margin-top:0.2rem; }
+    .site-breakdown table { font-size:0.95rem; }
+    .site-breakdown th { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#475569; background:#f1f5f9; }
+    @media(max-width:992px){
+      .app-shell{ grid-template-columns:minmax(0,1fr);} 
+      .sidebar{
+        position:fixed;
+        top:0;
+        left:0;
+        height:100vh;
+        width:min(82vw,300px);
+        max-width:320px;
+        z-index:1050;
+        display:flex;
+        transform:translateX(-100%);
+        transition:transform 0.2s ease;
+        box-shadow:0 24px 48px rgba(15,23,42,0.12);
+      }
+      body.mobile-nav-open .sidebar{ transform:translateX(0); }
+      .mobile-nav-backdrop{
+        position:fixed;
+        inset:0;
+        background:rgba(15,23,42,0.35);
+        z-index:1040;
+      }
+      body.mobile-nav-open .mobile-nav-backdrop{ display:block; }
+      .mobile-nav-toggle{
+        display:inline-flex;
+        align-items:center;
+        gap:0.4rem;
+        border-radius:0.75rem;
+        border:0;
+        background-image:var(--btn-grad-accent);
+        color:#ffffff;
+        padding:0.45rem 0.85rem;
+        font-size:0.95rem;
+        margin-bottom:1rem;
+        box-shadow:0 12px 24px rgba(15,118,110,0.25);
+      }
+      .mobile-nav-toggle:focus{ outline:2px solid rgba(15,118,110,0.4); outline-offset:2px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="admin-sidebar" class="sidebar">
+      <div class="sidebar-section-title">Navigation</div>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
+      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
+      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
+      <div class="sidebar-section-title">Account</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
+      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
+    </aside>
+    <main class="main-shell">
+      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }} border-0 text-dark">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <header class="mb-4">
+        <div class="badge-soft mb-2">Financial Overview</div>
+        <h1 class="h4 text-dark mb-1">💰 Monthly Income Report</h1>
+        <p class="text-secondary mb-0">Income breakdown by month and site</p>
+      </header>
+
+      <div class="mb-3">
+        <a href="{{ url_for('admin_invoices') }}" class="btn btn-outline-secondary">← Back to Invoices</a>
+      </div>
+
+      {% if monthly_summaries %}
+        {% for summary in monthly_summaries %}
+          <div class="month-card">
+            <div class="month-header">
+              <div class="month-title">{{ summary.month_name }}</div>
+            </div>
+
+            <div class="income-summary">
+              <div class="summary-stat">
+                <div class="summary-label">Total Income</div>
+                <div class="summary-value">${{ "%.2f"|format(summary.total_income) }}</div>
+                <div class="summary-sub">Gross earnings</div>
+              </div>
+              <div class="summary-stat">
+                <div class="summary-label">Total Hours</div>
+                <div class="summary-value">{{ summary.total_hours }}</div>
+                <div class="summary-sub">Hours worked</div>
+              </div>
+              <div class="summary-stat">
+                <div class="summary-label">Sites</div>
+                <div class="summary-value">{{ summary.sites|length }}</div>
+                <div class="summary-sub">Active clients</div>
+              </div>
+            </div>
+
+            {% if summary.sites %}
+              <div class="site-breakdown">
+                <table class="table table-sm table-striped mb-0">
+                  <thead>
+                    <tr>
+                      <th>Site</th>
+                      <th class="text-end">Hours</th>
+                      <th class="text-end">Rate</th>
+                      <th class="text-end">Income</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for site_id, site_data in summary.sites.items() %}
+                      <tr>
+                        <td><strong>{{ site_data.site_name }}</strong></td>
+                        <td class="text-end">{{ site_data.hours }}</td>
+                        <td class="text-end">${{ "%.2f"|format(site_data.hourly_rate) }}/hr</td>
+                        <td class="text-end"><strong>${{ "%.2f"|format(site_data.income) }}</strong></td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="card-surface">
+          <p class="text-muted mb-0">No work recorded yet. Start scheduling shifts to see income data.</p>
+        </div>
+      {% endif %}
+    </main>
+  </div>
+  <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const body = document.body;
+    const toggle = document.getElementById('mobile-nav-toggle');
+    const sidebar = document.getElementById('admin-sidebar');
+    const backdrop = document.getElementById('mobile-nav-backdrop');
+    if (toggle && sidebar && backdrop) {
+      const closeNav = () => {
+        body.classList.remove('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      };
+      const openNav = () => {
+        body.classList.add('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'true');
+      };
+      toggle.addEventListener('click', () => {
+        body.classList.contains('mobile-nav-open') ? closeNav() : openNav();
+      });
+      backdrop.addEventListener('click', closeNav);
+      sidebar.querySelectorAll('a').forEach(link => link.addEventListener('click', closeNav));
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
+"""
+
+INCOME_REPORT_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — Monthly Income Report</title>
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/logo.png">
+  <link rel="manifest" href="/static/admin-manifest.json">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-success: linear-gradient(135deg,#22c55e 0%,#16a34a 50%,#15803d 100%);
+      --btn-grad-success-hover: linear-gradient(135deg,#16a34a 0%,#15803d 50%,#166534 100%);
+    }
+    body { background:#f1f5f9; color:#0f172a; font-size:1.05rem; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); background:#ffffff; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; color:#0f172a; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill.active, .nav-pill:hover { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
+    .nav-text { display:inline; }
+    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; }
+    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .main-shell { padding:1.75rem; background:#ffffff; }
+    .badge-soft { border-radius:999px; border:1px solid #d6d3f0; color:#6366f1; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
+    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.25rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#475569; }
+    .mobile-nav-toggle { display:none; }
+    .mobile-nav-backdrop { display:none; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 14px 26px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-success { background-image:var(--btn-grad-success); color:#ffffff; box-shadow:0 12px 24px rgba(34,197,94,0.25); }
+    .btn-success:hover { background-image:var(--btn-grad-success-hover); color:#ffffff; }
+    .btn-link { background:none; box-shadow:none; color:#0f766e; }
+    .btn-link:hover { color:#0c615b; }
+    .month-card { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.5rem; margin-bottom:1.5rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .month-header { border-bottom:2px solid #e2e8f0; padding-bottom:1rem; margin-bottom:1rem; }
+    .month-title { font-size:1.3rem; font-weight:700; color:#0f172a; }
+    .income-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+    .summary-stat { border-radius:0.7rem; border:1px solid #cbd5f5; background:#f8fafc; padding:1rem; }
+    .summary-label { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#475569; margin-bottom:0.3rem; }
+    .summary-value { font-size:1.6rem; font-weight:700; color:#0f172a; }
+    .summary-sub { font-size:0.85rem; color:#64748b; margin-top:0.2rem; }
+    .site-breakdown table { font-size:0.95rem; }
+    .site-breakdown th { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#475569; background:#f1f5f9; }
+    @media(max-width:992px){
+      .app-shell{ grid-template-columns:minmax(0,1fr);} 
+      .sidebar{
+        position:fixed;
+        top:0;
+        left:0;
+        height:100vh;
+        width:min(82vw,300px);
+        max-width:320px;
+        z-index:1050;
+        display:flex;
+        transform:translateX(-100%);
+        transition:transform 0.2s ease;
+        box-shadow:0 24px 48px rgba(15,23,42,0.12);
+      }
+      body.mobile-nav-open .sidebar{ transform:translateX(0); }
+      .mobile-nav-backdrop{
+        position:fixed;
+        inset:0;
+        background:rgba(15,23,42,0.35);
+        z-index:1040;
+      }
+      body.mobile-nav-open .mobile-nav-backdrop{ display:block; }
+      .mobile-nav-toggle{
+        display:inline-flex;
+        align-items:center;
+        gap:0.4rem;
+        border-radius:0.75rem;
+        border:0;
+        background-image:var(--btn-grad-accent);
+        color:#ffffff;
+        padding:0.45rem 0.85rem;
+        font-size:0.95rem;
+        margin-bottom:1rem;
+        box-shadow:0 12px 24px rgba(15,118,110,0.25);
+      }
+      .mobile-nav-toggle:focus{ outline:2px solid rgba(15,118,110,0.4); outline-offset:2px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="admin-sidebar" class="sidebar">
+      <div class="sidebar-section-title">Navigation</div>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
+      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
+      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
+      <div class="sidebar-section-title">Account</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
+      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
+    </aside>
+    <main class="main-shell">
+      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }} border-0 text-dark">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <header class="mb-4">
+        <div class="badge-soft mb-2">Financial Overview</div>
+        <h1 class="h4 text-dark mb-1">💰 Monthly Income Report</h1>
+        <p class="text-secondary mb-0">Income breakdown by month and site</p>
+      </header>
+
+      <div class="mb-3">
+        <a href="{{ url_for('admin_invoices') }}" class="btn btn-outline-secondary">← Back to Invoices</a>
+      </div>
+
+      {% if monthly_summaries %}
+        {% for summary in monthly_summaries %}
+          <div class="month-card">
+            <div class="month-header">
+              <div class="month-title">{{ summary.month_name }}</div>
+            </div>
+
+            <div class="income-summary">
+              <div class="summary-stat">
+                <div class="summary-label">Total Income</div>
+                <div class="summary-value">${{ "%.2f"|format(summary.total_income) }}</div>
+                <div class="summary-sub">Gross earnings</div>
+              </div>
+              <div class="summary-stat">
+                <div class="summary-label">Total Hours</div>
+                <div class="summary-value">{{ summary.total_hours }}</div>
+                <div class="summary-sub">Hours worked</div>
+              </div>
+              <div class="summary-stat">
+                <div class="summary-label">Sites</div>
+                <div class="summary-value">{{ summary.sites|length }}</div>
+                <div class="summary-sub">Active clients</div>
+              </div>
+            </div>
+
+            {% if summary.sites %}
+              <div class="site-breakdown">
+                <table class="table table-sm table-striped mb-0">
+                  <thead>
+                    <tr>
+                      <th>Site</th>
+                      <th class="text-end">Hours</th>
+                      <th class="text-end">Rate</th>
+                      <th class="text-end">Income</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for site_id, site_data in summary.sites.items() %}
+                      <tr>
+                        <td><strong>{{ site_data.site_name }}</strong></td>
+                        <td class="text-end">{{ site_data.hours }}</td>
+                        <td class="text-end">${{ "%.2f"|format(site_data.hourly_rate) }}/hr</td>
+                        <td class="text-end"><strong>${{ "%.2f"|format(site_data.income) }}</strong></td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="card-surface">
+          <p class="text-muted mb-0">No work recorded yet. Start scheduling shifts to see income data.</p>
+        </div>
+      {% endif %}
+    </main>
+  </div>
+  <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const body = document.body;
+    const toggle = document.getElementById('mobile-nav-toggle');
+    const sidebar = document.getElementById('admin-sidebar');
+    const backdrop = document.getElementById('mobile-nav-backdrop');
+    if (toggle && sidebar && backdrop) {
+      const closeNav = () => {
+        body.classList.remove('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      };
+      const openNav = () => {
+        body.classList.add('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'true');
+      };
+      toggle.addEventListener('click', () => {
+        body.classList.contains('mobile-nav-open') ? closeNav() : openNav();
+      });
+      backdrop.addEventListener('click', closeNav);
+      sidebar.querySelectorAll('a').forEach(link => link.addEventListener('click', closeNav));
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
+"""
+
+INVOICE_FORM_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — Create Invoice</title>
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/logo.png">
+  <link rel="manifest" href="/static/admin-manifest.json">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-danger: linear-gradient(135deg,#f87171 0%,#ef4444 50%,#dc2626 100%);
+      --btn-grad-danger-hover: linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);
+      --btn-grad-info: linear-gradient(135deg,#38bdf8 0%,#0ea5e9 50%,#2563eb 100%);
+      --btn-grad-info-hover: linear-gradient(135deg,#0ea5e9 0%,#2563eb 50%,#1d4ed8 100%);
+      --btn-grad-success: linear-gradient(135deg,#22c55e 0%,#16a34a 50%,#15803d 100%);
+      --btn-grad-success-hover: linear-gradient(135deg,#16a34a 0%,#15803d 50%,#166534 100%);
+      --btn-grad-light: linear-gradient(135deg,#ffffff 0%,#f1f5f9 100%);
+      --btn-grad-light-hover: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+    }
+    body { background:#f1f5f9; color:#0f172a; font-size:1.05rem; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); background:#ffffff; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; color:#0f172a; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill.active, .nav-pill:hover { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
+    .nav-text { display:inline; }
+    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; }
+    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .main-shell { padding:1.75rem; background:#ffffff; }
+    .badge-soft { border-radius:999px; border:1px solid #d6d3f0; color:#6366f1; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
+    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.25rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#475569; }
+    .mobile-nav-toggle { display:none; }
+    .mobile-nav-backdrop { display:none; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 14px 26px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-outline-light { background-image:var(--btn-grad-light); color:#0f172a; }
+    .btn-outline-light:hover { background-image:var(--btn-grad-light-hover); color:#0f172a; }
+    .btn-outline-info,
+    .btn-info { background-image:var(--btn-grad-info); color:#ffffff; box-shadow:0 12px 24px rgba(14,165,233,0.25); }
+    .btn-outline-info:hover,
+    .btn-info:hover { background-image:var(--btn-grad-info-hover); color:#ffffff; }
+    .btn-outline-danger,
+    .btn-danger { background-image:var(--btn-grad-danger); color:#ffffff; box-shadow:0 12px 24px rgba(220,38,38,0.25); }
+    .btn-outline-danger:hover,
+    .btn-danger:hover { background-image:var(--btn-grad-danger-hover); color:#ffffff; }
+    .btn-success { background-image:var(--btn-grad-success); color:#ffffff; box-shadow:0 12px 24px rgba(34,197,94,0.25); }
+    .btn-success:hover { background-image:var(--btn-grad-success-hover); color:#ffffff; }
+    .btn-link { background:none; box-shadow:none; color:#0f766e; }
+    .btn-link:hover { color:#0c615b; }
+    @media(max-width:992px){
+      .app-shell{ grid-template-columns:minmax(0,1fr);} 
+      .sidebar{
+        position:fixed;
+        top:0;
+        left:0;
+        height:100vh;
+        width:min(82vw,300px);
+        max-width:320px;
+        z-index:1050;
+        display:flex;
+        transform:translateX(-100%);
+        transition:transform 0.2s ease;
+        box-shadow:0 24px 48px rgba(15,23,42,0.12);
+      }
+      body.mobile-nav-open .sidebar{ transform:translateX(0); }
+      .mobile-nav-backdrop{
+        position:fixed;
+        inset:0;
+        background:rgba(15,23,42,0.35);
+        z-index:1040;
+      }
+      body.mobile-nav-open .mobile-nav-backdrop{ display:block; }
+      .mobile-nav-toggle{
+        display:inline-flex;
+        align-items:center;
+        gap:0.4rem;
+        border-radius:0.75rem;
+        border:0;
+        background-image:var(--btn-grad-accent);
+        color:#ffffff;
+        padding:0.45rem 0.85rem;
+        font-size:0.95rem;
+        margin-bottom:1rem;
+        box-shadow:0 12px 24px rgba(15,118,110,0.25);
+      }
+      .mobile-nav-toggle:focus{ outline:2px solid rgba(15,118,110,0.4); outline-offset:2px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="admin-sidebar" class="sidebar">
+      <div class="sidebar-section-title">Navigation</div>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
+      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
+      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
+      <div class="sidebar-section-title">Account</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
+      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
+    </aside>
+    <main class="main-shell">
+      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }} border-0 text-dark">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <header class="mb-4">
+        <div class="badge-soft mb-2">Billing & Invoicing</div>
+        <h1 class="h4 text-dark mb-1">Create New Invoice</h1>
+        <p class="text-secondary mb-0">Generate an invoice for work completed</p>
+      </header>
+
+      <div class="row">
+        <div class="col-lg-8">
+          <div class="card-surface">
+            <form method="POST">
+              <div class="mb-3">
+                <label for="site_id" class="form-label fw-bold">Site *</label>
+                <select id="site_id" name="site_id" class="form-select" required>
+                  <option value="">Select a site</option>
+                  {% for site in sites %}
+                  <option value="{{ site.id }}">{{ site.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              
+              <div class="mb-3">
+                <label for="site_contact_name" class="form-label fw-bold">Contact Name</label>
+                <input type="text" id="site_contact_name" name="site_contact_name" class="form-control" placeholder="e.g., John Smith">
+              </div>
+              
+              <div class="mb-3">
+                <label for="site_contact_email" class="form-label fw-bold">Contact Email *</label>
+                <input type="email" id="site_contact_email" name="site_contact_email" class="form-control" required placeholder="contact@site.com">
+              </div>
+              
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label for="invoice_month" class="form-label fw-bold">Invoice Month *</label>
+                  <input type="month" id="invoice_month" name="invoice_month" class="form-control" value="{{ current_month }}" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-bold">Total Hours (auto)</label>
+                  <input type="text" class="form-control" value="Calculated from shifts" disabled>
+                  <div class="form-text">Hourly rate is pulled from the site profile.</div>
+                </div>
+              </div>
+              
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label for="tax_rate" class="form-label fw-bold">Tax Rate (%) *</label>
+                  <input type="number" id="tax_rate" name="tax_rate" step="0.01" value="0" class="form-control" placeholder="0 or 19">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label for="days_until_due" class="form-label fw-bold">Days Until Due *</label>
+                  <input type="number" id="days_until_due" name="days_until_due" value="30" class="form-control" required>
+                </div>
+              </div>
+              
+              <div class="mb-3">
+                <label for="notes" class="form-label fw-bold">Notes</label>
+                <textarea id="notes" name="notes" class="form-control" rows="4" placeholder="Additional notes or payment terms..."></textarea>
+              </div>
+              
+              <div class="mt-4">
+                <button type="submit" class="btn btn-primary">Create Invoice</button>
+                <a href="/admin/invoices" class="btn btn-outline-secondary">Cancel</a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const body = document.body;
+    const toggle = document.getElementById('mobile-nav-toggle');
+    const sidebar = document.getElementById('admin-sidebar');
+    const backdrop = document.getElementById('mobile-nav-backdrop');
+    if (toggle && sidebar && backdrop) {
+      const closeNav = () => {
+        body.classList.remove('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      };
+      const openNav = () => {
+        body.classList.add('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'true');
+      };
+      toggle.addEventListener('click', () => {
+        body.classList.contains('mobile-nav-open') ? closeNav() : openNav();
+      });
+      backdrop.addEventListener('click', closeNav);
+      sidebar.querySelectorAll('a').forEach(link => link.addEventListener('click', closeNav));
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
+"""
+
+INVOICE_EDIT_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — Edit Invoice</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h1 class="h4 mb-0">Edit Invoice {{ short_invoice_number(invoice.invoice_number) }}</h1>
+      <a href="{{ url_for('admin_view_invoice', invoice_id=invoice.id) }}" class="btn btn-outline-secondary">Back</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mb-3">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'warning' if category=='warning' else 'success' if category=='success' else 'info' }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <form method="POST">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Site</label>
+              <select name="site_id" class="form-select" required>
+                {% for site in sites %}
+                  <option value="{{ site.id }}" {% if site.id == invoice.site_id %}selected{% endif %}>{{ site.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Status</label>
+              <select name="status" class="form-select">
+                <option value="draft" {% if invoice.status == 'draft' %}selected{% endif %}>Draft</option>
+                <option value="sent" {% if invoice.status == 'sent' %}selected{% endif %}>Sent</option>
+                <option value="paid" {% if invoice.status == 'paid' %}selected{% endif %}>Paid</option>
+                <option value="overdue" {% if invoice.status == 'overdue' %}selected{% endif %}>Overdue</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Contact Name</label>
+              <input type="text" class="form-control" name="site_contact_name" value="{{ invoice.site_contact_name or '' }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Contact Email</label>
+              <input type="email" class="form-control" name="site_contact_email" value="{{ invoice.site_contact_email or '' }}">
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Hourly Rate</label>
+              <input type="number" step="0.01" min="0" class="form-control" name="hourly_rate" value="{{ invoice.hourly_rate }}" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Total Hours</label>
+              <input type="number" step="0.01" min="0" class="form-control" name="total_hours" value="{{ invoice.total_hours }}" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Tax Rate (%)</label>
+              <input type="number" step="0.01" min="0" class="form-control" name="tax_rate" value="{{ (invoice.tax_rate * 100)|round(2) }}" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Due Date</label>
+              <input type="date" class="form-control" name="due_date" value="{{ invoice.due_date.strftime('%Y-%m-%d') if invoice.due_date else '' }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Paid Date</label>
+              <input type="date" class="form-control" name="paid_at" value="{{ invoice.paid_at.strftime('%Y-%m-%d') if invoice.paid_at else '' }}">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Notes</label>
+              <textarea class="form-control" name="notes" rows="4">{{ invoice.notes or '' }}</textarea>
+            </div>
+          </div>
+
+          <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="{{ url_for('admin_view_invoice', invoice_id=invoice.id) }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+INVOICE_VIEW_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — View Invoice</title>
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/logo.png">
+  <link rel="manifest" href="/static/admin-manifest.json">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-danger: linear-gradient(135deg,#f87171 0%,#ef4444 50%,#dc2626 100%);
+      --btn-grad-danger-hover: linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);
+      --btn-grad-info: linear-gradient(135deg,#38bdf8 0%,#0ea5e9 50%,#2563eb 100%);
+      --btn-grad-info-hover: linear-gradient(135deg,#0ea5e9 0%,#2563eb 50%,#1d4ed8 100%);
+      --btn-grad-success: linear-gradient(135deg,#22c55e 0%,#16a34a 50%,#15803d 100%);
+      --btn-grad-success-hover: linear-gradient(135deg,#16a34a 0%,#15803d 50%,#166534 100%);
+      --btn-grad-light: linear-gradient(135deg,#ffffff 0%,#f1f5f9 100%);
+      --btn-grad-light-hover: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+    }
+    body { background:#f1f5f9; color:#0f172a; font-size:1.05rem; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); background:#ffffff; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; color:#0f172a; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill.active, .nav-pill:hover { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
+    .nav-text { display:inline; }
+    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; }
+    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .main-shell { padding:1.75rem; background:#ffffff; }
+    .badge-soft { border-radius:999px; border:1px solid #d6d3f0; color:#6366f1; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
+    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.25rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#475569; }
+    .mobile-nav-toggle { display:none; }
+    .mobile-nav-backdrop { display:none; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 14px 26px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-outline-light { background-image:var(--btn-grad-light); color:#0f172a; }
+    .btn-outline-light:hover { background-image:var(--btn-grad-light-hover); color:#0f172a; }
+    .btn-outline-info,
+    .btn-info { background-image:var(--btn-grad-info); color:#ffffff; box-shadow:0 12px 24px rgba(14,165,233,0.25); }
+    .btn-outline-info:hover,
+    .btn-info:hover { background-image:var(--btn-grad-info-hover); color:#ffffff; }
+    .btn-outline-danger,
+    .btn-danger { background-image:var(--btn-grad-danger); color:#ffffff; box-shadow:0 12px 24px rgba(220,38,38,0.25); }
+    .btn-outline-danger:hover,
+    .btn-danger:hover { background-image:var(--btn-grad-danger-hover); color:#ffffff; }
+    .btn-success { background-image:var(--btn-grad-success); color:#ffffff; box-shadow:0 12px 24px rgba(34,197,94,0.25); }
+    .btn-success:hover { background-image:var(--btn-grad-success-hover); color:#ffffff; }
+    .btn-link { background:none; box-shadow:none; color:#0f766e; }
+    .btn-link:hover { color:#0c615b; }
+    @media(max-width:992px){
+      .app-shell{ grid-template-columns:minmax(0,1fr);} 
+      .sidebar{
+        position:fixed;
+        top:0;
+        left:0;
+        height:100vh;
+        width:min(82vw,300px);
+        max-width:320px;
+        z-index:1050;
+        display:flex;
+        transform:translateX(-100%);
+        transition:transform 0.2s ease;
+        box-shadow:0 24px 48px rgba(15,23,42,0.12);
+      }
+      body.mobile-nav-open .sidebar{ transform:translateX(0); }
+      .mobile-nav-backdrop{
+        position:fixed;
+        inset:0;
+        background:rgba(15,23,42,0.35);
+        z-index:1040;
+      }
+      body.mobile-nav-open .mobile-nav-backdrop{ display:block; }
+      .mobile-nav-toggle{
+        display:inline-flex;
+        align-items:center;
+        gap:0.4rem;
+        border-radius:0.75rem;
+        border:0;
+        background-image:var(--btn-grad-accent);
+        color:#ffffff;
+        padding:0.45rem 0.85rem;
+        font-size:0.95rem;
+        margin-bottom:1rem;
+        box-shadow:0 12px 24px rgba(15,118,110,0.25);
+      }
+      .mobile-nav-toggle:focus{ outline:2px solid rgba(15,118,110,0.4); outline-offset:2px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="admin-sidebar" class="sidebar">
+      <div class="sidebar-section-title">Navigation</div>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
+      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
+      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
+      <div class="sidebar-section-title">Account</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
+      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
+    </aside>
+    <main class="main-shell">
+      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'warning' if category=='warning' else 'success' if category=='success' else 'info' }} border-0 text-dark">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <header class="mb-4">
+        <div class="badge-soft mb-2">Invoice Details</div>
+        <h1 class="h4 text-dark mb-1">Invoice {{ short_invoice_number(invoice.invoice_number) }}</h1>
+        <p class="text-secondary mb-0">
+          {% if invoice.status == 'draft' %}
+            <span class="badge bg-warning text-dark">DRAFT</span>
+          {% elif invoice.status == 'sent' %}
+            <span class="badge bg-info text-white">SENT</span>
+          {% elif invoice.status == 'paid' %}
+            <span class="badge bg-success text-white">PAID</span>
+          {% endif %}
+        </p>
+      </header>
+
+      <div class="mb-3">
+        <a href="/admin/invoices" class="btn btn-outline-secondary" title="Back" aria-label="Back to invoices">
+          <i class="bi bi-arrow-left"></i>
+        </a>
+        <a href="/admin/invoices/{{ invoice.id }}/edit" class="btn btn-outline-primary" title="Edit" aria-label="Edit invoice">
+          <i class="bi bi-pencil-square"></i>
+        </a>
+        <a href="/admin/invoices/{{ invoice.id }}/pdf" class="btn btn-success" target="_blank" title="PDF" aria-label="Download invoice PDF">
+          <i class="bi bi-file-earmark-pdf"></i>
+        </a>
+        <a href="/admin/invoices/{{ invoice.id }}/send-email" class="btn btn-primary" title="Send Email" aria-label="Send invoice email">
+          <i class="bi bi-send"></i>
+        </a>
+        <a href="/admin/invoices/{{ invoice.id }}/delete" class="btn btn-outline-danger" onclick="return confirm('Delete this invoice?');" title="Delete" aria-label="Delete invoice">
+          <i class="bi bi-trash"></i>
+        </a>
+        {% if invoice.status == 'paid' %}
+        <form method="POST" action="/admin/invoices/{{ invoice.id }}/status" class="d-inline">
+          <input type="hidden" name="status" value="sent">
+          <button type="submit" class="btn btn-outline-warning">Mark as Unpaid</button>
+        </form>
+        {% else %}
+        <form method="POST" action="/admin/invoices/{{ invoice.id }}/status" class="d-inline">
+          <input type="hidden" name="status" value="paid">
+          <button type="submit" class="btn btn-success">Mark as Paid</button>
+        </form>
+        {% endif %}
+      </div>
+
+      <div class="row">
+        <div class="col-lg-8">
+          <div class="card-surface mb-4">
+            <div class="row mb-4 pb-3 border-bottom">
+              <div class="col-md-6">
+                <h2 class="h5 mb-3">INVOICE</h2>
+                <p class="mb-1"><strong>Invoice #:</strong> {{ short_invoice_number(invoice.invoice_number) }}</p>
+                <p class="mb-1"><strong>Date:</strong> {{ invoice.issued_date.strftime("%d/%m/%Y") }}</p>
+                <p class="mb-0"><strong>Due Date:</strong> {{ invoice.due_date.strftime("%d/%m/%Y") if invoice.due_date else "Upon receipt" }}</p>
+                {% if invoice.paid_at %}
+                <p class="mb-0"><strong>Paid Date:</strong> {{ invoice.paid_at.strftime("%d/%m/%Y") }}</p>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="row mb-4">
+              <div class="col-md-6">
+                <h6 class="text-muted text-uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.08em;">Bill To:</h6>
+                <p class="mb-1"><strong>{{ invoice.site_contact_name or invoice.site.name }}</strong></p>
+                <p class="mb-1">{{ invoice.site.address or '' }}</p>
+                <p class="mb-0">{{ invoice.site_contact_email }}</p>
+              </div>
+              <div class="col-md-6">
+                <h6 class="text-muted text-uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.08em;">Invoice Details:</h6>
+                <p class="mb-1"><strong>Site:</strong> {{ invoice.site.name }}</p>
+                <p class="mb-1"><strong>Hourly Rate:</strong> ${{ "%.2f"|format(invoice.hourly_rate) }}</p>
+                <p class="mb-0"><strong>Total Hours:</strong> {{ invoice.total_hours }}</p>
+              </div>
+            </div>
+
+            <div class="table-responsive mb-4">
+              <table class="table mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Description</th>
+                    <th class="text-end">Quantity</th>
+                    <th class="text-end">Rate</th>
+                    <th class="text-end">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Work at {{ invoice.site.name }}</td>
+                    <td class="text-end">{{ invoice.total_hours }} hours</td>
+                    <td class="text-end">${{ "%.2f"|format(invoice.hourly_rate) }}/hr</td>
+                    <td class="text-end"><strong>${{ "%.2f"|format(invoice.subtotal) }}</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 offset-md-6">
+                <table class="table table-sm mb-0">
+                  <tr>
+                    <td class="text-end">Subtotal:</td>
+                    <td class="text-end"><strong>${{ "%.2f"|format(invoice.subtotal) }}</strong></td>
+                  </tr>
+                  <tr>
+                    <td class="text-end">Tax ({{ (invoice.tax_rate * 100)|round(1) }}%):</td>
+                    <td class="text-end"><strong>${{ "%.2f"|format(invoice.tax_amount) }}</strong></td>
+                  </tr>
+                  <tr class="table-dark">
+                    <td class="text-end"><strong>TOTAL:</strong></td>
+                    <td class="text-end"><strong>${{ "%.2f"|format(invoice.total_amount) }}</strong></td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+
+            {% if invoice.notes %}
+            <div class="mt-4 pt-3 border-top">
+              <h6 class="text-muted text-uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.08em;">Notes:</h6>
+              <p class="mb-0">{{ invoice.notes }}</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const body = document.body;
+    const toggle = document.getElementById('mobile-nav-toggle');
+    const sidebar = document.getElementById('admin-sidebar');
+    const backdrop = document.getElementById('mobile-nav-backdrop');
+    if (toggle && sidebar && backdrop) {
+      const closeNav = () => {
+        body.classList.remove('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      };
+      const openNav = () => {
+        body.classList.add('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'true');
+      };
+      toggle.addEventListener('click', () => {
+        body.classList.contains('mobile-nav-open') ? closeNav() : openNav();
+      });
+      backdrop.addEventListener('click', closeNav);
+      sidebar.querySelectorAll('a').forEach(link => link.addEventListener('click', closeNav));
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
+"""
+
 LOGIN_TEMPLATE = """
 <!doctype html>
 <html lang="en">
@@ -1242,8 +2659,9 @@ LOGIN_TEMPLATE = """
     }
     .brand {
       display: flex;
-      align-items: center;
-      gap: 0.75rem;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.45rem;
       margin-bottom: 1rem;
     }
     .brand-logo {
@@ -3328,6 +4746,7 @@ class Site(Base):
   id = Column(Integer, primary_key=True)
   name = Column(String(255), nullable=False)
   address = Column(String(255))
+  hourly_rate = Column(Float, nullable=False, default=50.0)
 
   shifts = relationship("Shift", back_populates="site", cascade="all, delete-orphan")
 
@@ -3369,6 +4788,32 @@ class Lead(Base):
   created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Invoice(Base):
+  __tablename__ = "invoices"
+
+  id = Column(Integer, primary_key=True)
+  invoice_number = Column(String(64), unique=True, nullable=False)
+  site_id = Column(Integer, ForeignKey("sites.id"), nullable=False)
+  site_contact_name = Column(String(255))
+  site_contact_email = Column(String(255))
+  hourly_rate = Column(Float, nullable=False, default=50.0)
+  tax_rate = Column(Float, nullable=False, default=0.0)  # e.g., 0.19 for 19% VAT
+  total_hours = Column(Float, nullable=False)
+  subtotal = Column(Float)
+  tax_amount = Column(Float)
+  total_amount = Column(Float)
+  issued_date = Column(DateTime, default=datetime.utcnow)
+  due_date = Column(DateTime)
+  billing_month = Column(String(7))  # YYYY-MM
+  status = Column(String(64), default="draft")  # draft, sent, paid, overdue
+  paid_at = Column(DateTime)
+  notes = Column(Text)
+  created_at = Column(DateTime, default=datetime.utcnow)
+  updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+  site = relationship("Site", backref="invoices")
+
+
 Base.metadata.create_all(bind=engine)
 
 
@@ -3395,6 +4840,9 @@ _ensure_sqlite_column(engine, "shifts", "clock_out_lat", "FLOAT")
 _ensure_sqlite_column(engine, "shifts", "clock_out_lng", "FLOAT")
 _ensure_sqlite_column(engine, "shifts", "before_photo_path", "TEXT")
 _ensure_sqlite_column(engine, "shifts", "after_photo_path", "TEXT")
+_ensure_sqlite_column(engine, "sites", "hourly_rate", "FLOAT")
+_ensure_sqlite_column(engine, "invoices", "paid_at", "DATETIME")
+_ensure_sqlite_column(engine, "invoices", "billing_month", "TEXT")
 
 
 def _allowed_image(filename: str | None) -> bool:
@@ -3847,6 +5295,133 @@ def _format_clock(dt_val: datetime | None, *, reference_day: date | None = None)
   if reference_day and dt_val.date() != reference_day:
     return dt_val.strftime("%d.%m %H:%M")
   return dt_val.strftime("%H:%M")
+
+
+def _month_range(month_value: str | None) -> tuple[date, date] | None:
+  if not month_value:
+    return None
+  try:
+    start_dt = datetime.strptime(month_value, "%Y-%m")
+  except ValueError:
+    return None
+  start_date = date(start_dt.year, start_dt.month, 1)
+  if start_dt.month == 12:
+    next_month = date(start_dt.year + 1, 1, 1)
+  else:
+    next_month = date(start_dt.year, start_dt.month + 1, 1)
+  end_date = next_month - timedelta(days=1)
+  return start_date, end_date
+
+
+def _calculate_site_hours_for_range(
+  db,
+  site_id: int,
+  start_date: date,
+  end_date: date,
+) -> float:
+  shifts = (
+    db.query(Shift)
+    .filter(
+      Shift.site_id == site_id,
+      Shift.day >= start_date,
+      Shift.day <= end_date,
+    )
+    .all()
+  )
+  total_delta = timedelta(0)
+  for shift in shifts:
+    actual = _shift_actual_duration(shift)
+    total_delta += actual if actual is not None else _shift_scheduled_duration(shift)
+  hours = total_delta.total_seconds() / 3600
+  return round(hours + 0.0000001, 2)
+
+
+def _calculate_monthly_income(db, year: int, month: int) -> dict[str, float]:
+  """Calculate income for a given month grouped by site."""
+  start_date = date(year, month, 1)
+  if month == 12:
+    end_date = date(year + 1, 1, 1) - timedelta(days=1)
+  else:
+    end_date = date(year, month + 1, 1) - timedelta(days=1)
+
+  shifts = (
+    db.query(Shift)
+    .options(joinedload(Shift.site))
+    .filter(Shift.day >= start_date, Shift.day <= end_date)
+    .all()
+  )
+
+  income_by_site: dict[int, dict[str, float]] = {}
+  for shift in shifts:
+    if not shift.site:
+      continue
+    site_id = shift.site.id
+    if site_id not in income_by_site:
+      income_by_site[site_id] = {
+        "site_name": shift.site.name,
+        "hourly_rate": shift.site.hourly_rate or 50.0,
+        "hours": 0.0,
+        "income": 0.0,
+      }
+
+    actual_delta = _shift_actual_duration(shift)
+    delta = actual_delta if actual_delta is not None else _shift_scheduled_duration(shift)
+    hours = delta.total_seconds() / 3600
+    hours = round(hours + 0.0000001, 2)
+
+    income_by_site[site_id]["hours"] += hours
+    income_by_site[site_id]["income"] = income_by_site[site_id]["hours"] * income_by_site[site_id]["hourly_rate"]
+
+  return {
+    site_id: data
+    for site_id, data in sorted(
+      income_by_site.items(),
+      key=lambda x: x[1]["site_name"],
+    )
+  }
+
+
+def _get_all_monthly_summaries(
+  db,
+  start_year: int = 2025,
+  start_month: int = 12,
+) -> list[dict]:
+  """Get income summaries from a fixed start month up to the current month."""
+  if start_month < 1 or start_month > 12:
+    start_month = 12
+
+  start_point = date(start_year, start_month, 1)
+  today = date.today()
+  end_point = date(today.year, today.month, 1)
+
+  if start_point > end_point:
+    return []
+
+  summaries: list[dict] = []
+  current = start_point
+  while current <= end_point:
+    current_year = current.year
+    current_month = current.month
+
+    income_by_site = _calculate_monthly_income(db, current_year, current_month)
+    total_income = sum(data["income"] for data in income_by_site.values())
+    total_hours = sum(data["hours"] for data in income_by_site.values())
+
+    summaries.append({
+      "year": current_year,
+      "month": current_month,
+      "month_name": date(current_year, current_month, 1).strftime("%B %Y"),
+      "total_income": round(total_income, 2),
+      "total_hours": round(total_hours, 2),
+      "sites": income_by_site,
+    })
+
+    if current_month == 12:
+      current = date(current_year + 1, 1, 1)
+    else:
+      current = date(current_year, current_month + 1, 1)
+
+  return sorted(summaries, key=lambda x: (x["year"], x["month"]), reverse=True)
 
 
 def _collect_hours_report(
@@ -5192,6 +6767,7 @@ def admin_sites():
         if action == "create":
           name = (request.form.get("name") or "").strip()
           address = (request.form.get("address") or "").strip()
+          hourly_rate = request.form.get("hourly_rate", type=float)
           if name and address:
             if _site_exists(db, name, address):
               flash(
@@ -5199,13 +6775,14 @@ def admin_sites():
                 "warning",
               )
             else:
-              db.add(Site(name=name, address=address))
+              db.add(Site(name=name, address=address, hourly_rate=hourly_rate or 50.0))
               db.commit()
         elif action == "update" and site_id:
           site = db.get(Site, int(site_id))
           if site:
             name = (request.form.get("name") or "").strip() or site.name
             address = (request.form.get("address") or "").strip() or site.address
+            hourly_rate = request.form.get("hourly_rate", type=float)
             if _site_exists(db, name, address, exclude_id=site.id):
               flash(
                 "Another site already uses that name and address.",
@@ -5214,6 +6791,8 @@ def admin_sites():
             else:
               site.name = name
               site.address = address
+              if hourly_rate is not None:
+                site.hourly_rate = hourly_rate
               db.commit()
         elif action == "delete" and site_id:
           site = db.get(Site, int(site_id))
@@ -5224,8 +6803,9 @@ def admin_sites():
         ids = request.form.getlist("site_id")
         names = request.form.getlist("site_name")
         addresses = request.form.getlist("site_address")
+        hourly_rates = request.form.getlist("site_hourly_rate")
         seen_pairs = set()
-        for sid, n, a in zip(ids, names, addresses):
+        for sid, n, a, rate in zip(ids, names, addresses, hourly_rates):
           n = (n or "").strip()
           a = (a or "").strip()
           if not sid or not n or not a:
@@ -5238,6 +6818,12 @@ def admin_sites():
           if site and not _site_exists(db, n, a, exclude_id=site.id):
             site.name = n
             site.address = a
+            try:
+              parsed_rate = float(rate)
+            except (TypeError, ValueError):
+              parsed_rate = None
+            if parsed_rate is not None:
+              site.hourly_rate = parsed_rate
         db.commit()
 
       return redirect(redirect_url)
@@ -5615,5 +7201,926 @@ def gpt_assistant():
         return jsonify({"error": "Failed to contact GPT backend."}), 500
 
 
+# --- Invoice functionality --------------------------------------------------
+
+def _format_invoice_number(invoice_number: str | None) -> str:
+  """Return a shorter, human-friendly invoice number for display."""
+  value = (invoice_number or "").strip()
+  if not value:
+    return ""
+
+  if re.fullmatch(r"INV-\d{8,20}", value):
+    return f"INV-{value[-6:]}"
+  if re.fullmatch(r"\d{8,20}", value):
+    return value[-6:]
+  return value
+
+
+def _generate_invoice_number(session_obj) -> str:
+  """Generate a short unique invoice number."""
+  while True:
+    candidate = f"INV-{secrets.token_hex(3).upper()}"
+    exists = session_obj.query(Invoice.id).filter(Invoice.invoice_number == candidate).first()
+    if not exists:
+      return candidate
+
+
+def _previous_month_range(reference_day: date | None = None) -> tuple[date, date]:
+  """Return first/last day of previous month."""
+  ref = reference_day or date.today()
+  first_of_current = date(ref.year, ref.month, 1)
+  previous_month_last = first_of_current - timedelta(days=1)
+  previous_month_first = date(previous_month_last.year, previous_month_last.month, 1)
+  return previous_month_first, previous_month_last
+
+
+def _auto_generate_monthly_invoices(
+  session_obj,
+  billing_month: str | None = None,
+  tax_rate_percent: float = 0.0,
+  days_until_due: int = 30,
+) -> dict[str, int | str]:
+  """Generate one draft invoice per site for the target month (idempotent by site+month)."""
+  if billing_month:
+    month_range = _month_range(billing_month)
+    if not month_range:
+      raise ValueError("Invalid billing month format. Use YYYY-MM.")
+    month_start, month_end = month_range
+  else:
+    month_start, month_end = _previous_month_range()
+
+  month_key = month_start.strftime("%Y-%m")
+  created_count = 0
+  skipped_existing = 0
+  skipped_zero_hours = 0
+
+  sites = session_obj.query(Site).order_by(Site.name.asc()).all()
+  for site in sites:
+    existing = (
+      session_obj.query(Invoice.id)
+      .filter(Invoice.site_id == site.id, Invoice.billing_month == month_key)
+      .first()
+    )
+    if existing:
+      skipped_existing += 1
+      continue
+
+    total_hours = _calculate_site_hours_for_range(session_obj, site.id, month_start, month_end)
+    if total_hours <= 0:
+      skipped_zero_hours += 1
+      continue
+
+    hourly_rate = site.hourly_rate or 50.0
+    subtotal = total_hours * hourly_rate
+    tax_decimal = (tax_rate_percent or 0.0) / 100
+    tax_amount = subtotal * tax_decimal
+    total_amount = subtotal + tax_amount
+
+    invoice = Invoice(
+      invoice_number=_generate_invoice_number(session_obj),
+      site_id=site.id,
+      site_contact_name="",
+      site_contact_email="",
+      hourly_rate=hourly_rate,
+      tax_rate=tax_decimal,
+      total_hours=total_hours,
+      subtotal=subtotal,
+      tax_amount=tax_amount,
+      total_amount=total_amount,
+      due_date=datetime.utcnow() + timedelta(days=days_until_due),
+      billing_month=month_key,
+      status="draft",
+      notes=f"Auto-generated for billing month {month_key}",
+    )
+    session_obj.add(invoice)
+    created_count += 1
+
+  session_obj.commit()
+  return {
+    "month": month_key,
+    "created": created_count,
+    "skipped_existing": skipped_existing,
+    "skipped_zero_hours": skipped_zero_hours,
+  }
+
+def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
+    """Generate a professional PDF invoice matching German invoice format."""
+    if not REPORTLAB_AVAILABLE:
+        raise ValueError("reportlab is required for PDF generation")
+    
+    pdf_buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        pdf_buffer, 
+        pagesize=A4,
+        leftMargin=0.75*inch,
+        rightMargin=0.75*inch,
+        topMargin=0.75*inch,
+        bottomMargin=0.75*inch
+    )
+    
+    # Styles
+    styles = getSampleStyleSheet()
+    
+    # Custom styles matching the invoice design
+    sender_style = ParagraphStyle(
+        'SenderStyle',
+        parent=styles['Normal'],
+        fontSize=7,
+        textColor=colors.HexColor('#666666'),
+        leading=9
+    )
+    
+    address_style = ParagraphStyle(
+        'AddressStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=12,
+        textColor=colors.HexColor('#000000')
+    )
+    
+    invoice_header_style = ParagraphStyle(
+      'InvoiceHeader',
+      parent=styles['Normal'],
+      fontSize=8,
+      leading=10,
+      textColor=colors.HexColor('#666666'),
+      alignment=2  # Right align
+    )
+
+    invoice_header_label_style = ParagraphStyle(
+      'InvoiceHeaderLabel',
+      parent=styles['Normal'],
+      fontSize=8,
+      leading=10,
+      textColor=colors.HexColor('#666666'),
+      alignment=0
+    )
+
+    invoice_header_value_style = ParagraphStyle(
+      'InvoiceHeaderValue',
+      parent=styles['Normal'],
+      fontSize=8,
+      leading=10,
+      textColor=colors.HexColor('#000000'),
+      alignment=2
+    )
+    
+    invoice_number_style = ParagraphStyle(
+        'InvoiceNumber',
+        parent=styles['Normal'],
+        fontSize=16,
+        fontName='Helvetica-Bold',
+        textColor=colors.HexColor('#000000'),
+        spaceAfter=30
+    )
+    
+    greeting_style = ParagraphStyle(
+        'GreetingStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor('#000000')
+    )
+    
+    table_header_style = ParagraphStyle(
+        'TableHeader',
+        parent=styles['Normal'],
+        fontSize=9,
+        fontName='Helvetica-Bold',
+        textColor=colors.HexColor('#000000')
+    )
+    
+    footer_style = ParagraphStyle(
+        'FooterStyle',
+        parent=styles['Normal'],
+        fontSize=7,
+        leading=9,
+        textColor=colors.HexColor('#666666')
+    )
+    
+    # Content
+    elements = []
+    
+    # Top section with sender info and invoice details
+    sender_text = "Staffconnecting • Simmeringer Hauptstraße 24 - 1110 Wien"
+    # Use current date for invoice and delivery date
+    current_date = datetime.now().strftime("%d.%m.%Y")
+    invoice_date = current_date
+    delivery_date = current_date
+    
+    # Customer number (using site_id as customer number)
+    customer_number = str(invoice.site_id) if invoice.site_id else "1000"
+    
+    # Logo path (drawn on canvas to avoid layout shifts)
+    logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'stafflogo.png')
+    logo_flowable = None
+    if os.path.exists(logo_path):
+      logo_flowable = Image(logo_path, width=1.6 * inch, height=0.4 * inch)
+      logo_flowable.hAlign = "LEFT"
+    
+    # Create header table with sender and invoice info
+    right_details_data = [
+      [Paragraph('Rechnungs-Nr.', invoice_header_label_style), Paragraph(_format_invoice_number(invoice.invoice_number), invoice_header_value_style)],
+      [Paragraph('Rechnungsdatum', invoice_header_label_style), Paragraph(invoice_date, invoice_header_value_style)],
+      [Paragraph('Lieferdatum', invoice_header_label_style), Paragraph(delivery_date, invoice_header_value_style)],
+      [Paragraph('Ihre Kundennummer', invoice_header_label_style), Paragraph(customer_number, invoice_header_value_style)],
+      [Paragraph('Ihr Ansprechpartner', invoice_header_label_style), Paragraph('Sebastijan Kerculj', invoice_header_value_style)],
+    ]
+    right_details_table = Table(right_details_data, colWidths=[1.6*inch, 1.2*inch])
+    right_details_table.setStyle(TableStyle([
+      ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+      ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+      ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+      ('TOPPADDING', (0, 0), (-1, -1), 1),
+      ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+    ]))
+
+    left_header_cell = []
+    if logo_flowable:
+      left_header_cell.extend([logo_flowable, Spacer(1, 0.08 * inch)])
+    left_header_cell.append(Paragraph(sender_text, sender_style))
+
+    header_data = [
+      [
+        left_header_cell,
+        right_details_table
+      ],
+      [
+        Paragraph('<font size=10>Sebastjian Kerclj</font>', address_style),
+        ''
+      ],
+      [
+        Paragraph('<font size=10>Brunnweg 12/15/3<br/>1050 Wien<br/>Österreich</font>', address_style),
+        ''
+      ],
+    ]
+
+    header_table = Table(header_data, colWidths=[3.6*inch, 2.9*inch])
+    header_table.setStyle(TableStyle([
+      ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+      ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+      ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+      ('TOPPADDING', (0, 0), (-1, -1), 2),
+      ('TOPPADDING', (1, 0), (1, 0), 7),
+      ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+    ]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 0.4*inch))
+    
+    # Invoice title
+    elements.append(Paragraph(f'Rechnung Nr. {_format_invoice_number(invoice.invoice_number)}', invoice_number_style))
+    elements.append(Spacer(1, 0.15*inch))
+    
+    # Greeting
+    elements.append(Paragraph('Sehr geehrte Damen und Herren,', greeting_style))
+    elements.append(Spacer(1, 0.1*inch))
+    
+    # Intro text
+    intro_text = "vielen Dank für Ihren Auftrag und das damit verbundene Vertrauen!<br/>Hiermit stelle ich Ihnen die folgenden Leistungen in Rechnung."
+    elements.append(Paragraph(intro_text, greeting_style))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Calculate totals (no discount shown)
+    unit_price = invoice.hourly_rate
+    quantity = invoice.total_hours
+    discount_rate = 0.0
+    original_total = unit_price * quantity
+    discount_amount = original_total * discount_rate
+    discounted_total = original_total - discount_amount
+    
+    # Items table
+    table_data = [
+        [
+            Paragraph('<b>Pos.</b>', table_header_style),
+            Paragraph('<b>Beschreibung</b>', table_header_style),
+            Paragraph('<b>Menge</b>', table_header_style),
+            Paragraph('<b>Einzelpreis</b>', table_header_style),
+            Paragraph('<b>Gesamtpreis</b>', table_header_style)
+        ],
+        [
+            '1.',
+            'Reinigungsservice',
+            f'{quantity:.2f}',
+            f'{unit_price:.2f} EUR',
+            f'{original_total:.2f} EUR'
+        ]
+    ]
+    
+    # No discount row
+    
+    invoice_table = Table(table_data, colWidths=[0.5*inch, 2.5*inch, 0.8*inch, 1.2*inch, 1.5*inch])
+    invoice_table.setStyle(TableStyle([
+        # Header row
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0f0f0')),
+        ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+        ('ALIGN', (1, 0), (1, 0), 'LEFT'),
+        ('ALIGN', (2, 0), (-1, 0), 'RIGHT'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('TOPPADDING', (0, 0), (-1, 0), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        # Data rows
+        ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+        ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+        ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('TOPPADDING', (0, 1), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+        # Grid
+        ('GRID', (0, 0), (-1, 0), 0.5, colors.HexColor('#cccccc')),
+        ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#cccccc')),
+        ('LINEBELOW', (0, -1), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+    ]))
+    elements.append(invoice_table)
+    elements.append(Spacer(1, 0.15*inch))
+    
+    # Totals section
+    net_total = invoice.subtotal if invoice.subtotal else discounted_total
+    tax_amount = invoice.tax_amount if invoice.tax_amount else 0
+    tax_rate_percent = invoice.tax_rate * 100 if invoice.tax_rate else 20
+    gross_total = invoice.total_amount if invoice.total_amount else (net_total + tax_amount)
+    
+    totals_data = [
+        ['', '', '', 'Gesamtbetrag netto', f'{net_total:.2f} EUR'],
+        ['', '', '', f'zzgl. Umsatzsteuer {tax_rate_percent:.0f}%', f'{tax_amount:.2f} EUR'],
+        ['', '', '', 'Gesamtbetrag brutto', f'{gross_total:.2f} EUR']
+    ]
+    
+    totals_table = Table(totals_data, colWidths=[0.5*inch, 2.5*inch, 0.8*inch, 1.2*inch, 1.5*inch])
+    totals_table.setStyle(TableStyle([
+        ('ALIGN', (3, 0), (4, -1), 'RIGHT'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        # Bold the last row (gross total)
+        ('FONTNAME', (3, 2), (4, 2), 'Helvetica-Bold'),
+        ('FONTSIZE', (3, 2), (4, 2), 10),
+        ('TOPPADDING', (0, 2), (-1, 2), 6),
+        ('BOTTOMPADDING', (0, 2), (-1, 2), 6),
+    ]))
+    elements.append(totals_table)
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Payment terms
+    due_days = 31
+    if invoice.due_date:
+        due_days = (invoice.due_date - invoice.issued_date).days if invoice.issued_date else 31
+    
+    payment_text = f'Zahlungsbedingungen: Zahlung innerhalb von {due_days} Tagen ab Rechnungseingang ohne Abzüge.'
+    elements.append(Paragraph(payment_text, greeting_style))
+    elements.append(Spacer(1, 0.1*inch))
+    
+    bank_info_text = f'Bitte überweisen Sie den Rechnungsbetrag unter Angabe der Rechnungsnummer auf das unten angegebene Konto.'
+    elements.append(Paragraph(bank_info_text, greeting_style))
+    elements.append(Spacer(1, 0.05*inch))
+    
+    # Due date
+    due_date_str = invoice.due_date.strftime("%d.%m.%Y") if invoice.due_date else (datetime.now() + timedelta(days=31)).strftime("%d.%m.%Y")
+    due_date_text = f'Der Rechnungsbetrag ist bis zum {due_date_str} fällig.'
+    elements.append(Paragraph(due_date_text, greeting_style))
+    elements.append(Spacer(1, 0.15*inch))
+    
+    # Closing
+    elements.append(Paragraph('Mit freundlichen Grüßen<br/>Sebastijan Kerculj', greeting_style))
+    elements.append(Spacer(1, 0.5*inch))
+    
+    # Build PDF
+    def _draw_header_footer(canvas_obj, doc_obj):
+      canvas_obj.saveState()
+      canvas_obj.setFont('Helvetica', 7)
+      canvas_obj.setFillColor(colors.HexColor('#666666'))
+
+      left_column = [
+        "Sebastijan Aleksandar Kerculj",
+        "Staffconnecting",
+        "Simmeringer Hauptstraße 24",
+        "1110 Wien",
+        "Österreich",
+      ]
+
+      middle_column = [
+        "Tel. 06766300167",
+        "E-Mail s.kerculj@staffconnecting.at",
+        "Amtsgericht Wien",
+        "USt.-ID ATU78448967",
+        "Steuer-Nr. 04 544/9573",
+        "Geschäftsführung Sebastijan Aleksandar Kerculj",
+      ]
+
+      right_column = [
+        "Bank UniCredit Bank Austria AG",
+        "Konto 51488162831",
+        "BLZ 12000",
+        "IBAN AT8312000051488162831",
+        "BIC BKAUATWWXXX",
+      ]
+
+      line_height = 9
+      bottom_y = doc_obj.bottomMargin - 6
+      left_x = doc_obj.leftMargin
+      middle_x = doc_obj.leftMargin + 2.3 * inch
+      right_x = doc_obj.leftMargin + 4.6 * inch
+
+      for idx, line in enumerate(reversed(left_column)):
+        canvas_obj.drawString(left_x, bottom_y + idx * line_height, line)
+
+      for idx, line in enumerate(reversed(middle_column)):
+        canvas_obj.drawString(middle_x, bottom_y + idx * line_height, line)
+
+      for idx, line in enumerate(reversed(right_column)):
+        canvas_obj.drawString(right_x, bottom_y + idx * line_height, line)
+
+      canvas_obj.restoreState()
+
+    doc.build(elements, onFirstPage=_draw_header_footer)
+    pdf_buffer.seek(0)
+    return pdf_buffer
+
+
+def send_invoice_email(invoice: Invoice, pdf_buffer: io.BytesIO) -> bool:
+    """Send invoice PDF via email. Requires email configuration."""
+    try:
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.base import MIMEBase
+        from email.mime.text import MIMEText
+        from email import encoders
+        
+        smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        sender_email = os.getenv("SENDER_EMAIL")
+        sender_password = os.getenv("SENDER_PASSWORD")
+        
+        if not sender_email or not sender_password:
+            app.logger.warning("Email configuration not set (SENDER_EMAIL, SENDER_PASSWORD)")
+            return False
+        
+        recipient_email = invoice.site_contact_email
+        if not recipient_email:
+            app.logger.warning(f"No email address for invoice {invoice.invoice_number}")
+            return False
+        
+        # Create message
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = recipient_email
+        msg['Subject'] = f'Invoice {invoice.invoice_number} - {invoice.site.name}'
+        
+        # Body
+        body = f"""
+Dear {invoice.site_contact_name or 'Customer'},
+
+Please find attached your invoice {invoice.invoice_number}.
+
+Invoice Details:
+- Site: {invoice.site.name}
+- Hours Worked: {invoice.total_hours}
+- Hourly Rate: ${invoice.hourly_rate:.2f}
+- Total Amount: ${invoice.total_amount:.2f}
+- Due Date: {invoice.due_date.strftime("%d/%m/%Y") if invoice.due_date else "Upon receipt"}
+
+{f"Additional Notes: {invoice.notes}" if invoice.notes else ""}
+
+Thank you for your business!
+
+Best regards,
+Your Company
+        """
+        
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Attach PDF
+        attachment = MIMEBase('application', 'octet-stream')
+        attachment.set_payload(pdf_buffer.getvalue())
+        encoders.encode_base64(attachment)
+        attachment.add_header('Content-Disposition', f'attachment; filename= invoice_{invoice.invoice_number}.pdf')
+        msg.attach(attachment)
+        
+        # Send email
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+        
+        app.logger.info(f"Invoice {invoice.invoice_number} sent to {recipient_email}")
+        return True
+        
+    except Exception as e:
+        app.logger.error(f"Failed to send invoice email: {e}")
+        return False
+
+
+# --- Invoice Routes --------------------------------------------------------
+
+@app.route("/admin/invoices/generate-monthly", methods=["POST"])
+@login_required
+def admin_generate_monthly_invoices():
+  """Generate monthly invoices for previous month (or provided YYYY-MM month)."""
+  session_obj = SessionLocal()
+  try:
+    month = (request.form.get("month") or "").strip()
+    tax_rate = request.form.get("tax_rate", type=float, default=0.0)
+    due_days = request.form.get("days_until_due", type=int, default=30)
+
+    result = _auto_generate_monthly_invoices(
+      session_obj,
+      billing_month=month or None,
+      tax_rate_percent=tax_rate or 0.0,
+      days_until_due=due_days or 30,
+    )
+    flash(
+      (
+        f"Monthly invoices generated for {result['month']}: "
+        f"created {result['created']}, "
+        f"skipped existing {result['skipped_existing']}, "
+        f"skipped zero-hours {result['skipped_zero_hours']}."
+      ),
+      "success",
+    )
+  except ValueError as exc:
+    flash(str(exc), "warning")
+  finally:
+    session_obj.close()
+
+  return redirect(url_for("admin_invoices"))
+
+@app.route("/admin/invoices", methods=["GET"])
+@login_required
+def admin_invoices():
+    """List all invoices."""
+    session_obj = SessionLocal()
+    try:
+        status_filter = (request.args.get("status") or "all").strip().lower()
+        created_from_raw = (request.args.get("created_from") or "").strip()
+        created_to_raw = (request.args.get("created_to") or "").strip()
+
+        query = session_obj.query(Invoice)
+
+        if status_filter in {"draft", "sent", "paid", "overdue"}:
+            query = query.filter(Invoice.status == status_filter)
+        else:
+            status_filter = "all"
+
+        created_from = None
+        if created_from_raw:
+            try:
+                created_from = datetime.strptime(created_from_raw, "%Y-%m-%d").date()
+                query = query.filter(func.date(Invoice.created_at) >= created_from)
+            except ValueError:
+                created_from_raw = ""
+                flash("Invalid 'created from' date filter.", "warning")
+
+        created_to = None
+        if created_to_raw:
+            try:
+                created_to = datetime.strptime(created_to_raw, "%Y-%m-%d").date()
+                query = query.filter(func.date(Invoice.created_at) <= created_to)
+            except ValueError:
+                created_to_raw = ""
+                flash("Invalid 'created to' date filter.", "warning")
+
+        invoices = query.order_by(Invoice.created_at.desc()).all()
+        return render_template_string(
+            INVOICE_LIST_TEMPLATE,
+            invoices=invoices,
+            status_filter=status_filter,
+            created_from=created_from_raw,
+            created_to=created_to_raw,
+          short_invoice_number=_format_invoice_number,
+        )
+    finally:
+        session_obj.close()
+
+
+@app.route("/admin/invoices/new", methods=["GET", "POST"])
+@login_required
+def admin_create_invoice():
+    """Create a new invoice."""
+    session_obj = SessionLocal()
+    try:
+        if request.method == "POST":
+            site_id = request.form.get("site_id", type=int)
+            site_contact_name = request.form.get("site_contact_name", "")
+            site_contact_email = request.form.get("site_contact_email", "")
+            tax_rate = request.form.get("tax_rate", type=float, default=0.0)
+            invoice_month = (request.form.get("invoice_month") or "").strip()
+            notes = request.form.get("notes", "")
+            days_until_due = request.form.get("days_until_due", type=int, default=30)
+
+            site = session_obj.get(Site, site_id) if site_id else None
+            if not site:
+                flash("Please select a valid site.", "warning")
+                return redirect(url_for("admin_create_invoice"))
+
+            month_range = _month_range(invoice_month)
+            if not month_range:
+                flash("Please choose a valid invoice month.", "warning")
+                return redirect(url_for("admin_create_invoice"))
+            month_start, month_end = month_range
+            total_hours = _calculate_site_hours_for_range(
+                session_obj,
+                site.id,
+                month_start,
+                month_end,
+            )
+            hourly_rate = site.hourly_rate or 50.0
+            
+            # Calculate totals
+            subtotal = total_hours * hourly_rate
+            tax_amount = subtotal * (tax_rate / 100)
+            total_amount = subtotal + tax_amount
+            
+            invoice = Invoice(
+              invoice_number=_generate_invoice_number(session_obj),
+                site_id=site.id,
+                site_contact_name=site_contact_name,
+                site_contact_email=site_contact_email,
+                hourly_rate=hourly_rate,
+                tax_rate=tax_rate / 100,  # Convert percentage to decimal
+                total_hours=total_hours,
+                subtotal=subtotal,
+                tax_amount=tax_amount,
+                total_amount=total_amount,
+                billing_month=month_start.strftime("%Y-%m"),
+                due_date=datetime.utcnow() + timedelta(days=days_until_due),
+                notes=notes
+            )
+            
+            session_obj.add(invoice)
+            session_obj.commit()
+            
+            flash(f"Invoice {invoice.invoice_number} created successfully!", "success")
+            return redirect(url_for("admin_invoices"))
+        
+        sites = session_obj.query(Site).all()
+        current_month = datetime.utcnow().strftime("%Y-%m")
+        return render_template_string(
+            INVOICE_FORM_TEMPLATE,
+            sites=sites,
+            current_month=current_month,
+        )
+    finally:
+        session_obj.close()
+
+
+@app.route("/admin/invoices/<int:invoice_id>", methods=["GET"])
+@login_required
+def admin_view_invoice(invoice_id):
+    """View invoice details."""
+    session_obj = SessionLocal()
+    try:
+        invoice = session_obj.query(Invoice).get(invoice_id)
+        if not invoice:
+            return "Invoice not found", 404
+        
+        return render_template_string(
+          INVOICE_VIEW_TEMPLATE,
+          invoice=invoice,
+          short_invoice_number=_format_invoice_number,
+        )
+    finally:
+        session_obj.close()
+
+
+@app.route("/admin/invoices/<int:invoice_id>/edit", methods=["GET", "POST"])
+@login_required
+def admin_edit_invoice(invoice_id):
+    """Edit invoice details."""
+    session_obj = SessionLocal()
+    try:
+        invoice = session_obj.query(Invoice).get(invoice_id)
+        if not invoice:
+            return "Invoice not found", 404
+
+        if request.method == "POST":
+            site_id = request.form.get("site_id", type=int)
+            status = (request.form.get("status") or "draft").strip().lower()
+            site_contact_name = (request.form.get("site_contact_name") or "").strip()
+            site_contact_email = (request.form.get("site_contact_email") or "").strip()
+            hourly_rate = request.form.get("hourly_rate", type=float)
+            total_hours = request.form.get("total_hours", type=float)
+            tax_rate_percent = request.form.get("tax_rate", type=float)
+            due_date_raw = (request.form.get("due_date") or "").strip()
+            paid_at_raw = (request.form.get("paid_at") or "").strip()
+            notes = request.form.get("notes", "")
+
+            site = session_obj.get(Site, site_id) if site_id else None
+            if not site:
+                flash("Please select a valid site.", "warning")
+                return redirect(url_for("admin_edit_invoice", invoice_id=invoice_id))
+
+            if status not in {"draft", "sent", "paid", "overdue"}:
+                flash("Invalid status selected.", "warning")
+                return redirect(url_for("admin_edit_invoice", invoice_id=invoice_id))
+
+            if hourly_rate is None or total_hours is None or tax_rate_percent is None:
+                flash("Hourly rate, total hours and tax rate are required.", "warning")
+                return redirect(url_for("admin_edit_invoice", invoice_id=invoice_id))
+
+            due_date = None
+            if due_date_raw:
+                try:
+                    due_date = datetime.strptime(due_date_raw, "%Y-%m-%d")
+                except ValueError:
+                    flash("Invalid due date format.", "warning")
+                    return redirect(url_for("admin_edit_invoice", invoice_id=invoice_id))
+
+            paid_at = None
+            if paid_at_raw:
+                try:
+                    paid_at = datetime.strptime(paid_at_raw, "%Y-%m-%d")
+                except ValueError:
+                    flash("Invalid paid date format.", "warning")
+                    return redirect(url_for("admin_edit_invoice", invoice_id=invoice_id))
+
+            subtotal = total_hours * hourly_rate
+            tax_rate_decimal = tax_rate_percent / 100
+            tax_amount = subtotal * tax_rate_decimal
+            total_amount = subtotal + tax_amount
+
+            invoice.site_id = site.id
+            invoice.status = status
+            invoice.site_contact_name = site_contact_name
+            invoice.site_contact_email = site_contact_email
+            invoice.hourly_rate = hourly_rate
+            invoice.total_hours = total_hours
+            invoice.tax_rate = tax_rate_decimal
+            invoice.subtotal = subtotal
+            invoice.tax_amount = tax_amount
+            invoice.total_amount = total_amount
+            invoice.due_date = due_date
+            invoice.notes = notes
+            invoice.paid_at = paid_at if status == "paid" else None
+
+            session_obj.commit()
+            flash(f"Invoice {invoice.invoice_number} updated successfully.", "success")
+            return redirect(url_for("admin_view_invoice", invoice_id=invoice_id))
+
+        sites = session_obj.query(Site).order_by(Site.name.asc()).all()
+        return render_template_string(
+            INVOICE_EDIT_TEMPLATE,
+            invoice=invoice,
+            sites=sites,
+            short_invoice_number=_format_invoice_number,
+        )
+    finally:
+        session_obj.close()
+
+
+@app.route("/admin/income-report", methods=["GET"])
+@login_required
+def admin_income_report():
+    """Display monthly income report."""
+    session_obj = SessionLocal()
+    try:
+        monthly_summaries = _get_all_monthly_summaries(
+            session_obj,
+            start_year=2025,
+            start_month=12,
+        )
+        return render_template_string(
+            INCOME_REPORT_TEMPLATE,
+            monthly_summaries=monthly_summaries,
+        )
+    finally:
+        session_obj.close()
+
+
+@app.route("/admin/invoices/<int:invoice_id>/pdf", methods=["GET"])
+@login_required
+def admin_invoice_pdf(invoice_id):
+    """Download invoice as PDF."""
+    session_obj = SessionLocal()
+    try:
+        invoice = session_obj.query(Invoice).get(invoice_id)
+        if not invoice:
+            return "Invoice not found", 404
+        
+        pdf_buffer = generate_invoice_pdf(invoice)
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'invoice_{invoice.invoice_number}.pdf'
+        )
+    finally:
+        session_obj.close()
+
+
+@app.route("/admin/invoices/<int:invoice_id>/send-email", methods=["GET"])
+@login_required
+def admin_send_invoice_email(invoice_id):
+    """Send invoice via email."""
+    session_obj = SessionLocal()
+    try:
+        invoice = session_obj.query(Invoice).get(invoice_id)
+        if not invoice:
+            return "Invoice not found", 404
+        
+        pdf_buffer = generate_invoice_pdf(invoice)
+        success = send_invoice_email(invoice, pdf_buffer)
+        
+        if success:
+            invoice.status = "sent"
+            session_obj.commit()
+            flash(f"Invoice {invoice.invoice_number} sent to {invoice.site_contact_email}", "success")
+        else:
+            flash("Failed to send email. Check email configuration.", "error")
+        
+        return redirect(url_for("admin_view_invoice", invoice_id=invoice_id))
+    finally:
+        session_obj.close()
+
+
+@app.route("/admin/invoices/<int:invoice_id>/status", methods=["POST"])
+@login_required
+def admin_update_invoice_status(invoice_id):
+    """Update invoice status (draft, sent, paid)."""
+    session_obj = SessionLocal()
+    try:
+        invoice = session_obj.query(Invoice).get(invoice_id)
+        if not invoice:
+            return "Invoice not found", 404
+
+        new_status = (request.form.get("status") or "").strip().lower()
+        allowed_statuses = {"draft", "sent", "paid"}
+        if new_status not in allowed_statuses:
+            flash("Invalid invoice status.", "warning")
+            return redirect(url_for("admin_view_invoice", invoice_id=invoice_id))
+
+        invoice.status = new_status
+        if new_status == "paid":
+            invoice.paid_at = datetime.utcnow()
+        else:
+            invoice.paid_at = None
+
+        session_obj.commit()
+        flash(f"Invoice {invoice.invoice_number} marked as {new_status}.", "success")
+        return redirect(url_for("admin_view_invoice", invoice_id=invoice_id))
+    finally:
+        session_obj.close()
+
+
+@app.route("/admin/invoices/<int:invoice_id>/delete", methods=["GET"])
+@login_required
+def admin_delete_invoice(invoice_id):
+    """Delete an invoice."""
+    session_obj = SessionLocal()
+    try:
+        invoice = session_obj.query(Invoice).get(invoice_id)
+        if invoice:
+            invoice_number = invoice.invoice_number
+            session_obj.delete(invoice)
+            session_obj.commit()
+            flash(f"Invoice {invoice_number} deleted", "success")
+        return redirect(url_for("admin_invoices"))
+    finally:
+        session_obj.close()
+
+
+def _run_monthly_invoice_generation_from_cli() -> int:
+    """CLI entrypoint to support cron-based monthly invoice generation."""
+    month = None
+    tax_rate = 0.0
+    due_days = 30
+    for arg in sys.argv[1:]:
+        if arg.startswith("--month="):
+            month = arg.split("=", 1)[1].strip()
+        elif arg.startswith("--tax-rate="):
+            try:
+                tax_rate = float(arg.split("=", 1)[1].strip())
+            except ValueError:
+                print("Invalid --tax-rate value")
+                return 1
+        elif arg.startswith("--due-days="):
+            try:
+                due_days = int(arg.split("=", 1)[1].strip())
+            except ValueError:
+                print("Invalid --due-days value")
+                return 1
+
+    session_obj = SessionLocal()
+    try:
+        result = _auto_generate_monthly_invoices(
+            session_obj,
+            billing_month=month,
+            tax_rate_percent=tax_rate,
+            days_until_due=due_days,
+        )
+        print(
+            f"Generated month {result['month']}: "
+            f"created={result['created']}, "
+            f"skipped_existing={result['skipped_existing']}, "
+            f"skipped_zero_hours={result['skipped_zero_hours']}"
+        )
+        return 0
+    except ValueError as exc:
+        print(str(exc))
+        return 1
+    finally:
+        session_obj.close()
+
+
 if __name__ == "__main__":
+    if "--generate-monthly-invoices" in sys.argv:
+      raise SystemExit(_run_monthly_invoice_generation_from_cli())
     app.run(host="0.0.0.0", port=5000, debug=True)
