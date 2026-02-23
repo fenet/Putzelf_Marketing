@@ -46,6 +46,29 @@ Open that address in your browser.
 
 ---
 
+## Invoice email setup (SMTP)
+
+To send invoices by email, create a `.env` file (or copy from `.env.example`) and set:
+
+```bash
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USE_TLS=true
+SMTP_USE_SSL=false
+SMTP_USERNAME=your-email@domain.com
+SMTP_PASSWORD=your-smtp-password-or-app-password
+SENDER_EMAIL=your-email@domain.com
+SENDER_NAME=Your Company Name
+```
+
+Notes:
+
+- For Gmail, use an **App Password** (not your normal login password).
+- `SMTP_USERNAME` can be different from `SENDER_EMAIL` if your provider requires it.
+- If both `SMTP_USE_SSL=true` and `SMTP_USE_TLS=true` are set, SSL mode is used.
+
+---
+
 ## 3. How to use
 
 1. Go to `http://127.0.0.1:5000/`

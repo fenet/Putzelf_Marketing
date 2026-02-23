@@ -9,7 +9,7 @@ import secrets
 from collections import deque
 from datetime import datetime, date, timedelta
 from functools import wraps
-from typing import Any
+from typing import Any, Tuple
 from urllib.parse import urljoin, urldefrag, urlparse, quote_plus
 from dotenv import load_dotenv
 
@@ -34,6 +34,7 @@ from sqlalchemy import (
   create_engine,
   Column,
   Integer,
+  Boolean,
   String,
   Date,
   Time,
@@ -1011,22 +1012,26 @@ ADMIN_SITES_TEMPLATE = """
         </div>
         <div class="d-flex gap-2 flex-wrap">
           <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Back to overview</a>
+          <a href="{{ url_for('admin_contract_builder') }}" class="btn btn-sm btn-outline-secondary">Client contract PDF</a>
           <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-primary">Open schedule</a>
         </div>
       </div>
-      {% set unassigned_sites = total_sites - covered_sites if total_sites > covered_sites else 0 %}
       <section class="stats-grid">
         <div class="stat-card">
           <div class="stat-label">Total sites</div>
           <div class="stat-value">{{ total_sites }}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Sites with shifts this week</div>
+          <div class="stat-label">Active sites with shifts this week</div>
           <div class="stat-value">{{ covered_sites }}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Unassigned sites</div>
-          <div class="stat-value">{{ unassigned_sites }}</div>
+          <div class="stat-label">Unassigned active sites</div>
+          <div class="stat-value">{{ unassigned_active_sites }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Inactive clients</div>
+          <div class="stat-value">{{ inactive_sites }}</div>
         </div>
       </section>
       <form method="get" class="row g-2 align-items-end mb-4">
@@ -1061,6 +1066,21 @@ ADMIN_SITES_TEMPLATE = """
                 <input type="number" class="form-control form-control-sm" id="new_site_hourly_rate" name="hourly_rate" step="0.01" min="0" value="50.00" required>
               </div>
               <div class="col-12">
+                <label class="form-label" for="new_site_contact_name">Contact name (optional)</label>
+                <input type="text" class="form-control form-control-sm" id="new_site_contact_name" name="contact_name" placeholder="e.g. John Smith">
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="new_site_contact_email">Contact email (optional)</label>
+                <input type="email" class="form-control form-control-sm" id="new_site_contact_email" name="contact_email" placeholder="contact@site.com">
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="new_site_is_active">Status</label>
+                <select class="form-select form-select-sm" id="new_site_is_active" name="is_active">
+                  <option value="1" selected>Active</option>
+                  <option value="0">Inactive</option>
+                </select>
+              </div>
+              <div class="col-12">
                 <button type="submit" class="btn btn-sm btn-primary w-100">Add site</button>
               </div>
             </form>
@@ -1086,6 +1106,9 @@ ADMIN_SITES_TEMPLATE = """
                       <th scope="col">Name</th>
                       <th scope="col">Address</th>
                       <th scope="col">Hourly rate</th>
+                      <th scope="col">Contact name</th>
+                      <th scope="col">Contact email</th>
+                      <th scope="col">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1100,6 +1123,18 @@ ADMIN_SITES_TEMPLATE = """
                         </td>
                         <td>
                           <input type="number" class="form-control form-control-sm" name="site_hourly_rate" value="{{ '%.2f'|format(site.hourly_rate or 0) }}" step="0.01" min="0" required>
+                        </td>
+                        <td>
+                          <input type="text" class="form-control form-control-sm" name="site_contact_name" value="{{ site.contact_name or '' }}">
+                        </td>
+                        <td>
+                          <input type="email" class="form-control form-control-sm" name="site_contact_email" value="{{ site.contact_email or '' }}">
+                        </td>
+                        <td>
+                          <select class="form-select form-select-sm" name="site_is_active">
+                            <option value="1" {% if site.is_active != 0 %}selected{% endif %}>Active</option>
+                            <option value="0" {% if site.is_active == 0 %}selected{% endif %}>Inactive</option>
+                          </select>
                         </td>
                       </tr>
                     {% endfor %}
@@ -1128,6 +1163,21 @@ ADMIN_SITES_TEMPLATE = """
                     <div class="col-md-2 col-12">
                       <label class="form-label">Hourly rate ($)</label>
                       <input type="number" name="hourly_rate" value="{{ '%.2f'|format(site.hourly_rate or 0) }}" class="form-control form-control-sm" step="0.01" min="0" required>
+                    </div>
+                    <div class="col-md-2 col-12">
+                      <label class="form-label">Contact name</label>
+                      <input type="text" name="contact_name" value="{{ site.contact_name or '' }}" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-md-2 col-12">
+                      <label class="form-label">Contact email</label>
+                      <input type="email" name="contact_email" value="{{ site.contact_email or '' }}" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-md-2 col-12">
+                      <label class="form-label">Status</label>
+                      <select name="is_active" class="form-select form-select-sm">
+                        <option value="1" {% if site.is_active != 0 %}selected{% endif %}>Active</option>
+                        <option value="0" {% if site.is_active == 0 %}selected{% endif %}>Inactive</option>
+                      </select>
                     </div>
                     <div class="col-md-2 col-12">
                       <div class="d-grid gap-2">
@@ -1376,6 +1426,14 @@ INVOICE_LIST_TEMPLATE = """
       <div class="mb-3">
         <a href="/admin/invoices/new" class="btn btn-primary">+ Create Invoice</a>
         <a href="{{ url_for('admin_income_report') }}" class="btn btn-outline-primary">💰 Monthly Income</a>
+        <button form="bulk-invoice-email-form" type="submit" class="btn btn-outline-primary" onclick="return confirm('Send selected invoices by email now?');">✉ Send selected emails</button>
+        <button
+          form="bulk-invoice-email-form"
+          type="submit"
+          formaction="{{ url_for('admin_delete_bulk_invoices') }}"
+          class="btn btn-outline-danger"
+          onclick="return confirm('Delete selected invoices? This cannot be undone.');"
+        >🗑 Delete selected</button>
       </div>
 
       <div class="card-surface mb-3">
@@ -1427,10 +1485,14 @@ INVOICE_LIST_TEMPLATE = """
 
       {% if invoices %}
       <div class="card-surface">
+        <form id="bulk-invoice-email-form" method="POST" action="{{ url_for('admin_send_bulk_invoice_emails') }}">
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
             <thead>
               <tr>
+                <th>
+                  <input type="checkbox" id="select-all-invoices" aria-label="Select all invoices">
+                </th>
                 <th>Invoice #</th>
                 <th>Site</th>
                 <th>Contact</th>
@@ -1444,6 +1506,9 @@ INVOICE_LIST_TEMPLATE = """
             <tbody>
               {% for inv in invoices %}
               <tr>
+                <td>
+                  <input type="checkbox" name="invoice_ids" value="{{ inv.id }}" class="invoice-select" aria-label="Select invoice {{ short_invoice_number(inv.invoice_number) }}">
+                </td>
                 <td><strong>{{ short_invoice_number(inv.invoice_number) }}</strong></td>
                 <td>{{ inv.site.name }}</td>
                 <td>{{ inv.site_contact_name or 'N/A' }}</td>
@@ -1480,6 +1545,7 @@ INVOICE_LIST_TEMPLATE = """
             </tbody>
           </table>
         </div>
+        </form>
       </div>
       {% else %}
       <div class="card-surface">
@@ -1495,6 +1561,25 @@ INVOICE_LIST_TEMPLATE = """
   <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+    (function() {
+      const selectAll = document.getElementById('select-all-invoices');
+      if (!selectAll) return;
+      const boxes = Array.from(document.querySelectorAll('.invoice-select'));
+      selectAll.addEventListener('change', () => {
+        boxes.forEach((box) => {
+          box.checked = selectAll.checked;
+        });
+      });
+      boxes.forEach((box) => {
+        box.addEventListener('change', () => {
+          if (!box.checked) {
+            selectAll.checked = false;
+            return;
+          }
+          selectAll.checked = boxes.length > 0 && boxes.every((item) => item.checked);
+        });
+      });
+    })();
     const body = document.body;
     const toggle = document.getElementById('mobile-nav-toggle');
     const sidebar = document.getElementById('admin-sidebar');
@@ -2144,9 +2229,14 @@ INVOICE_FORM_TEMPLATE = """
                 <select id="site_id" name="site_id" class="form-select" required>
                   <option value="">Select a site</option>
                   {% for site in sites %}
-                  <option value="{{ site.id }}">{{ site.name }}</option>
+                  <option
+                    value="{{ site.id }}"
+                    data-contact-name="{{ site.contact_name or '' }}"
+                    data-contact-email="{{ site.contact_email or '' }}"
+                  >{{ site.name }}</option>
                   {% endfor %}
                 </select>
+                <div class="form-text">Site profile contact details are auto-filled when available.</div>
               </div>
               
               <div class="mb-3">
@@ -2155,8 +2245,8 @@ INVOICE_FORM_TEMPLATE = """
               </div>
               
               <div class="mb-3">
-                <label for="site_contact_email" class="form-label fw-bold">Contact Email *</label>
-                <input type="email" id="site_contact_email" name="site_contact_email" class="form-control" required placeholder="contact@site.com">
+                <label for="site_contact_email" class="form-label fw-bold">Contact Email</label>
+                <input type="email" id="site_contact_email" name="site_contact_email" class="form-control" placeholder="contact@site.com">
               </div>
               
               <div class="row">
@@ -2221,6 +2311,31 @@ INVOICE_FORM_TEMPLATE = """
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    (function() {
+      const siteSelect = document.getElementById('site_id');
+      const nameInput = document.getElementById('site_contact_name');
+      const emailInput = document.getElementById('site_contact_email');
+      if (!siteSelect || !nameInput || !emailInput) {
+        return;
+      }
+      const applyProfile = () => {
+        const selected = siteSelect.options[siteSelect.selectedIndex];
+        if (!selected) {
+          return;
+        }
+        const profileName = selected.dataset.contactName || '';
+        const profileEmail = selected.dataset.contactEmail || '';
+        if (profileName) {
+          nameInput.value = profileName;
+        }
+        if (profileEmail) {
+          emailInput.value = profileEmail;
+        }
+      };
+      siteSelect.addEventListener('change', applyProfile);
+    })();
+  </script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -2320,6 +2435,65 @@ INVOICE_EDIT_TEMPLATE = """
           <div class="mt-4 d-flex gap-2">
             <button type="submit" class="btn btn-primary">Save Changes</button>
             <a href="{{ url_for('admin_view_invoice', invoice_id=invoice.id) }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+CONTRACT_BUILDER_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — Contract PDF</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h1 class="h4 mb-0">Client contract PDF</h1>
+      <a href="{{ url_for('admin_sites') }}" class="btn btn-outline-secondary">Back to manage sites</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mb-3">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Upload contract PDF</label>
+              <input type="file" class="form-control" name="contract_pdf" accept="application/pdf,.pdf">
+              <div class="form-text">Optional if server template exists at uploads/contract_template.pdf. If uploaded, this file is used.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Name des partners</label>
+              <input type="text" class="form-control" name="partner_name" value="{{ partner_name or '' }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Firma</label>
+              <input type="text" class="form-control" name="company_name" value="{{ company_name or '' }}" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Tel./ Fax / E-Mail</label>
+              <input type="text" class="form-control" name="contact_details" value="{{ contact_details or '' }}" required>
+            </div>
+          </div>
+          <div class="mt-4">
+            <button type="submit" class="btn btn-primary">Download PDF</button>
           </div>
         </form>
       </div>
@@ -4252,6 +4426,9 @@ SCHEDULE_TEMPLATE = """
             {% else %}
               <span class="insight-badge">All employees</span>
             {% endif %}
+            {% if selected_site %}
+              <span class="insight-badge">Site: {{ selected_site.name }}</span>
+            {% endif %}
           </div>
           <form method="get" action="{{ url_for('schedule_dashboard') }}" class="filter-toolbar">
             <div>
@@ -4260,6 +4437,15 @@ SCHEDULE_TEMPLATE = """
                 <option value="">All employees</option>
                 {% for emp in employees %}
                   <option value="{{ emp.id }}" {% if selected_employee_id == emp.id %}selected{% endif %}>{{ emp.name }}{% if emp.role %} — {{ emp.role }}{% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="form-label" for="filter_site_id">Focus on site</label>
+              <select class="form-select form-select-sm" id="filter_site_id" name="site_id" onchange="this.form.submit()">
+                <option value="">All sites</option>
+                {% for site in sites %}
+                  <option value="{{ site.id }}" {% if selected_site_id == site.id %}selected{% endif %}>{{ site.name }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -4513,6 +4699,7 @@ try:
   from reportlab.lib.pagesizes import A4, landscape
   from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
   from reportlab.lib.units import inch
+  from reportlab.pdfgen import canvas
   from reportlab.platypus import (
     Image,
     Paragraph,
@@ -4529,6 +4716,7 @@ except Exception:  # pragma: no cover - degrade gracefully when missing
   ParagraphStyle = None
   getSampleStyleSheet = None
   inch = None
+  canvas = None
   Image = None
   Paragraph = None
   SimpleDocTemplate = None
@@ -4536,6 +4724,20 @@ except Exception:  # pragma: no cover - degrade gracefully when missing
   Table = None
   TableStyle = None
   REPORTLAB_AVAILABLE = False
+
+try:
+  from pypdf import PdfReader, PdfWriter
+  PYPDF_AVAILABLE = True
+except Exception:  # pragma: no cover - optional dependency
+  PdfReader = None
+  PdfWriter = None
+  PYPDF_AVAILABLE = False
+
+try:
+  from pypdf.generic import BooleanObject, NameObject
+except Exception:  # pragma: no cover - optional dependency / version differences
+  BooleanObject = None
+  NameObject = None
 
 try:
   from openai import OpenAI
@@ -4747,6 +4949,9 @@ class Site(Base):
   name = Column(String(255), nullable=False)
   address = Column(String(255))
   hourly_rate = Column(Float, nullable=False, default=50.0)
+  contact_name = Column(String(255))
+  contact_email = Column(String(255))
+  is_active = Column(Boolean, nullable=False, default=True)
 
   shifts = relationship("Shift", back_populates="site", cascade="all, delete-orphan")
 
@@ -4841,6 +5046,9 @@ _ensure_sqlite_column(engine, "shifts", "clock_out_lng", "FLOAT")
 _ensure_sqlite_column(engine, "shifts", "before_photo_path", "TEXT")
 _ensure_sqlite_column(engine, "shifts", "after_photo_path", "TEXT")
 _ensure_sqlite_column(engine, "sites", "hourly_rate", "FLOAT")
+_ensure_sqlite_column(engine, "sites", "contact_name", "TEXT")
+_ensure_sqlite_column(engine, "sites", "contact_email", "TEXT")
+_ensure_sqlite_column(engine, "sites", "is_active", "INTEGER NOT NULL DEFAULT 1")
 _ensure_sqlite_column(engine, "invoices", "paid_at", "DATETIME")
 _ensure_sqlite_column(engine, "invoices", "billing_month", "TEXT")
 
@@ -5254,6 +5462,7 @@ def _load_schedule_context(db, week_days):
         key = (s.employee_id, s.day)
         shift_info = {
             'id': s.id,
+        'site_id': s.site_id,
             'label': f"{s.site.name} — {s.site.address or 'No address'} ({s.start_time.strftime('%H:%M')}–{s.end_time.strftime('%H:%M')})"
         }
         matrix.setdefault(key, []).append(shift_info)
@@ -5969,7 +6178,7 @@ def _employee_redirect_target(next_url: str | None) -> str:
 def login():
   next_url = _safe_next_url()
   if session.get("role") == "admin" and session.get("auth"):
-    return redirect(next_url or url_for("index"))
+    return redirect(next_url or url_for("admin_dashboard"))
   if session.get("role") == "employee" and session.get("employee_id"):
     return redirect(_employee_redirect_target(next_url))
 
@@ -5983,7 +6192,7 @@ def login():
         session["auth"] = True
         session["role"] = "admin"
         session["user"] = username_raw
-        return redirect(next_url or url_for("index"))
+        return redirect(next_url or url_for("admin_dashboard"))
 
       normalized = username_raw.lower()
       db = SessionLocal()
@@ -6420,6 +6629,7 @@ def schedule_dashboard():
             return redirect(url_for("schedule_dashboard"))
 
         selected_employee_id = request.args.get("employee_id", type=int)
+        selected_site_id = request.args.get("site_id", type=int)
         weeks = request.args.get("weeks", default=1, type=int) or 1
         weeks = max(1, min(weeks, 12))
         start_date_str = request.args.get("start_date")
@@ -6434,11 +6644,21 @@ def schedule_dashboard():
         employees, sites, matrix = _load_schedule_context(db, week_days)
 
         selected_employee = None
+        selected_site = None
         visible_employees = employees
         if selected_employee_id:
             selected_employee = next((e for e in employees if e.id == selected_employee_id), None)
             if selected_employee:
                 visible_employees = [selected_employee]
+
+        filtered_matrix = matrix
+        if selected_site_id:
+          selected_site = next((s for s in sites if s.id == selected_site_id), None)
+          filtered_matrix = {}
+          for key, shifts in matrix.items():
+            matched = [shift for shift in shifts if shift.get("site_id") == selected_site_id]
+            if matched:
+              filtered_matrix[key] = matched
 
         pdf_params = {"week": week_days[0].isoformat()}
         pdf_params["weeks"] = weeks
@@ -6464,10 +6684,12 @@ def schedule_dashboard():
             week_days=week_days,
             weeks=weeks,
             start_date=start_date_val.isoformat() if start_date_val else "",
-            cells=matrix,
+            cells=filtered_matrix,
             reportlab_available=REPORTLAB_AVAILABLE,
             selected_employee_id=selected_employee_id,
+            selected_site_id=selected_site_id,
             selected_employee=selected_employee,
+            selected_site=selected_site,
             pdf_url=pdf_url,
             hours_pdf_url=hours_pdf_url,
             active_page="schedule",
@@ -6768,6 +6990,9 @@ def admin_sites():
           name = (request.form.get("name") or "").strip()
           address = (request.form.get("address") or "").strip()
           hourly_rate = request.form.get("hourly_rate", type=float)
+          contact_name = (request.form.get("contact_name") or "").strip() or None
+          contact_email = (request.form.get("contact_email") or "").strip() or None
+          is_active = (request.form.get("is_active", "1") or "1").strip() != "0"
           if name and address:
             if _site_exists(db, name, address):
               flash(
@@ -6775,7 +7000,16 @@ def admin_sites():
                 "warning",
               )
             else:
-              db.add(Site(name=name, address=address, hourly_rate=hourly_rate or 50.0))
+              db.add(
+                Site(
+                  name=name,
+                  address=address,
+                  hourly_rate=hourly_rate or 50.0,
+                  contact_name=contact_name,
+                  contact_email=contact_email,
+                  is_active=is_active,
+                )
+              )
               db.commit()
         elif action == "update" and site_id:
           site = db.get(Site, int(site_id))
@@ -6783,6 +7017,9 @@ def admin_sites():
             name = (request.form.get("name") or "").strip() or site.name
             address = (request.form.get("address") or "").strip() or site.address
             hourly_rate = request.form.get("hourly_rate", type=float)
+            contact_name = (request.form.get("contact_name") or "").strip() or None
+            contact_email = (request.form.get("contact_email") or "").strip() or None
+            is_active = (request.form.get("is_active", "1") or "1").strip() != "0"
             if _site_exists(db, name, address, exclude_id=site.id):
               flash(
                 "Another site already uses that name and address.",
@@ -6793,6 +7030,9 @@ def admin_sites():
               site.address = address
               if hourly_rate is not None:
                 site.hourly_rate = hourly_rate
+              site.contact_name = contact_name
+              site.contact_email = contact_email
+              site.is_active = is_active
               db.commit()
         elif action == "delete" and site_id:
           site = db.get(Site, int(site_id))
@@ -6804,8 +7044,19 @@ def admin_sites():
         names = request.form.getlist("site_name")
         addresses = request.form.getlist("site_address")
         hourly_rates = request.form.getlist("site_hourly_rate")
+        contact_names = request.form.getlist("site_contact_name")
+        contact_emails = request.form.getlist("site_contact_email")
+        active_flags = request.form.getlist("site_is_active")
         seen_pairs = set()
-        for sid, n, a, rate in zip(ids, names, addresses, hourly_rates):
+        for sid, n, a, rate, contact_name, contact_email, active_flag in zip(
+          ids,
+          names,
+          addresses,
+          hourly_rates,
+          contact_names,
+          contact_emails,
+          active_flags,
+        ):
           n = (n or "").strip()
           a = (a or "").strip()
           if not sid or not n or not a:
@@ -6824,6 +7075,9 @@ def admin_sites():
               parsed_rate = None
             if parsed_rate is not None:
               site.hourly_rate = parsed_rate
+            site.contact_name = (contact_name or "").strip() or None
+            site.contact_email = (contact_email or "").strip() or None
+            site.is_active = (active_flag or "1").strip() != "0"
         db.commit()
 
       return redirect(redirect_url)
@@ -6866,6 +7120,13 @@ def admin_sites():
     next_page = page + 1 if has_next else None
 
     total_sites = db.query(func.count(Site.id)).scalar() or 0
+    active_sites_total = (
+      db.query(func.count(Site.id))
+      .filter(or_(Site.is_active.is_(True), Site.is_active.is_(None)))
+      .scalar()
+      or 0
+    )
+    inactive_sites_total = max(total_sites - active_sites_total, 0)
     site_ids = [site.id for site in sites if site.id]
     shift_counts: dict[int, int] = {}
     if site_ids:
@@ -6888,6 +7149,15 @@ def admin_sites():
       .all()
       if row[0] is not None
     }
+    active_site_ids = {
+      row[0]
+      for row in db.query(Site.id)
+      .filter(or_(Site.is_active.is_(True), Site.is_active.is_(None)))
+      .all()
+      if row[0] is not None
+    }
+    covered_active_site_ids = covered_site_ids.intersection(active_site_ids)
+    unassigned_active_sites = max(active_sites_total - len(covered_active_site_ids), 0)
 
     return render_template_string(
       ADMIN_SITES_TEMPLATE,
@@ -6897,7 +7167,9 @@ def admin_sites():
       shift_counts=shift_counts,
       total_sites=total_sites,
       filtered_sites=filtered_sites,
-      covered_sites=len(covered_site_ids),
+      covered_sites=len(covered_active_site_ids),
+      inactive_sites=inactive_sites_total,
+      unassigned_active_sites=unassigned_active_sites,
       page=page,
       per_page=per_page,
       total_pages=total_pages,
@@ -7112,7 +7384,13 @@ def hours_pdf():
   )
 
 
-@app.route("/", methods=["GET", "POST"])
+@app.route("/", methods=["GET"])
+@login_required
+def home():
+  return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/crawler", methods=["GET", "POST"])
 @login_required
 def index():
     if request.method == "GET":
@@ -7204,25 +7482,37 @@ def gpt_assistant():
 # --- Invoice functionality --------------------------------------------------
 
 def _format_invoice_number(invoice_number: str | None) -> str:
-  """Return a shorter, human-friendly invoice number for display."""
+  """Return invoice number for display."""
   value = (invoice_number or "").strip()
   if not value:
     return ""
-
-  if re.fullmatch(r"INV-\d{8,20}", value):
-    return f"INV-{value[-6:]}"
-  if re.fullmatch(r"\d{8,20}", value):
-    return value[-6:]
   return value
 
 
 def _generate_invoice_number(session_obj) -> str:
-  """Generate a short unique invoice number."""
-  while True:
-    candidate = f"INV-{secrets.token_hex(3).upper()}"
-    exists = session_obj.query(Invoice.id).filter(Invoice.invoice_number == candidate).first()
-    if not exists:
-      return candidate
+  """Generate continuous invoice numbers: RE-1000, RE-1001, ..."""
+  start_number = 1000
+  highest = start_number - 1
+
+  existing_numbers = session_obj.query(Invoice.invoice_number).all()
+  for (raw_number,) in existing_numbers:
+    value = (raw_number or "").strip().upper()
+    match = re.fullmatch(r"RE-(\d+)", value)
+    if not match:
+      continue
+    number = int(match.group(1))
+    if number > highest:
+      highest = number
+
+  next_number = max(start_number, highest + 1)
+  candidate = f"RE-{next_number}"
+
+  # Safety check in case of rare race conditions.
+  while session_obj.query(Invoice.id).filter(Invoice.invoice_number == candidate).first():
+    next_number += 1
+    candidate = f"RE-{next_number}"
+
+  return candidate
 
 
 def _previous_month_range(reference_day: date | None = None) -> tuple[date, date]:
@@ -7279,8 +7569,8 @@ def _auto_generate_monthly_invoices(
     invoice = Invoice(
       invoice_number=_generate_invoice_number(session_obj),
       site_id=site.id,
-      site_contact_name="",
-      site_contact_email="",
+      site_contact_name=(site.contact_name or "").strip(),
+      site_contact_email=(site.contact_email or "").strip(),
       hourly_rate=hourly_rate,
       tax_rate=tax_decimal,
       total_hours=total_hours,
@@ -7410,6 +7700,20 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     
     # Customer number (using site_id as customer number)
     customer_number = str(invoice.site_id) if invoice.site_id else "1000"
+
+    # Client profile for recipient block
+    recipient_name = (
+      (invoice.site_contact_name or "").strip()
+      or (invoice.site.name if invoice.site else "")
+      or ""
+    )
+    recipient_address_raw = (invoice.site.address if invoice.site and invoice.site.address else "").strip()
+    recipient_address_lines: list[str] = []
+    if recipient_address_raw:
+      if "\n" in recipient_address_raw:
+        recipient_address_lines = [line.strip() for line in recipient_address_raw.splitlines() if line.strip()]
+      else:
+        recipient_address_lines = [part.strip() for part in recipient_address_raw.split(",") if part.strip()]
     
     # Logo path (drawn on canvas to avoid layout shifts)
     logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'stafflogo.png')
@@ -7446,11 +7750,11 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
         right_details_table
       ],
       [
-        Paragraph('<font size=10>Sebastjian Kerclj</font>', address_style),
+        Paragraph(f'<font size=10>{recipient_name}</font>', address_style),
         ''
       ],
       [
-        Paragraph('<font size=10>Brunnweg 12/15/3<br/>1050 Wien<br/>Österreich</font>', address_style),
+        Paragraph(f'<font size=10>{"<br/>".join(recipient_address_lines) if recipient_address_lines else ""}</font>', address_style),
         ''
       ],
     ]
@@ -7586,10 +7890,10 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     # Build PDF
     def _draw_header_footer(canvas_obj, doc_obj):
       canvas_obj.saveState()
-      canvas_obj.setFont('Helvetica', 7)
+      canvas_obj.setFont('Helvetica', 6.6)
       canvas_obj.setFillColor(colors.HexColor('#666666'))
 
-      left_column = [
+      col_1 = [
         "Sebastijan Aleksandar Kerculj",
         "Staffconnecting",
         "Simmeringer Hauptstraße 24",
@@ -7597,16 +7901,20 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
         "Österreich",
       ]
 
-      middle_column = [
+      col_2 = [
         "Tel. 06766300167",
         "E-Mail s.kerculj@staffconnecting.at",
+      ]
+
+      col_3 = [
         "Amtsgericht Wien",
         "USt.-ID ATU78448967",
         "Steuer-Nr. 04 544/9573",
-        "Geschäftsführung Sebastijan Aleksandar Kerculj",
+        "Geschäftsführung Sebastijan Aleksandar",
+        "Kerculj",
       ]
 
-      right_column = [
+      col_4 = [
         "Bank UniCredit Bank Austria AG",
         "Konto 51488162831",
         "BLZ 12000",
@@ -7614,20 +7922,24 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
         "BIC BKAUATWWXXX",
       ]
 
-      line_height = 9
-      bottom_y = doc_obj.bottomMargin - 6
-      left_x = doc_obj.leftMargin
-      middle_x = doc_obj.leftMargin + 2.3 * inch
-      right_x = doc_obj.leftMargin + 4.6 * inch
+      line_height = 8
+      top_y = doc_obj.bottomMargin + 32
 
-      for idx, line in enumerate(reversed(left_column)):
-        canvas_obj.drawString(left_x, bottom_y + idx * line_height, line)
+      col_1_x = doc_obj.leftMargin
+      col_2_x = doc_obj.leftMargin + 1.85 * inch
+      col_3_x = doc_obj.leftMargin + 3.70 * inch
+      col_4_x = doc_obj.leftMargin + 5.45 * inch
 
-      for idx, line in enumerate(reversed(middle_column)):
-        canvas_obj.drawString(middle_x, bottom_y + idx * line_height, line)
+      def _draw_column(lines: list[str], x_pos: float) -> None:
+        y = top_y
+        for line in lines:
+          canvas_obj.drawString(x_pos, y, line)
+          y -= line_height
 
-      for idx, line in enumerate(reversed(right_column)):
-        canvas_obj.drawString(right_x, bottom_y + idx * line_height, line)
+      _draw_column(col_1, col_1_x)
+      _draw_column(col_2, col_2_x)
+      _draw_column(col_3, col_3_x)
+      _draw_column(col_4, col_4_x)
 
       canvas_obj.restoreState()
 
@@ -7636,8 +7948,8 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     return pdf_buffer
 
 
-def send_invoice_email(invoice: Invoice, pdf_buffer: io.BytesIO) -> bool:
-    """Send invoice PDF via email. Requires email configuration."""
+def send_invoice_email(invoice: Invoice, pdf_buffer: io.BytesIO) -> Tuple[bool, str]:
+    """Send invoice PDF via email. Returns (success, message)."""
     try:
         import smtplib
         from email.mime.multipart import MIMEMultipart
@@ -7645,23 +7957,46 @@ def send_invoice_email(invoice: Invoice, pdf_buffer: io.BytesIO) -> bool:
         from email.mime.text import MIMEText
         from email import encoders
         
-        smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+        smtp_server = (os.getenv("SMTP_SERVER") or os.getenv("SMTP_HOST") or "smtp.gmail.com").strip()
         smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        sender_email = os.getenv("SENDER_EMAIL")
-        sender_password = os.getenv("SENDER_PASSWORD")
-        
-        if not sender_email or not sender_password:
-            app.logger.warning("Email configuration not set (SENDER_EMAIL, SENDER_PASSWORD)")
-            return False
+
+        smtp_secure_raw = (os.getenv("SMTP_SECURE") or "").strip().lower()
+        if smtp_secure_raw:
+            smtp_use_ssl = smtp_secure_raw in {"1", "true", "yes", "on"}
+            smtp_use_tls = not smtp_use_ssl
+        else:
+            smtp_use_tls = (os.getenv("SMTP_USE_TLS", "true") or "").strip().lower() in {"1", "true", "yes", "on"}
+            smtp_use_ssl = (os.getenv("SMTP_USE_SSL", "false") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+        sender_email = (
+            os.getenv("SENDER_EMAIL")
+            or os.getenv("SMTP_FROM_EMAIL")
+            or os.getenv("SMTP_FROM")
+            or ""
+        ).strip()
+        sender_name = (os.getenv("SENDER_NAME") or os.getenv("SMTP_FROM_NAME") or "").strip()
+        smtp_username = (os.getenv("SMTP_USERNAME") or os.getenv("SMTP_USER") or sender_email).strip()
+        smtp_password = (
+            os.getenv("SMTP_PASSWORD")
+            or os.getenv("SMTP_PASS")
+            or os.getenv("SENDER_PASSWORD")
+            or ""
+        ).strip()
+
+        if not sender_email or not smtp_password:
+            msg = "Email configuration missing. Set sender email and SMTP password."
+            app.logger.warning(msg)
+            return False, msg
         
         recipient_email = invoice.site_contact_email
         if not recipient_email:
-            app.logger.warning(f"No email address for invoice {invoice.invoice_number}")
-            return False
+            msg = f"No recipient email set for invoice {invoice.invoice_number}."
+            app.logger.warning(msg)
+            return False, msg
         
         # Create message
         msg = MIMEMultipart()
-        msg['From'] = sender_email
+        msg['From'] = f"{sender_name} <{sender_email}>" if sender_name else sender_email
         msg['To'] = recipient_email
         msg['Subject'] = f'Invoice {invoice.invoice_number} - {invoice.site.name}'
         
@@ -7696,20 +8031,223 @@ Your Company
         msg.attach(attachment)
         
         # Send email
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
+        if smtp_use_ssl:
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+        else:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+
+        with server:
+            if smtp_use_tls and not smtp_use_ssl:
+                server.starttls()
+            server.login(smtp_username, smtp_password)
             server.send_message(msg)
         
         app.logger.info(f"Invoice {invoice.invoice_number} sent to {recipient_email}")
-        return True
+        return True, f"Invoice {invoice.invoice_number} sent to {recipient_email}"
         
     except Exception as e:
         app.logger.error(f"Failed to send invoice email: {e}")
-        return False
+        return False, str(e)
+
+
+def generate_contract_pdf(
+  partner_name: str,
+  company_name: str,
+  contact_details: str,
+  template_pdf_bytes: bytes | None = None,
+) -> io.BytesIO:
+    """Generate a client contract PDF with editable form inputs applied."""
+    if not REPORTLAB_AVAILABLE:
+        raise ValueError("reportlab is required for PDF generation")
+
+    partner_name = (partner_name or "").strip()
+    company_name = (company_name or "").strip()
+    contact_details = (contact_details or "").strip()
+
+    overlay_buffer = io.BytesIO()
+    c = canvas.Canvas(overlay_buffer, pagesize=A4)
+    _, page_height = A4
+
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, page_height - 70, "Client Contract")
+
+    c.setFont("Helvetica", 10)
+    c.drawString(50, page_height - 105, f"Name des partners: {partner_name}")
+    c.drawString(50, page_height - 125, f"Firma: {company_name}")
+    c.drawString(50, page_height - 145, f"Tel./ Fax / E-Mail: {contact_details}")
+
+    c.setFont("Helvetica-Oblique", 8)
+    c.drawString(
+      50,
+      35,
+      f"Generated on {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    )
+    c.save()
+    overlay_buffer.seek(0)
+
+    template_reader = None
+    if template_pdf_bytes and PYPDF_AVAILABLE:
+      template_reader = PdfReader(io.BytesIO(template_pdf_bytes))
+    elif PYPDF_AVAILABLE:
+      template_path = os.path.join(APP_ROOT, "uploads", "contract_template.pdf")
+      if os.path.exists(template_path):
+        template_reader = PdfReader(template_path)
+
+    def _contains_any(value: str, tokens: list[str]) -> bool:
+      lowered = (value or "").lower()
+      return any(token in lowered for token in tokens)
+
+    # Preferred path: update true AcroForm fields (fillable PDF)
+    if template_reader and PYPDF_AVAILABLE:
+      fields = template_reader.get_fields() or {}
+      field_names = list(fields.keys())
+
+      field_value_map: dict[str, str] = {}
+
+      for fname in field_names:
+        # Raw internal field name from the PDF
+        raw = (fname or "").strip()
+        fl = raw.lower()
+
+        # 1) Match common exact names first (your typical German labels)
+        if fl in {
+          "name des partners",
+          "name_des_partners",
+          "name_des partners",
+        }:
+          field_value_map[fname] = partner_name
+          continue
+        elif fl in {
+          "firma",
+          "firma:",
+          "firma_name",
+          "company",
+          "company_name",
+        }:
+          field_value_map[fname] = company_name
+          continue
+        elif fl in {
+          "tel./ fax / e-mail",
+          "tel./ fax / e-mail:",
+          "kontakt",
+          "kontakt_daten",
+          "contact_details",
+        }:
+          field_value_map[fname] = contact_details
+          continue
+
+        # 2) Fallback: heuristic matching based on substrings
+        if _contains_any(fl, ["partner", "ansprech", "name des partners"]) and "firma" not in fl:
+          field_value_map[fname] = partner_name
+        elif _contains_any(fl, ["firma", "company"]):
+          field_value_map[fname] = company_name
+        elif _contains_any(fl, ["tel", "fax", "mail", "email", "e-mail", "kontakt", "contact"]):
+          field_value_map[fname] = contact_details
+
+      if field_value_map:
+        writer = PdfWriter()
+        writer.clone_document_from_reader(template_reader)
+        for page in writer.pages:
+          writer.update_page_form_field_values(page, field_value_map, auto_regenerate=False)
+
+        # Improve compatibility with viewers that rely on appearances
+        if NameObject is not None and BooleanObject is not None and "/AcroForm" in writer._root_object:
+          writer._root_object["/AcroForm"].update(
+            {NameObject("/NeedAppearances"): BooleanObject(True)}
+          )
+
+        out = io.BytesIO()
+        writer.write(out)
+        out.seek(0)
+        return out
+
+    if template_reader and PYPDF_AVAILABLE:
+      overlay_reader = PdfReader(overlay_buffer)
+      writer = PdfWriter()
+
+      if template_reader.pages:
+        target_index = 2 if len(template_reader.pages) >= 3 else 0
+        for idx, page in enumerate(template_reader.pages):
+          if idx == target_index:
+            page.merge_page(overlay_reader.pages[0])
+          writer.add_page(page)
+      else:
+        for page in overlay_reader.pages:
+          writer.add_page(page)
+
+      final_pdf = io.BytesIO()
+      writer.write(final_pdf)
+      final_pdf.seek(0)
+      return final_pdf
+
+    # Fallback: standalone generated PDF only
+    return overlay_buffer
 
 
 # --- Invoice Routes --------------------------------------------------------
+
+@app.route("/admin/contracts", methods=["GET", "POST"])
+@login_required
+def admin_contract_builder():
+    if request.method == "POST":
+        partner_name = (request.form.get("partner_name") or "").strip()
+        company_name = (request.form.get("company_name") or "").strip()
+        contact_details = (request.form.get("contact_details") or "").strip()
+        contract_pdf_file = request.files.get("contract_pdf")
+        template_path = os.path.join(APP_ROOT, "uploads", "contract_template.pdf")
+
+        if not partner_name or not company_name or not contact_details:
+            flash("Please fill all contract fields.", "warning")
+            return render_template_string(
+              CONTRACT_BUILDER_TEMPLATE,
+              partner_name=partner_name,
+              company_name=company_name,
+              contact_details=contact_details,
+            )
+
+        uploaded_pdf_bytes = None
+        if contract_pdf_file and (contract_pdf_file.filename or "").strip():
+            if not (contract_pdf_file.filename or "").lower().endswith(".pdf"):
+                flash("Please upload a valid PDF contract file.", "warning")
+                return render_template_string(
+                  CONTRACT_BUILDER_TEMPLATE,
+                  partner_name=partner_name,
+                  company_name=company_name,
+                  contact_details=contact_details,
+                )
+            uploaded_pdf_bytes = contract_pdf_file.read()
+            if not uploaded_pdf_bytes:
+                flash("Uploaded PDF is empty.", "warning")
+                return render_template_string(
+                  CONTRACT_BUILDER_TEMPLATE,
+                  partner_name=partner_name,
+                  company_name=company_name,
+                  contact_details=contact_details,
+                )
+        elif not os.path.exists(template_path):
+            flash("Upload a contract PDF or place a template at uploads/contract_template.pdf.", "warning")
+            return render_template_string(
+              CONTRACT_BUILDER_TEMPLATE,
+              partner_name=partner_name,
+              company_name=company_name,
+              contact_details=contact_details,
+            )
+
+        pdf_buffer = generate_contract_pdf(
+          partner_name,
+          company_name,
+          contact_details,
+          template_pdf_bytes=uploaded_pdf_bytes,
+        )
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        return send_file(
+          pdf_buffer,
+          mimetype="application/pdf",
+          as_attachment=True,
+          download_name=f"client_contract_{timestamp}.pdf",
+        )
+
+    return render_template_string(CONTRACT_BUILDER_TEMPLATE)
 
 @app.route("/admin/invoices/generate-monthly", methods=["POST"])
 @login_required
@@ -7799,8 +8337,8 @@ def admin_create_invoice():
     try:
         if request.method == "POST":
             site_id = request.form.get("site_id", type=int)
-            site_contact_name = request.form.get("site_contact_name", "")
-            site_contact_email = request.form.get("site_contact_email", "")
+            site_contact_name = (request.form.get("site_contact_name") or "").strip()
+            site_contact_email = (request.form.get("site_contact_email") or "").strip()
             tax_rate = request.form.get("tax_rate", type=float, default=0.0)
             invoice_month = (request.form.get("invoice_month") or "").strip()
             notes = request.form.get("notes", "")
@@ -7810,6 +8348,11 @@ def admin_create_invoice():
             if not site:
                 flash("Please select a valid site.", "warning")
                 return redirect(url_for("admin_create_invoice"))
+
+            if not site_contact_name:
+                site_contact_name = (site.contact_name or "").strip()
+            if not site_contact_email:
+                site_contact_email = (site.contact_email or "").strip()
 
             month_range = _month_range(invoice_month)
             if not month_range:
@@ -8017,16 +8560,127 @@ def admin_send_invoice_email(invoice_id):
             return "Invoice not found", 404
         
         pdf_buffer = generate_invoice_pdf(invoice)
-        success = send_invoice_email(invoice, pdf_buffer)
+        success, detail = send_invoice_email(invoice, pdf_buffer)
         
         if success:
             invoice.status = "sent"
             session_obj.commit()
             flash(f"Invoice {invoice.invoice_number} sent to {invoice.site_contact_email}", "success")
         else:
-            flash("Failed to send email. Check email configuration.", "error")
+          flash(f"Failed to send email: {detail}", "error")
         
         return redirect(url_for("admin_view_invoice", invoice_id=invoice_id))
+    finally:
+        session_obj.close()
+
+@app.route("/admin/invoices/send-bulk", methods=["POST"])
+@login_required
+def admin_send_bulk_invoice_emails():
+    """Send multiple selected invoices by email."""
+    session_obj = SessionLocal()
+    try:
+        invoice_ids_raw = request.form.getlist("invoice_ids")
+        invoice_ids: list[int] = []
+        seen: set[int] = set()
+        for raw in invoice_ids_raw:
+            try:
+                invoice_id = int(raw)
+            except (TypeError, ValueError):
+                continue
+            if invoice_id in seen:
+                continue
+            seen.add(invoice_id)
+            invoice_ids.append(invoice_id)
+
+        if not invoice_ids:
+            flash("Select at least one invoice to send.", "warning")
+            return redirect(url_for("admin_invoices"))
+
+        invoices = (
+            session_obj.query(Invoice)
+            .options(joinedload(Invoice.site))
+            .filter(Invoice.id.in_(invoice_ids))
+            .all()
+        )
+
+        sent_count = 0
+        failed_count = 0
+        skipped_count = 0
+        failure_examples: list[str] = []
+
+        for invoice in invoices:
+            recipient = (invoice.site_contact_email or "").strip()
+            if not recipient:
+                skipped_count += 1
+                continue
+
+            try:
+                pdf_buffer = generate_invoice_pdf(invoice)
+            except Exception as exc:
+                failed_count += 1
+                if len(failure_examples) < 3:
+                    failure_examples.append(f"{invoice.invoice_number}: PDF error ({exc})")
+                continue
+
+            success, detail = send_invoice_email(invoice, pdf_buffer)
+            if success:
+                if invoice.status != "paid":
+                    invoice.status = "sent"
+                sent_count += 1
+            else:
+                failed_count += 1
+                if len(failure_examples) < 3:
+                    failure_examples.append(f"{invoice.invoice_number}: {detail}")
+
+        session_obj.commit()
+
+        flash(
+            f"Bulk email result — sent: {sent_count}, skipped (no email): {skipped_count}, failed: {failed_count}.",
+            "success" if failed_count == 0 else "warning",
+        )
+        if failure_examples:
+            flash("; ".join(failure_examples), "warning")
+
+        return redirect(url_for("admin_invoices"))
+    finally:
+        session_obj.close()
+
+@app.route("/admin/invoices/delete-bulk", methods=["POST"])
+@login_required
+def admin_delete_bulk_invoices():
+    """Delete multiple selected invoices."""
+    session_obj = SessionLocal()
+    try:
+        invoice_ids_raw = request.form.getlist("invoice_ids")
+        invoice_ids: list[int] = []
+        seen: set[int] = set()
+        for raw in invoice_ids_raw:
+            try:
+                invoice_id = int(raw)
+            except (TypeError, ValueError):
+                continue
+            if invoice_id in seen:
+                continue
+            seen.add(invoice_id)
+            invoice_ids.append(invoice_id)
+
+        if not invoice_ids:
+            flash("Select at least one invoice to delete.", "warning")
+            return redirect(url_for("admin_invoices"))
+
+        invoices = session_obj.query(Invoice).filter(Invoice.id.in_(invoice_ids)).all()
+        if not invoices:
+            flash("No matching invoices found to delete.", "warning")
+            return redirect(url_for("admin_invoices"))
+
+        deleted_count = 0
+        for invoice in invoices:
+            session_obj.delete(invoice)
+            deleted_count += 1
+
+        session_obj.commit()
+        flash(f"Deleted {deleted_count} invoice(s).", "success")
+        return redirect(url_for("admin_invoices"))
     finally:
         session_obj.close()
 

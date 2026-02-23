@@ -58,7 +58,17 @@ Create a `.env` file on your production server:
 DATABASE_URL=sqlite:///schedule.db
 AUTH_USERNAME=your_admin_username
 AUTH_PASSWORD=your_secure_password
-SECRET_KEY=your-secret-key-here
+FLASK_SECRET_KEY=your-secret-key-here
+
+# SMTP (invoice emails)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USE_TLS=true
+SMTP_USE_SSL=false
+SMTP_USERNAME=your-email@domain.com
+SMTP_PASSWORD=your-smtp-password-or-app-password
+SENDER_EMAIL=your-email@domain.com
+SENDER_NAME=Your Company Name
 ```
 
 ### Directory Structure
