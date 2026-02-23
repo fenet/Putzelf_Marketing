@@ -1,6 +1,5 @@
 .env
 schedule.db
-uploads/*
 !uploads/.gitkeep
 *.pyc
 __pycache__/
