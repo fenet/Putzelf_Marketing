@@ -62,6 +62,7 @@ ADMIN_TEMPLATE = """
   <link rel="manifest" href="/static/admin-manifest.json">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
   <style>
     :root {
       --accent: #0f766e;
@@ -623,9 +624,55 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                         <label class="form-label">Role</label>
                         <input type="text" class="form-control form-control-sm" name="role" value="{{ emp.role or '' }}">
                       </div>
+                      <div class="col-md-3 col-12">
+                        <label class="form-label">ZIP Code</label>
+                        <input type="text" class="form-control form-control-sm" name="profile_zip_code" value="{{ emp.profile_zip_code or '' }}">
+                      </div>
+                      <div class="col-md-3 col-12">
+                        <label class="form-label">City</label>
+                        <input type="text" class="form-control form-control-sm" name="profile_city" value="{{ emp.profile_city or '' }}">
+                      </div>
+                      <div class="col-md-3 col-12">
+                        <label class="form-label">Beginning Date</label>
+                        <input type="text" class="form-control form-control-sm js-contract-date" name="profile_contract_start_date" value="{{ emp.profile_contract_start_date or '' }}" placeholder="YYYY-MM-DD">
+                      </div>
+                      <div class="col-md-3 col-12">
+                        <label class="form-label">End Date</label>
+                        <input type="text" class="form-control form-control-sm js-contract-date" name="profile_contract_end_date" value="{{ emp.profile_contract_end_date or '' }}" placeholder="YYYY-MM-DD">
+                      </div>
+                      <div class="col-md-4 col-12">
+                        <label class="form-label">Type of Employment</label>
+                        <input type="text" class="form-control form-control-sm" name="profile_employment_type" value="{{ emp.profile_employment_type or 'Reinigungskraft' }}">
+                      </div>
+                      <div class="col-md-3 col-12">
+                        <label class="form-label">Euros/hr</label>
+                        <input type="text" class="form-control form-control-sm" name="profile_euros_per_hour" value="{{ emp.profile_euros_per_hour or '12,37' }}" placeholder="12,37">
+                      </div>
+                      <div class="col-md-3 col-12">
+                        <label class="form-label">Working Hours</label>
+                        <input type="text" class="form-control form-control-sm" name="profile_working_hours" value="{{ emp.profile_working_hours or '3' }}" placeholder="3">
+                      </div>
+                      <div class="col-md-3 col-12">
+                        <label class="form-label">Work Type</label>
+                        <select class="form-select form-select-sm" name="profile_work_type">
+                          <option value="Teilzeit" {% if (emp.profile_work_type or 'Teilzeit') == 'Teilzeit' %}selected{% endif %}>Teilzeit</option>
+                          <option value="Vollzeit" {% if (emp.profile_work_type or '') == 'Vollzeit' %}selected{% endif %}>Vollzeit</option>
+                        </select>
+                      </div>
+                      <div class="col-md-4 col-12">
+                        <label class="form-label">Groups</label>
+                        <div class="input-group input-group-sm">
+                          <select class="form-select" name="profile_group_type">
+                            <option value="Lohngruppe" {% if (emp.profile_group_type or 'Lohngruppe') == 'Lohngruppe' %}selected{% endif %}>Lohngruppe</option>
+                            <option value="Verwendungsgruppe" {% if (emp.profile_group_type or '') == 'Verwendungsgruppe' %}selected{% endif %}>Verwendungsgruppe</option>
+                          </select>
+                          <input type="number" min="1" class="form-control" name="profile_group_number" value="{{ emp.profile_group_number or '6' }}" placeholder="6">
+                        </div>
+                      </div>
                       <div class="col-md-2 col-12 employee-action-buttons">
                         <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Save"><i class="bi bi-check2"></i></button>
                         <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ emp.name }}?')" title="Delete"><i class="bi bi-trash"></i></button>
+                        <a href="{{ url_for('admin_employee_docx', employee_id=emp.id) }}" class="btn btn-sm btn-outline-primary" title="Download employee document"><i class="bi bi-file-earmark-word"></i></a>
                       </div>
                     </form>
                     <div class="small text-secondary mt-2">Shifts scheduled: <span class="text-primary">{{ shift_counts.get(emp.id, 0) }}</span></div>
@@ -861,6 +908,17 @@ ADMIN_EMPLOYEES_TEMPLATE = """
         });
       });
     </script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script>
+    if (window.flatpickr) {
+      flatpickr('.js-contract-date', {
+        dateFormat: 'Y-m-d',
+        locale: {
+          firstDayOfWeek: 1,
+        },
+      });
+    }
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
@@ -5120,6 +5178,13 @@ except Exception:  # pragma: no cover - optional dependency / version difference
     NameObject = None
 
 try:
+  from docx import Document
+  PYTHON_DOCX_AVAILABLE = True
+except Exception:  # pragma: no cover - optional dependency
+  Document = None
+  PYTHON_DOCX_AVAILABLE = False
+
+try:
   from openai import OpenAI
 except ImportError:  # pragma: no cover - optional dependency
   OpenAI = None
@@ -5315,6 +5380,7 @@ ADMIN_PROFILES_TEMPLATE = """
   <title>Putzelf Marketing — Profiles</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
   <style>
     :root {
       --accent: #0f766e;
@@ -5474,8 +5540,53 @@ ADMIN_PROFILES_TEMPLATE = """
                           <input type="text" class="form-control form-control-sm" name="profile_emergency_phone" value="{{ emp.profile_emergency_phone or '' }}">
                         </div>
                         <div class="col-md-6 col-12">
-                          <label class="form-label">Address</label>
+                          <label class="form-label">Street / Address</label>
                           <input type="text" class="form-control form-control-sm" name="profile_address" value="{{ emp.profile_address or '' }}">
+                        </div>
+                        <div class="col-md-3 col-12">
+                          <label class="form-label">ZIP Code</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_zip_code" value="{{ emp.profile_zip_code or '' }}">
+                        </div>
+                        <div class="col-md-3 col-12">
+                          <label class="form-label">City</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_city" value="{{ emp.profile_city or '' }}">
+                        </div>
+                        <div class="col-md-3 col-12">
+                          <label class="form-label">Beginning Date</label>
+                          <input type="text" class="form-control form-control-sm js-contract-date" name="profile_contract_start_date" value="{{ emp.profile_contract_start_date or '' }}" placeholder="YYYY-MM-DD">
+                        </div>
+                        <div class="col-md-3 col-12">
+                          <label class="form-label">End Date</label>
+                          <input type="text" class="form-control form-control-sm js-contract-date" name="profile_contract_end_date" value="{{ emp.profile_contract_end_date or '' }}" placeholder="YYYY-MM-DD">
+                        </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Type of Employment</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_employment_type" value="{{ emp.profile_employment_type or 'Reinigungskraft' }}">
+                        </div>
+                        <div class="col-md-3 col-12">
+                          <label class="form-label">Euros/hr</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_euros_per_hour" value="{{ emp.profile_euros_per_hour or '12,37' }}" placeholder="12,37">
+                        </div>
+                        <div class="col-md-3 col-12">
+                          <label class="form-label">Working Hours</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_working_hours" value="{{ emp.profile_working_hours or '3' }}" placeholder="3">
+                        </div>
+                        <div class="col-md-3 col-12">
+                          <label class="form-label">Work Type</label>
+                          <select class="form-select form-select-sm" name="profile_work_type">
+                            <option value="Teilzeit" {% if (emp.profile_work_type or 'Teilzeit') == 'Teilzeit' %}selected{% endif %}>Teilzeit</option>
+                            <option value="Vollzeit" {% if (emp.profile_work_type or '') == 'Vollzeit' %}selected{% endif %}>Vollzeit</option>
+                          </select>
+                        </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Groups</label>
+                          <div class="input-group input-group-sm">
+                            <select class="form-select" name="profile_group_type">
+                              <option value="Lohngruppe" {% if (emp.profile_group_type or 'Lohngruppe') == 'Lohngruppe' %}selected{% endif %}>Lohngruppe</option>
+                              <option value="Verwendungsgruppe" {% if (emp.profile_group_type or '') == 'Verwendungsgruppe' %}selected{% endif %}>Verwendungsgruppe</option>
+                            </select>
+                            <input type="number" min="1" class="form-control" name="profile_group_number" value="{{ emp.profile_group_number or '6' }}" placeholder="6">
+                          </div>
                         </div>
                         <div class="col-md-6 col-12">
                           <label class="form-label">Notes</label>
@@ -5485,6 +5596,7 @@ ADMIN_PROFILES_TEMPLATE = """
                     </div>
                   </div>
                   <div class="mt-2 d-flex justify-content-end">
+                    <a href="{{ url_for('admin_employee_docx', employee_id=emp.id) }}" class="btn btn-sm btn-outline-primary icon-btn me-2" title="Download employee document"><i class="bi bi-file-earmark-word"></i></a>
                     <button class="btn btn-sm btn-primary icon-btn" type="submit" title="Save profile"><i class="bi bi-check2-circle"></i></button>
                   </div>
                 </form>
@@ -5550,6 +5662,10 @@ ADMIN_PROFILES_TEMPLATE = """
                           <label class="form-label">Customer ID</label>
                           <input type="text" class="form-control form-control-sm" name="profile_tax_id" value="{{ site.profile_tax_id or '' }}" readonly>
                         </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">VAT ID</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_vat_id" value="{{ site.profile_vat_id or '' }}" placeholder="ATU...">
+                        </div>
                         <div class="col-md-6 col-12">
                           <label class="form-label">Notes</label>
                           <input type="text" class="form-control form-control-sm" name="profile_notes" value="{{ site.profile_notes or '' }}">
@@ -5598,6 +5714,17 @@ ADMIN_PROFILES_TEMPLATE = """
       });
     });
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script>
+    if (window.flatpickr) {
+      flatpickr('.js-contract-date', {
+        dateFormat: 'Y-m-d',
+        locale: {
+          firstDayOfWeek: 1,
+        },
+      });
+    }
+  </script>
 </body>
 </html>
 """
@@ -5619,6 +5746,16 @@ class Employee(Base):
   profile_emergency_name = Column(String(255))
   profile_emergency_phone = Column(String(64))
   profile_address = Column(String(255))
+  profile_zip_code = Column(String(32))
+  profile_city = Column(String(128))
+  profile_contract_start_date = Column(String(10))
+  profile_contract_end_date = Column(String(10))
+  profile_employment_type = Column(String(128))
+  profile_group_type = Column(String(64))
+  profile_group_number = Column(String(16))
+  profile_euros_per_hour = Column(String(32))
+  profile_working_hours = Column(String(32))
+  profile_work_type = Column(String(32))
   profile_notes = Column(Text)
   profile_image_path = Column(String(255))
 
@@ -5640,6 +5777,7 @@ class Site(Base):
   profile_contact_email = Column(String(255))
   profile_phone = Column(String(64))
   profile_billing_address = Column(String(255))
+  profile_vat_id = Column(String(128))
   profile_tax_id = Column(String(128))
   profile_default_hourly_rate = Column(Float)
   profile_notes = Column(Text)
@@ -5738,6 +5876,16 @@ _ensure_sqlite_column(engine, "employees", "profile_phone", "TEXT")
 _ensure_sqlite_column(engine, "employees", "profile_emergency_name", "TEXT")
 _ensure_sqlite_column(engine, "employees", "profile_emergency_phone", "TEXT")
 _ensure_sqlite_column(engine, "employees", "profile_address", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_zip_code", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_city", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_contract_start_date", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_contract_end_date", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_employment_type", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_group_type", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_group_number", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_euros_per_hour", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_working_hours", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_work_type", "TEXT")
 _ensure_sqlite_column(engine, "employees", "profile_notes", "TEXT")
 _ensure_sqlite_column(engine, "employees", "profile_image_path", "TEXT")
 _ensure_sqlite_column(engine, "shifts", "instructions", "TEXT")
@@ -5758,6 +5906,7 @@ _ensure_sqlite_column(engine, "sites", "profile_contact_name", "TEXT")
 _ensure_sqlite_column(engine, "sites", "profile_contact_email", "TEXT")
 _ensure_sqlite_column(engine, "sites", "profile_phone", "TEXT")
 _ensure_sqlite_column(engine, "sites", "profile_billing_address", "TEXT")
+_ensure_sqlite_column(engine, "sites", "profile_vat_id", "TEXT")
 _ensure_sqlite_column(engine, "sites", "profile_tax_id", "TEXT")
 _ensure_sqlite_column(engine, "sites", "profile_default_hourly_rate", "FLOAT")
 _ensure_sqlite_column(engine, "sites", "profile_notes", "TEXT")
@@ -7507,9 +7656,33 @@ def admin_employees():
         if emp:
           name = (request.form.get("name") or "").strip()
           role = (request.form.get("role") or "").strip()
+          profile_zip_code = (request.form.get("profile_zip_code") or "").strip()
+          profile_city = (request.form.get("profile_city") or "").strip()
+          profile_contract_start_date = (request.form.get("profile_contract_start_date") or "").strip()
+          profile_contract_end_date = (request.form.get("profile_contract_end_date") or "").strip()
+          profile_employment_type = (request.form.get("profile_employment_type") or "").strip()
+          profile_euros_per_hour = (request.form.get("profile_euros_per_hour") or "").strip()
+          profile_working_hours = (request.form.get("profile_working_hours") or "").strip()
+          profile_work_type = (request.form.get("profile_work_type") or "").strip()
+          if profile_work_type not in {"Teilzeit", "Vollzeit"}:
+            profile_work_type = "Teilzeit"
+          profile_group_type = (request.form.get("profile_group_type") or "").strip()
+          profile_group_number = (request.form.get("profile_group_number") or "").strip()
+          if profile_group_type not in {"Lohngruppe", "Verwendungsgruppe"}:
+            profile_group_type = "Lohngruppe"
           if name:
             emp.name = name
             emp.role = role or None
+            emp.profile_zip_code = profile_zip_code or None
+            emp.profile_city = profile_city or None
+            emp.profile_contract_start_date = profile_contract_start_date or None
+            emp.profile_contract_end_date = profile_contract_end_date or None
+            emp.profile_employment_type = profile_employment_type or "Reinigungskraft"
+            emp.profile_euros_per_hour = profile_euros_per_hour or None
+            emp.profile_working_hours = profile_working_hours or None
+            emp.profile_work_type = profile_work_type or "Teilzeit"
+            emp.profile_group_type = profile_group_type or "Lohngruppe"
+            emp.profile_group_number = profile_group_number or None
             db.commit()
       elif action == "delete" and emp_id:
         emp = db.get(Employee, int(emp_id))
@@ -7702,6 +7875,38 @@ def admin_employees():
       prev_page=prev_page,
       next_page=next_page,
       page_employees=page_employees,
+    )
+  finally:
+    db.close()
+
+
+@app.route("/admin/employees/<int:employee_id>/document", methods=["GET"])
+@login_required
+def admin_employee_docx(employee_id: int):
+  db = SessionLocal()
+  try:
+    employee = db.get(Employee, employee_id)
+    if not employee:
+      flash("Employee not found.", "warning")
+      return redirect(url_for("admin_employees"))
+
+    template_path = _resolve_employee_template_path()
+    if not template_path:
+      flash("Employee template not found. Place employee_template.docx in uploads/ or static/uploads/.", "warning")
+      return redirect(url_for("admin_employees"))
+
+    if not PYTHON_DOCX_AVAILABLE:
+      flash("DOCX generation is unavailable. Install python-docx.", "warning")
+      return redirect(url_for("admin_employees"))
+
+    docx_buffer = _build_employee_docx(employee, template_path)
+    safe_name = re.sub(r"[^a-zA-Z0-9_-]+", "_", (employee.name or f"employee_{employee.id}").strip())
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    return send_file(
+      docx_buffer,
+      mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      as_attachment=True,
+      download_name=f"employee_{safe_name}_{timestamp}.docx",
     )
   finally:
     db.close()
@@ -7943,6 +8148,23 @@ def admin_profiles():
           emp.profile_emergency_name = (request.form.get("profile_emergency_name") or "").strip() or None
           emp.profile_emergency_phone = (request.form.get("profile_emergency_phone") or "").strip() or None
           emp.profile_address = (request.form.get("profile_address") or "").strip() or None
+          emp.profile_zip_code = (request.form.get("profile_zip_code") or "").strip() or None
+          emp.profile_city = (request.form.get("profile_city") or "").strip() or None
+          emp.profile_contract_start_date = (request.form.get("profile_contract_start_date") or "").strip() or None
+          emp.profile_contract_end_date = (request.form.get("profile_contract_end_date") or "").strip() or None
+          profile_employment_type = (request.form.get("profile_employment_type") or "").strip()
+          profile_work_type = (request.form.get("profile_work_type") or "").strip()
+          if profile_work_type not in {"Teilzeit", "Vollzeit"}:
+            profile_work_type = "Teilzeit"
+          profile_group_type = (request.form.get("profile_group_type") or "").strip()
+          if profile_group_type not in {"Lohngruppe", "Verwendungsgruppe"}:
+            profile_group_type = "Lohngruppe"
+          emp.profile_employment_type = profile_employment_type or "Reinigungskraft"
+          emp.profile_euros_per_hour = (request.form.get("profile_euros_per_hour") or "").strip() or None
+          emp.profile_working_hours = (request.form.get("profile_working_hours") or "").strip() or None
+          emp.profile_work_type = profile_work_type or "Teilzeit"
+          emp.profile_group_type = profile_group_type or "Lohngruppe"
+          emp.profile_group_number = (request.form.get("profile_group_number") or "").strip() or None
           emp.profile_notes = (request.form.get("profile_notes") or "").strip() or None
           if saved_image:
             emp.profile_image_path = saved_image
@@ -7960,6 +8182,7 @@ def admin_profiles():
           site.profile_contact_name = (request.form.get("profile_contact_name") or "").strip() or None
           site.profile_contact_email = (request.form.get("profile_contact_email") or "").strip() or None
           site.profile_phone = (request.form.get("profile_phone") or "").strip() or None
+          site.profile_vat_id = (request.form.get("profile_vat_id") or "").strip() or None
           if "profile_billing_address" in request.form:
             site.profile_billing_address = (request.form.get("profile_billing_address") or "").strip() or None
           submitted_customer_id = (request.form.get("profile_tax_id") or "").strip()
@@ -9008,6 +9231,106 @@ def _resolve_contract_template_path() -> str | None:
     if os.path.exists(candidate):
       return candidate
   return None
+
+
+def _resolve_employee_template_path() -> str | None:
+  configured = (os.getenv("EMPLOYEE_TEMPLATE_PATH") or "").strip()
+  if configured:
+    candidate = configured if os.path.isabs(configured) else os.path.join(APP_ROOT, configured)
+    if os.path.exists(candidate):
+      return candidate
+
+  candidates = [
+    os.path.join(APP_ROOT, "uploads", "employee_template.docx"),
+    os.path.join(APP_ROOT, "static", "uploads", "employee_template.docx"),
+  ]
+  for candidate in candidates:
+    if os.path.exists(candidate):
+      return candidate
+  return None
+
+
+def _build_employee_docx(employee: Employee, template_path: str) -> io.BytesIO:
+  if not PYTHON_DOCX_AVAILABLE or Document is None:
+    raise ValueError("python-docx is required for employee DOCX generation")
+
+  doc = Document(template_path)
+  employee_name = (employee.name or "").strip()
+  street_line = (employee.profile_address or "").strip()
+  zip_code = (employee.profile_zip_code or "").strip()
+  city = (employee.profile_city or "").strip()
+  city_line = " ".join([part for part in [zip_code, city] if part]).strip()
+  full_line = ", ".join([part for part in [employee_name, street_line, city_line] if part])
+
+  def _to_doc_date(value: str | None) -> str:
+    raw = (value or "").strip()
+    if not raw:
+      return ""
+    try:
+      return datetime.strptime(raw, "%Y-%m-%d").strftime("%d.%m.%Y")
+    except ValueError:
+      return raw
+
+  start_date_value = _to_doc_date(employee.profile_contract_start_date)
+  end_date_value = _to_doc_date(employee.profile_contract_end_date)
+  employment_type = (employee.profile_employment_type or "").strip() or "Reinigungskraft"
+  euros_per_hour_raw = (employee.profile_euros_per_hour or "").strip() or "12,37"
+  euros_per_hour = euros_per_hour_raw.replace(".", ",")
+  working_hours = (employee.profile_working_hours or "").strip() or "3"
+  work_type = (employee.profile_work_type or "").strip()
+  if work_type not in {"Teilzeit", "Vollzeit"}:
+    work_type = "Teilzeit"
+  group_type = (employee.profile_group_type or "").strip()
+  if group_type not in {"Lohngruppe", "Verwendungsgruppe"}:
+    group_type = "Lohngruppe"
+  group_number = (employee.profile_group_number or "").strip() or "6"
+  group_label = f"{group_type} {group_number}".strip()
+
+  replacements = {
+    "Max Mustermann, Maxmustermanngasse 4/5/10, 1210 Wien": full_line,
+    "Max Mustermann": employee_name,
+    "Maxmustermanngasse 4/5/10": street_line,
+    "1210 Wien": city_line,
+    "09.06.2025": start_date_value or "09.06.2025",
+    "30.09.2025": end_date_value or "30.09.2025",
+    "Reinigungskraft": employment_type,
+    "Stundenlohn von brutto € 12,37": f"Stundenlohn von brutto € {euros_per_hour}",
+    "€ 12,37": f"€ {euros_per_hour}",
+    "3 Stunden": f"{working_hours} Stunden",
+    "geringfügige": work_type,
+    "geringfugige": work_type,
+    "Lohngruppe 6": group_label,
+    "Verwendungsgruppe 6": group_label,
+    "Verwendungsgruupe 6": group_label,
+  }
+
+  def _apply_to_paragraph(paragraph) -> None:
+    if not paragraph.text:
+      return
+    new_text = paragraph.text
+    for source, target in replacements.items():
+      if source in new_text:
+        new_text = new_text.replace(source, target)
+    new_text = re.sub(r"Stundenlohn\s+von\s+brutto\s+€\s*\d+[\.,]\d+", f"Stundenlohn von brutto € {euros_per_hour}", new_text)
+    new_text = re.sub(r"\b\d+\s*Stunden\b", f"{working_hours} Stunden", new_text)
+    new_text = re.sub(r"geringf[uü]gige", work_type, new_text, flags=re.IGNORECASE)
+    new_text = re.sub(r"(Lohngruppe|Verwendungsgruppe|Verwendungsgruupe)\s*\d+", group_label, new_text)
+    if new_text != paragraph.text:
+      paragraph.text = new_text
+
+  for paragraph in doc.paragraphs:
+    _apply_to_paragraph(paragraph)
+
+  for table in doc.tables:
+    for row in table.rows:
+      for cell in row.cells:
+        for paragraph in cell.paragraphs:
+          _apply_to_paragraph(paragraph)
+
+  output = io.BytesIO()
+  doc.save(output)
+  output.seek(0)
+  return output
 
 
 def generate_contract_pdf(
