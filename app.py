@@ -8847,72 +8847,72 @@ def generate_contract_pdf(
 @app.route("/admin/contracts", methods=["GET", "POST"])
 @login_required
 def admin_contract_builder():
-    if request.method == "POST":
-        partner_name = (request.form.get("partner_name") or "").strip()
-        company_name = (request.form.get("company_name") or "").strip()
-        contact_details = (request.form.get("contact_details") or "").strip()
-        contract_pdf_file = request.files.get("contract_pdf")
+  if request.method == "POST":
+    partner_name = (request.form.get("partner_name") or "").strip()
+    company_name = (request.form.get("company_name") or "").strip()
+    contact_details = (request.form.get("contact_details") or "").strip()
+    contract_pdf_file = request.files.get("contract_pdf")
     template_path = _resolve_contract_template_path()
 
-        if not partner_name or not company_name or not contact_details:
-            flash("Please fill all contract fields.", "warning")
-            return render_template_string(
-              CONTRACT_BUILDER_TEMPLATE,
-              partner_name=partner_name,
-              company_name=company_name,
-              contact_details=contact_details,
-            )
+    if not partner_name or not company_name or not contact_details:
+      flash("Please fill all contract fields.", "warning")
+      return render_template_string(
+        CONTRACT_BUILDER_TEMPLATE,
+        partner_name=partner_name,
+        company_name=company_name,
+        contact_details=contact_details,
+      )
 
-        uploaded_pdf_bytes = None
-        if contract_pdf_file and (contract_pdf_file.filename or "").strip():
-            if not (contract_pdf_file.filename or "").lower().endswith(".pdf"):
-                flash("Please upload a valid PDF contract file.", "warning")
-                return render_template_string(
-                  CONTRACT_BUILDER_TEMPLATE,
-                  partner_name=partner_name,
-                  company_name=company_name,
-                  contact_details=contact_details,
-                )
-            uploaded_pdf_bytes = contract_pdf_file.read()
-            if not uploaded_pdf_bytes:
-                flash("Uploaded PDF is empty.", "warning")
-                return render_template_string(
-                  CONTRACT_BUILDER_TEMPLATE,
-                  partner_name=partner_name,
-                  company_name=company_name,
-                  contact_details=contact_details,
-                )
-        elif not template_path:
-            flash("Upload a contract PDF or place a template at uploads/contract_template.pdf or static/uploads/contract_template.pdf.", "warning")
-            return render_template_string(
-              CONTRACT_BUILDER_TEMPLATE,
-              partner_name=partner_name,
-              company_name=company_name,
-              contact_details=contact_details,
-            )
-
-        if (uploaded_pdf_bytes or template_path) and not PYPDF_AVAILABLE:
-            flash("PDF template merge is unavailable on this server. Install pypdf (or PyPDF2) in production.", "warning")
-            return render_template_string(
-              CONTRACT_BUILDER_TEMPLATE,
-              partner_name=partner_name,
-              company_name=company_name,
-              contact_details=contact_details,
-            )
-
-        pdf_buffer = generate_contract_pdf(
-          partner_name,
-          company_name,
-          contact_details,
-          template_pdf_bytes=uploaded_pdf_bytes,
+    uploaded_pdf_bytes = None
+    if contract_pdf_file and (contract_pdf_file.filename or "").strip():
+      if not (contract_pdf_file.filename or "").lower().endswith(".pdf"):
+        flash("Please upload a valid PDF contract file.", "warning")
+        return render_template_string(
+          CONTRACT_BUILDER_TEMPLATE,
+          partner_name=partner_name,
+          company_name=company_name,
+          contact_details=contact_details,
         )
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        return send_file(
-          pdf_buffer,
-          mimetype="application/pdf",
-          as_attachment=True,
-          download_name=f"client_contract_{timestamp}.pdf",
+      uploaded_pdf_bytes = contract_pdf_file.read()
+      if not uploaded_pdf_bytes:
+        flash("Uploaded PDF is empty.", "warning")
+        return render_template_string(
+          CONTRACT_BUILDER_TEMPLATE,
+          partner_name=partner_name,
+          company_name=company_name,
+          contact_details=contact_details,
         )
+    elif not template_path:
+      flash("Upload a contract PDF or place a template at uploads/contract_template.pdf or static/uploads/contract_template.pdf.", "warning")
+      return render_template_string(
+        CONTRACT_BUILDER_TEMPLATE,
+        partner_name=partner_name,
+        company_name=company_name,
+        contact_details=contact_details,
+      )
+
+    if (uploaded_pdf_bytes or template_path) and not PYPDF_AVAILABLE:
+      flash("PDF template merge is unavailable on this server. Install pypdf (or PyPDF2) in production.", "warning")
+      return render_template_string(
+        CONTRACT_BUILDER_TEMPLATE,
+        partner_name=partner_name,
+        company_name=company_name,
+        contact_details=contact_details,
+      )
+
+    pdf_buffer = generate_contract_pdf(
+      partner_name,
+      company_name,
+      contact_details,
+      template_pdf_bytes=uploaded_pdf_bytes,
+    )
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    return send_file(
+      pdf_buffer,
+      mimetype="application/pdf",
+      as_attachment=True,
+      download_name=f"client_contract_{timestamp}.pdf",
+    )
 
     return render_template_string(CONTRACT_BUILDER_TEMPLATE)
 
