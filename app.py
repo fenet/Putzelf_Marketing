@@ -175,6 +175,7 @@ ADMIN_TEMPLATE = """
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Overview</span></a>
       <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Manage employees</span></a>
       <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">Profiles</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Assign coverage</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
@@ -398,6 +399,18 @@ ADMIN_EMPLOYEES_TEMPLATE = """
     .badge-soft { border-radius:999px; border:1px solid #d6d3f0; color:#6366f1; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
     .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.25rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
     .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#475569; }
+    .form-control, .form-select, .input-group-text {
+      background:#ffffff;
+      color:#0f172a;
+      border:1.5px solid #94a3b8;
+    }
+    .form-control::placeholder { color:#64748b; opacity:1; }
+    .form-control:focus, .form-select:focus {
+      border-color:#0f766e;
+      box-shadow:0 0 0 3px rgba(15,118,110,0.15);
+      background:#ffffff;
+      color:#0f172a;
+    }
     .little-card { border-radius:0.85rem; border:1px solid #e2e8f0; background:#f8fafc; }
     .credential-box { border-radius:0.85rem; border:1px solid #cbd5f5; background:#f8fafc; padding:1rem; }
     .credential-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:0.75rem; }
@@ -428,6 +441,8 @@ ADMIN_EMPLOYEES_TEMPLATE = """
     .stat-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#475569; margin-bottom:0.35rem; }
     .stat-value { font-size:1.6rem; font-weight:600; color:#0f172a; }
     .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .btn { border:1px solid rgba(15,23,42,0.18); }
+    .btn i { font-size:1.05rem; }
     .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
     .btn:hover { transform:translateY(-1px); box-shadow:0 14px 26px rgba(15,23,42,0.12); }
     .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
@@ -498,6 +513,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Overview</span></a>
       <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Manage employees</span></a>
       <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">Profiles</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Assign coverage</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
@@ -530,6 +546,9 @@ ADMIN_EMPLOYEES_TEMPLATE = """
           · {{ total_employees }} total · {{ today_shifts }} shifts today
         </p>
       </header>
+      <div class="mb-3 d-flex justify-content-end">
+        <a href="{{ url_for('admin_profiles', tab='employees') }}" class="btn btn-sm btn-outline-primary">Open employee profiles</a>
+      </div>
 
       <section class="stats-grid">
         <div class="stat-card">
@@ -556,11 +575,11 @@ ADMIN_EMPLOYEES_TEMPLATE = """
             <label class="form-label" for="employee_search">Search employees</label>
             <div class="input-group input-group-sm">
               <input type="text" class="form-control" id="employee_search" name="q" value="{{ search_q or '' }}" placeholder="Search by name or role">
-              <button class="btn btn-outline-primary" type="submit">Search</button>
+              <button class="btn btn-outline-primary" type="submit" title="Search"><i class="bi bi-search"></i></button>
             </div>
           </div>
           <div class="col-sm-4">
-            <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-secondary w-100">Clear filters</a>
+            <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-secondary w-100" title="Clear filters"><i class="bi bi-x-circle"></i></a>
           </div>
         </form>
       </section>
@@ -580,7 +599,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                 <input type="text" class="form-control form-control-sm" id="new_employee_role" name="role" value="Cleaner">
               </div>
               <div class="col-12">
-                <button type="submit" class="btn btn-sm btn-primary w-100">Add employee</button>
+                <button type="submit" class="btn btn-sm btn-primary w-100" title="Add employee"><i class="bi bi-person-plus"></i></button>
               </div>
             </form>
           </div>
@@ -605,8 +624,8 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                         <input type="text" class="form-control form-control-sm" name="role" value="{{ emp.role or '' }}">
                       </div>
                       <div class="col-md-2 col-12 employee-action-buttons">
-                        <button type="submit" name="action" value="update" class="btn btn-sm btn-success">Save</button>
-                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ emp.name }}?')">Delete</button>
+                        <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Save"><i class="bi bi-check2"></i></button>
+                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ emp.name }}?')" title="Delete"><i class="bi bi-trash"></i></button>
                       </div>
                     </form>
                     <div class="small text-secondary mt-2">Shifts scheduled: <span class="text-primary">{{ shift_counts.get(emp.id, 0) }}</span></div>
@@ -896,10 +915,24 @@ ADMIN_SITES_TEMPLATE = """
     .main-shell { padding:1.75rem; background:#ffffff; }
     .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.25rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
     .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#475569; }
+    .form-control, .form-select, .input-group-text {
+      background:#ffffff;
+      color:#0f172a;
+      border:1.5px solid #94a3b8;
+    }
+    .form-control::placeholder { color:#64748b; opacity:1; }
+    .form-control:focus, .form-select:focus {
+      border-color:#0f766e;
+      box-shadow:0 0 0 3px rgba(15,118,110,0.15);
+      background:#ffffff;
+      color:#0f172a;
+    }
     .little-card { border-radius:0.85rem; border:1px solid #e2e8f0; background:#f8fafc; }
     .placeholder { color:#94a3b8; font-size:0.85rem; }
     .table thead th { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#475569; background:#f1f5f9; }
     .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .btn { border:1px solid rgba(15,23,42,0.18); }
+    .btn i { font-size:1.05rem; }
     .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
     .btn:hover { transform:translateY(-1px); box-shadow:0 14px 26px rgba(15,23,42,0.12); }
     .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
@@ -923,6 +956,24 @@ ADMIN_SITES_TEMPLATE = """
     .btn-success:hover { background-image:var(--btn-grad-success-hover); color:#ffffff; }
     .btn-link { background:none; box-shadow:none; color:#0f766e; }
     .btn-link:hover { color:#0c615b; }
+    .btn-clear-sites {
+      min-height:2rem;
+      padding:0.35rem 0.55rem;
+      border-radius:0.65rem;
+      background-image:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 100%);
+      color:#0c4a6e;
+      border:1px solid #7dd3fc;
+      box-shadow:0 6px 12px rgba(14,116,144,0.12);
+    }
+    .btn-clear-sites:hover {
+      background-image:linear-gradient(135deg,#bae6fd 0%,#7dd3fc 100%);
+      color:#083344;
+    }
+    .site-row-actions .btn {
+      min-height:2rem;
+      padding:0.35rem 0.55rem;
+      border-radius:0.6rem;
+    }
     .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-bottom:1.5rem; }
     .stat-card { border-radius:0.85rem; border:1px solid #e2e8f0; background:#ffffff; padding:1rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
     .stat-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#475569; margin-bottom:0.35rem; }
@@ -976,6 +1027,7 @@ ADMIN_SITES_TEMPLATE = """
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Overview</span></a>
       <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Manage employees</span></a>
       <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">Profiles</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Assign coverage</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
@@ -1011,8 +1063,8 @@ ADMIN_SITES_TEMPLATE = """
           </p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
+          <a href="{{ url_for('admin_profiles', tab='clients') }}" class="btn btn-sm btn-outline-primary">Client profiles</a>
           <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Back to overview</a>
-          <a href="{{ url_for('admin_contract_builder') }}" class="btn btn-sm btn-outline-secondary">Client contract PDF</a>
           <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-primary">Open schedule</a>
         </div>
       </div>
@@ -1039,11 +1091,11 @@ ADMIN_SITES_TEMPLATE = """
           <label class="form-label" for="site_search">Search sites</label>
           <div class="input-group input-group-sm">
             <input type="text" class="form-control" id="site_search" name="q" value="{{ search_q or '' }}" placeholder="Search by name or address">
-            <button class="btn btn-outline-primary" type="submit">Search</button>
+              <button class="btn btn-outline-primary" type="submit" title="Search"><i class="bi bi-search"></i></button>
           </div>
         </div>
         <div class="col-sm-4">
-          <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-outline-secondary w-100">Clear filters</a>
+          <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-clear-sites w-100" title="Clear filters"><i class="bi bi-x-circle"></i></a>
         </div>
       </form>
       <div class="row g-3">
@@ -1066,14 +1118,6 @@ ADMIN_SITES_TEMPLATE = """
                 <input type="number" class="form-control form-control-sm" id="new_site_hourly_rate" name="hourly_rate" step="0.01" min="0" value="50.00" required>
               </div>
               <div class="col-12">
-                <label class="form-label" for="new_site_contact_name">Contact name (optional)</label>
-                <input type="text" class="form-control form-control-sm" id="new_site_contact_name" name="contact_name" placeholder="e.g. John Smith">
-              </div>
-              <div class="col-12">
-                <label class="form-label" for="new_site_contact_email">Contact email (optional)</label>
-                <input type="email" class="form-control form-control-sm" id="new_site_contact_email" name="contact_email" placeholder="contact@site.com">
-              </div>
-              <div class="col-12">
                 <label class="form-label" for="new_site_is_active">Status</label>
                 <select class="form-select form-select-sm" id="new_site_is_active" name="is_active">
                   <option value="1" selected>Active</option>
@@ -1081,7 +1125,10 @@ ADMIN_SITES_TEMPLATE = """
                 </select>
               </div>
               <div class="col-12">
-                <button type="submit" class="btn btn-sm btn-primary w-100">Add site</button>
+                <a href="{{ url_for('admin_profiles', tab='clients') }}" class="btn btn-sm btn-outline-secondary w-100">Manage client profile fields</a>
+              </div>
+              <div class="col-12">
+                <button type="submit" class="btn btn-sm btn-primary w-100" title="Add site"><i class="bi bi-building-add"></i></button>
               </div>
             </form>
           </div>
@@ -1106,8 +1153,6 @@ ADMIN_SITES_TEMPLATE = """
                       <th scope="col">Name</th>
                       <th scope="col">Address</th>
                       <th scope="col">Hourly rate</th>
-                      <th scope="col">Contact name</th>
-                      <th scope="col">Contact email</th>
                       <th scope="col">Status</th>
                     </tr>
                   </thead>
@@ -1123,12 +1168,6 @@ ADMIN_SITES_TEMPLATE = """
                         </td>
                         <td>
                           <input type="number" class="form-control form-control-sm" name="site_hourly_rate" value="{{ '%.2f'|format(site.hourly_rate or 0) }}" step="0.01" min="0" required>
-                        </td>
-                        <td>
-                          <input type="text" class="form-control form-control-sm" name="site_contact_name" value="{{ site.contact_name or '' }}">
-                        </td>
-                        <td>
-                          <input type="email" class="form-control form-control-sm" name="site_contact_email" value="{{ site.contact_email or '' }}">
                         </td>
                         <td>
                           <select class="form-select form-select-sm" name="site_is_active">
@@ -1165,14 +1204,6 @@ ADMIN_SITES_TEMPLATE = """
                       <input type="number" name="hourly_rate" value="{{ '%.2f'|format(site.hourly_rate or 0) }}" class="form-control form-control-sm" step="0.01" min="0" required>
                     </div>
                     <div class="col-md-2 col-12">
-                      <label class="form-label">Contact name</label>
-                      <input type="text" name="contact_name" value="{{ site.contact_name or '' }}" class="form-control form-control-sm">
-                    </div>
-                    <div class="col-md-2 col-12">
-                      <label class="form-label">Contact email</label>
-                      <input type="email" name="contact_email" value="{{ site.contact_email or '' }}" class="form-control form-control-sm">
-                    </div>
-                    <div class="col-md-2 col-12">
                       <label class="form-label">Status</label>
                       <select name="is_active" class="form-select form-select-sm">
                         <option value="1" {% if site.is_active != 0 %}selected{% endif %}>Active</option>
@@ -1180,9 +1211,9 @@ ADMIN_SITES_TEMPLATE = """
                       </select>
                     </div>
                     <div class="col-md-2 col-12">
-                      <div class="d-grid gap-2">
-                        <button type="submit" name="action" value="update" class="btn btn-sm btn-success">Save</button>
-                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ site.name }}?')">Delete</button>
+                      <div class="d-grid gap-2 site-row-actions">
+                        <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Save"><i class="bi bi-check2"></i></button>
+                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ site.name }}?')" title="Delete"><i class="bi bi-trash"></i></button>
                       </div>
                     </div>
                   </div>
@@ -1397,6 +1428,7 @@ INVOICE_LIST_TEMPLATE = """
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
       <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
       <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
@@ -1444,7 +1476,7 @@ INVOICE_LIST_TEMPLATE = """
           </div>
           <div class="col-md-3">
             <label for="tax_rate_auto" class="form-label">Tax Rate (%)</label>
-            <input type="number" id="tax_rate_auto" name="tax_rate" step="0.01" value="0" class="form-control">
+            <input type="number" id="tax_rate_auto" name="tax_rate" step="0.01" value="20" class="form-control" readonly>
           </div>
           <div class="col-md-3">
             <label for="due_days_auto" class="form-label">Days Until Due</label>
@@ -1722,6 +1754,7 @@ INCOME_REPORT_TEMPLATE = """
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
       <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
       <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
@@ -1955,6 +1988,7 @@ INCOME_REPORT_TEMPLATE = """
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
       <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
       <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
@@ -2194,6 +2228,7 @@ INVOICE_FORM_TEMPLATE = """
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
       <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
       <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
@@ -2231,12 +2266,21 @@ INVOICE_FORM_TEMPLATE = """
                   {% for site in sites %}
                   <option
                     value="{{ site.id }}"
-                    data-contact-name="{{ site.contact_name or '' }}"
-                    data-contact-email="{{ site.contact_email or '' }}"
+                    data-contact-name="{{ site.profile_contact_name or site.contact_name or '' }}"
+                    data-contact-email="{{ site.profile_contact_email or site.contact_email or '' }}"
+                    data-company-name="{{ site.profile_company_name or site.name or '' }}"
+                    data-phone="{{ site.profile_phone or '' }}"
+                    data-billing-address="{{ site.profile_billing_address or site.address or '' }}"
+                    data-customer-id="{{ site.profile_tax_id or '' }}"
                   >{{ site.name }}</option>
                   {% endfor %}
                 </select>
                 <div class="form-text">Site profile contact details are auto-filled when available.</div>
+              </div>
+
+              <div class="mb-3">
+                <label for="site_company_name" class="form-label fw-bold">Company Name</label>
+                <input type="text" id="site_company_name" name="site_company_name" class="form-control" placeholder="e.g., ACME GmbH">
               </div>
               
               <div class="mb-3">
@@ -2247,6 +2291,22 @@ INVOICE_FORM_TEMPLATE = """
               <div class="mb-3">
                 <label for="site_contact_email" class="form-label fw-bold">Contact Email</label>
                 <input type="email" id="site_contact_email" name="site_contact_email" class="form-control" placeholder="contact@site.com">
+              </div>
+
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label for="site_phone" class="form-label fw-bold">Contact Phone</label>
+                  <input type="text" id="site_phone" name="site_phone" class="form-control" placeholder="+43 ...">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label for="site_tax_id" class="form-label fw-bold">Customer ID</label>
+                  <input type="text" id="site_tax_id" name="site_tax_id" class="form-control" placeholder="UT- 0001" readonly>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="site_billing_address" class="form-label fw-bold">Billing Address</label>
+                <input type="text" id="site_billing_address" name="site_billing_address" class="form-control" placeholder="Street, ZIP, City">
               </div>
               
               <div class="row">
@@ -2263,8 +2323,8 @@ INVOICE_FORM_TEMPLATE = """
               
               <div class="row">
                 <div class="col-md-6 mb-3">
-                  <label for="tax_rate" class="form-label fw-bold">Tax Rate (%) *</label>
-                  <input type="number" id="tax_rate" name="tax_rate" step="0.01" value="0" class="form-control" placeholder="0 or 19">
+                  <label for="tax_rate" class="form-label fw-bold">Tax Rate (%)</label>
+                  <input type="number" id="tax_rate" name="tax_rate" step="0.01" value="20" class="form-control" readonly>
                 </div>
                 <div class="col-md-6 mb-3">
                   <label for="days_until_due" class="form-label fw-bold">Days Until Due *</label>
@@ -2278,8 +2338,8 @@ INVOICE_FORM_TEMPLATE = """
               </div>
               
               <div class="mt-4">
-                <button type="submit" class="btn btn-primary">Create Invoice</button>
-                <a href="/admin/invoices" class="btn btn-outline-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary" title="Create invoice"><i class="bi bi-file-earmark-plus"></i></button>
+                <a href="/admin/invoices" class="btn btn-outline-secondary" title="Cancel"><i class="bi bi-x-circle"></i></a>
               </div>
             </form>
           </div>
@@ -2314,9 +2374,13 @@ INVOICE_FORM_TEMPLATE = """
   <script>
     (function() {
       const siteSelect = document.getElementById('site_id');
+      const companyInput = document.getElementById('site_company_name');
       const nameInput = document.getElementById('site_contact_name');
       const emailInput = document.getElementById('site_contact_email');
-      if (!siteSelect || !nameInput || !emailInput) {
+      const phoneInput = document.getElementById('site_phone');
+      const billingAddressInput = document.getElementById('site_billing_address');
+      const customerIdInput = document.getElementById('site_tax_id');
+      if (!siteSelect || !nameInput || !emailInput || !companyInput || !phoneInput || !billingAddressInput || !customerIdInput) {
         return;
       }
       const applyProfile = () => {
@@ -2324,13 +2388,29 @@ INVOICE_FORM_TEMPLATE = """
         if (!selected) {
           return;
         }
+        const profileCompany = selected.dataset.companyName || '';
         const profileName = selected.dataset.contactName || '';
         const profileEmail = selected.dataset.contactEmail || '';
+        const profilePhone = selected.dataset.phone || '';
+        const profileBillingAddress = selected.dataset.billingAddress || '';
+        const profileCustomerId = selected.dataset.customerId || '';
+        if (profileCompany) {
+          companyInput.value = profileCompany;
+        }
         if (profileName) {
           nameInput.value = profileName;
         }
         if (profileEmail) {
           emailInput.value = profileEmail;
+        }
+        if (profilePhone) {
+          phoneInput.value = profilePhone;
+        }
+        if (profileBillingAddress) {
+          billingAddressInput.value = profileBillingAddress;
+        }
+        if (profileCustomerId) {
+          customerIdInput.value = profileCustomerId;
         }
       };
       siteSelect.addEventListener('change', applyProfile);
@@ -2355,12 +2435,13 @@ INVOICE_EDIT_TEMPLATE = """
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Putzelf Marketing — Edit Invoice</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 </head>
 <body class="bg-light">
   <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h1 class="h4 mb-0">Edit Invoice {{ short_invoice_number(invoice.invoice_number) }}</h1>
-      <a href="{{ url_for('admin_view_invoice', invoice_id=invoice.id) }}" class="btn btn-outline-secondary">Back</a>
+      <a href="{{ url_for('admin_view_invoice', invoice_id=invoice.id) }}" class="btn btn-outline-secondary" title="Back"><i class="bi bi-arrow-left"></i></a>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -2396,12 +2477,29 @@ INVOICE_EDIT_TEMPLATE = """
             </div>
 
             <div class="col-md-6">
+              <label class="form-label">Company Name</label>
+              <input type="text" class="form-control" name="site_company_name" value="{{ invoice.site_company_name or '' }}">
+            </div>
+
+            <div class="col-md-6">
               <label class="form-label">Contact Name</label>
               <input type="text" class="form-control" name="site_contact_name" value="{{ invoice.site_contact_name or '' }}">
             </div>
             <div class="col-md-6">
               <label class="form-label">Contact Email</label>
               <input type="email" class="form-control" name="site_contact_email" value="{{ invoice.site_contact_email or '' }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Contact Phone</label>
+              <input type="text" class="form-control" name="site_phone" value="{{ invoice.site_phone or '' }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Billing Address</label>
+              <input type="text" class="form-control" name="site_billing_address" value="{{ invoice.site_billing_address or '' }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Customer ID</label>
+              <input type="text" class="form-control" name="site_tax_id" value="{{ invoice.site_tax_id or '' }}">
             </div>
 
             <div class="col-md-4">
@@ -2414,7 +2512,7 @@ INVOICE_EDIT_TEMPLATE = """
             </div>
             <div class="col-md-4">
               <label class="form-label">Tax Rate (%)</label>
-              <input type="number" step="0.01" min="0" class="form-control" name="tax_rate" value="{{ (invoice.tax_rate * 100)|round(2) }}" required>
+              <input type="number" step="0.01" min="0" class="form-control" name="tax_rate" value="20" readonly>
             </div>
 
             <div class="col-md-6">
@@ -2434,7 +2532,7 @@ INVOICE_EDIT_TEMPLATE = """
 
           <div class="mt-4 d-flex gap-2">
             <button type="submit" class="btn btn-primary">Save Changes</button>
-            <a href="{{ url_for('admin_view_invoice', invoice_id=invoice.id) }}" class="btn btn-outline-secondary">Cancel</a>
+            <a href="{{ url_for('admin_view_invoice', invoice_id=invoice.id) }}" class="btn btn-outline-secondary" title="Cancel"><i class="bi bi-x-circle"></i></a>
           </div>
         </form>
       </div>
@@ -2619,6 +2717,7 @@ INVOICE_VIEW_TEMPLATE = """
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
       <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
       <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
@@ -2700,15 +2799,14 @@ INVOICE_VIEW_TEMPLATE = """
             <div class="row mb-4">
               <div class="col-md-6">
                 <h6 class="text-muted text-uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.08em;">Bill To:</h6>
-                <p class="mb-1"><strong>{{ invoice.site_contact_name or invoice.site.name }}</strong></p>
-                <p class="mb-1">{{ invoice.site.address or '' }}</p>
-                <p class="mb-0">{{ invoice.site_contact_email }}</p>
+                <p class="mb-1"><strong>Billing Contact Person:</strong> {{ invoice.site_contact_name or '' }}</p>
+                <p class="mb-1"><strong>Address:</strong> {{ invoice.site_billing_address or invoice.site.address or '' }}</p>
               </div>
               <div class="col-md-6">
                 <h6 class="text-muted text-uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.08em;">Invoice Details:</h6>
                 <p class="mb-1"><strong>Site:</strong> {{ invoice.site.name }}</p>
                 <p class="mb-1"><strong>Hourly Rate:</strong> ${{ "%.2f"|format(invoice.hourly_rate) }}</p>
-                <p class="mb-0"><strong>Total Hours:</strong> {{ invoice.total_hours }}</p>
+                <p class="mb-1"><strong>Total Hours:</strong> {{ invoice.total_hours }}</p>
               </div>
             </div>
 
@@ -3465,6 +3563,10 @@ LEADS_TEMPLATE = """
           <span class="nav-pill-icon">🏢</span>
           <span class="nav-text">Manage sites</span>
         </a>
+        <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">
+          <span class="nav-pill-icon">🪪</span>
+          <span class="nav-text">Profiles</span>
+        </a>
         <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">
           <span class="nav-pill-icon">🗓</span>
           <span class="nav-text">Assign coverage</span>
@@ -3662,7 +3764,7 @@ LEADS_TEMPLATE = """
                 </div>
               </div>
               <div class="modal-footer border-0 d-flex justify-content-between">
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" title="Cancel"><i class="bi bi-x-circle"></i></button>
                 <button type="submit" class="btn btn-sm btn-primary">Save changes</button>
               </div>
             </form>
@@ -3967,6 +4069,10 @@ HTML_TEMPLATE = """
         <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">
           <span class="nav-pill-icon">🏢</span>
           <span class="nav-text">Manage sites</span>
+        </a>
+        <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">
+          <span class="nav-pill-icon">🪪</span>
+          <span class="nav-text">Profiles</span>
         </a>
         <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">
           <span class="nav-pill-icon">🗓</span>
@@ -4360,6 +4466,10 @@ SCHEDULE_TEMPLATE = """
         <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">
           <span class="nav-pill-icon">🏢</span>
           <span class="nav-text">Manage sites</span>
+        </a>
+        <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">
+          <span class="nav-pill-icon">🪪</span>
+          <span class="nav-text">Profiles</span>
         </a>
         <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">
           <span class="nav-pill-icon">🗓</span>
@@ -4926,6 +5036,289 @@ def find_labelled_phones(text: str | None, region: str | None = None) -> list[st
   return results
 
 
+ADMIN_PROFILES_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — Profiles</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #0f766e;
+      --bg-soft: #f1f5f9;
+      --panel: #ffffff;
+      --line: #dbe5f2;
+      --muted: #64748b;
+    }
+    body { background:linear-gradient(180deg,#f8fbff 0%, #eef6ff 100%); color:#0f172a; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); background:transparent; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.25rem; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; }
+    .nav-pill.active, .nav-pill:hover { background:var(--accent); color:#fff; }
+    .main-shell { padding:1.5rem; }
+    .badge-soft { border-radius:999px; border:1px solid #d6d3f0; color:#6366f1; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
+    .tab-btn { text-decoration:none; display:inline-flex; align-items:center; gap:.4rem; padding:0.5rem 0.85rem; border-radius:0.7rem; border:1px solid #cbd5f5; color:#1e293b; background:#fff; }
+    .tab-btn.active { background:#0f766e; color:#fff; border-color:#0f766e; }
+    .card-surface { border-radius:1rem; border:1px solid var(--line); background:var(--panel); padding:1rem; box-shadow:0 12px 24px rgba(15,23,42,0.06); }
+    .registration-card {
+      border:1px solid #e2e8f0;
+      border-radius:1rem;
+      background:#f8fbff;
+      padding:0.95rem;
+    }
+    .registration-grid { display:grid; grid-template-columns:120px minmax(0,1fr); gap:0.9rem; align-items:start; }
+    .avatar-wrap { display:flex; justify-content:center; }
+    .avatar-uploader {
+      position:relative;
+      width:88px;
+      height:88px;
+      border-radius:999px;
+      cursor:pointer;
+      border:2px solid #cbd5f5;
+      background:#e2e8f0;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#334155;
+      font-weight:700;
+      font-size:1.2rem;
+    }
+    .avatar-uploader img {
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:none;
+    }
+    .avatar-badge {
+      position:absolute;
+      right:-2px;
+      bottom:-2px;
+      width:28px;
+      height:28px;
+      border-radius:999px;
+      background:#0f766e;
+      color:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border:2px solid #fff;
+      font-size:.82rem;
+    }
+    .form-label { text-transform:uppercase; font-size:0.71rem; letter-spacing:0.08em; color:#475569; margin-bottom:.3rem; }
+    .form-control, .form-select {
+      background:#ffffff;
+      color:#0f172a;
+      border:1.5px solid #94a3b8;
+    }
+    .form-control::placeholder { color:#64748b; opacity:1; }
+    .form-control:focus, .form-select:focus {
+      border-color:#0f766e;
+      box-shadow:0 0 0 3px rgba(15,118,110,0.15);
+      background:#ffffff;
+      color:#0f172a;
+    }
+    .muted { color:var(--muted); }
+    .icon-btn {
+      min-width:2.4rem;
+      height:2.4rem;
+      border-radius:.65rem;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:0;
+    }
+    .btn { border:1px solid rgba(15,23,42,0.18); }
+    @media(max-width:992px){
+      .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{display:none;}
+      .registration-grid{ grid-template-columns:minmax(0,1fr); }
+      .avatar-wrap{ justify-content:flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ Overview</a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 Manage employees</a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 Manage sites</a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill active">🪪 Profiles</a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill">📄 Invoices</a>
+      <a href="{{ url_for('logout') }}" class="nav-pill">⇦ Log out</a>
+    </aside>
+    <main class="main-shell">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }} border-0 text-dark">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      <header class="mb-4">
+        <div class="badge-soft mb-2">Profiles</div>
+        <h1 class="h4 text-dark mb-1">Profile Center</h1>
+      </header>
+
+      <div class="d-flex gap-2 mb-3">
+        <a class="tab-btn {% if active_tab == 'employees' %}active{% endif %}" href="{{ url_for('admin_profiles', tab='employees') }}"><i class="bi bi-person-vcard"></i> Employee profiles</a>
+        <a class="tab-btn {% if active_tab == 'clients' %}active{% endif %}" href="{{ url_for('admin_profiles', tab='clients') }}"><i class="bi bi-building"></i> Client profiles</a>
+      </div>
+
+      {% if active_tab == 'employees' %}
+        <div class="card-surface">
+          <h2 class="h6 text-uppercase text-secondary mb-3">Employee registration</h2>
+          {% if employees %}
+            <div class="vstack gap-3">
+              {% for emp in employees %}
+                <form method="post" enctype="multipart/form-data" class="registration-card">
+                  <input type="hidden" name="entity" value="employee_profile">
+                  <input type="hidden" name="id" value="{{ emp.id }}">
+                  <input type="hidden" name="tab" value="employees">
+                  <div class="registration-grid">
+                    <div class="avatar-wrap">
+                      <label class="avatar-uploader" title="Upload photo">
+                        <img class="avatar-preview" alt="Profile image preview" {% if emp.profile_image_path %}src="/static/{{ emp.profile_image_path }}" style="display:block;"{% endif %}>
+                        <span class="avatar-initials" {% if emp.profile_image_path %}style="display:none;"{% endif %}>{{ (emp.name or 'U')[:1]|upper }}</span>
+                        <span class="avatar-badge"><i class="bi bi-camera-fill"></i></span>
+                        <input type="file" name="employee_profile_image" class="d-none avatar-input" accept="image/*">
+                      </label>
+                    </div>
+                    <div>
+                      <div class="mb-2"><strong>{{ emp.name }}</strong> <span class="muted">· {{ emp.role or 'No role' }}</span></div>
+                      <div class="row g-2">
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Phone</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_phone" value="{{ emp.profile_phone or '' }}">
+                        </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Emergency contact name</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_emergency_name" value="{{ emp.profile_emergency_name or '' }}">
+                        </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Emergency contact phone</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_emergency_phone" value="{{ emp.profile_emergency_phone or '' }}">
+                        </div>
+                        <div class="col-md-6 col-12">
+                          <label class="form-label">Address</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_address" value="{{ emp.profile_address or '' }}">
+                        </div>
+                        <div class="col-md-6 col-12">
+                          <label class="form-label">Notes</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_notes" value="{{ emp.profile_notes or '' }}">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mt-2 d-flex justify-content-end">
+                    <button class="btn btn-sm btn-primary icon-btn" type="submit" title="Save profile"><i class="bi bi-check2-circle"></i></button>
+                  </div>
+                </form>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="muted mb-0">No employees found.</p>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="card-surface">
+          <h2 class="h6 text-uppercase text-secondary mb-3">Client registration</h2>
+          {% if sites %}
+            <div class="vstack gap-3">
+              {% for site in sites %}
+                <form method="post" enctype="multipart/form-data" class="registration-card">
+                  <input type="hidden" name="entity" value="site_profile">
+                  <input type="hidden" name="id" value="{{ site.id }}">
+                  <input type="hidden" name="tab" value="clients">
+                  <div class="registration-grid">
+                    <div class="avatar-wrap">
+                      <label class="avatar-uploader" title="Upload logo">
+                        <img class="avatar-preview" alt="Logo preview" {% if site.profile_image_path %}src="/static/{{ site.profile_image_path }}" style="display:block;"{% endif %}>
+                        <span class="avatar-initials" {% if site.profile_image_path %}style="display:none;"{% endif %}>{{ (site.name or 'C')[:1]|upper }}</span>
+                        <span class="avatar-badge"><i class="bi bi-camera-fill"></i></span>
+                        <input type="file" name="site_profile_image" class="d-none avatar-input" accept="image/*">
+                      </label>
+                    </div>
+                    <div>
+                      <div class="mb-2"><strong>{{ site.name }}</strong> <span class="muted">· {{ site.address or 'No address' }}</span></div>
+                      <div class="row g-2">
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Firma</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_company_name" value="{{ site.profile_company_name or '' }}">
+                        </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Billing contact name</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_contact_name" value="{{ site.profile_contact_name or '' }}">
+                        </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Billing contact email</label>
+                          <input type="email" class="form-control form-control-sm" name="profile_contact_email" value="{{ site.profile_contact_email or '' }}">
+                        </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Billing phone</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_phone" value="{{ site.profile_phone or '' }}">
+                        </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Customer ID</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_tax_id" value="{{ site.profile_tax_id or '' }}" readonly>
+                        </div>
+                        <div class="col-md-6 col-12">
+                          <label class="form-label">Notes</label>
+                          <input type="text" class="form-control form-control-sm" name="profile_notes" value="{{ site.profile_notes or '' }}">
+                        </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Name des partners</label>
+                          <input type="text" class="form-control form-control-sm" name="contract_partner_name" value="{{ site.contract_partner_name or '' }}">
+                        </div>
+                        <div class="col-md-8 col-12">
+                          <label class="form-label">Tel./ Fax / E-Mail</label>
+                          <input type="text" class="form-control form-control-sm" name="contract_contact_details" value="{{ site.contract_contact_details or '' }}">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mt-2 d-flex justify-content-end gap-2">
+                    <button class="btn btn-sm btn-outline-primary icon-btn" type="submit" name="profile_action" value="generate_contract" title="Generate contract PDF"><i class="bi bi-file-earmark-pdf"></i></button>
+                    <button class="btn btn-sm btn-primary icon-btn" type="submit" name="profile_action" value="save" title="Save profile"><i class="bi bi-check2-circle"></i></button>
+                  </div>
+                </form>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="muted mb-0">No sites found.</p>
+          {% endif %}
+        </div>
+      {% endif %}
+    </main>
+  </div>
+  <script>
+    document.querySelectorAll('.avatar-input').forEach((input) => {
+      input.addEventListener('change', (event) => {
+        const file = event.target.files && event.target.files[0];
+        const wrap = event.target.closest('.avatar-uploader');
+        if (!file || !wrap) return;
+        const img = wrap.querySelector('.avatar-preview');
+        const initials = wrap.querySelector('.avatar-initials');
+        if (!img) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          img.src = e.target && e.target.result ? e.target.result : '';
+          img.style.display = 'block';
+          if (initials) initials.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+  </script>
+</body>
+</html>
+"""
+
+
 # --- ORM models ----------------------------------------------------------------
 
 
@@ -4938,6 +5331,12 @@ class Employee(Base):
   login_email = Column(String(255), unique=True)
   login_code = Column(String(64), unique=True)
   login_pin_hash = Column(String(255))
+  profile_phone = Column(String(64))
+  profile_emergency_name = Column(String(255))
+  profile_emergency_phone = Column(String(64))
+  profile_address = Column(String(255))
+  profile_notes = Column(Text)
+  profile_image_path = Column(String(255))
 
   shifts = relationship("Shift", back_populates="employee", cascade="all, delete-orphan")
 
@@ -4952,6 +5351,17 @@ class Site(Base):
   contact_name = Column(String(255))
   contact_email = Column(String(255))
   is_active = Column(Boolean, nullable=False, default=True)
+  profile_company_name = Column(String(255))
+  profile_contact_name = Column(String(255))
+  profile_contact_email = Column(String(255))
+  profile_phone = Column(String(64))
+  profile_billing_address = Column(String(255))
+  profile_tax_id = Column(String(128))
+  profile_default_hourly_rate = Column(Float)
+  profile_notes = Column(Text)
+  profile_image_path = Column(String(255))
+  contract_partner_name = Column(String(255))
+  contract_contact_details = Column(String(255))
 
   shifts = relationship("Shift", back_populates="site", cascade="all, delete-orphan")
 
@@ -4999,8 +5409,12 @@ class Invoice(Base):
   id = Column(Integer, primary_key=True)
   invoice_number = Column(String(64), unique=True, nullable=False)
   site_id = Column(Integer, ForeignKey("sites.id"), nullable=False)
+  site_company_name = Column(String(255))
   site_contact_name = Column(String(255))
   site_contact_email = Column(String(255))
+  site_phone = Column(String(64))
+  site_billing_address = Column(String(255))
+  site_tax_id = Column(String(128))
   hourly_rate = Column(Float, nullable=False, default=50.0)
   tax_rate = Column(Float, nullable=False, default=0.0)  # e.g., 0.19 for 19% VAT
   total_hours = Column(Float, nullable=False)
@@ -5036,6 +5450,12 @@ _ensure_sqlite_column(engine, "shifts", "created_at", "DATETIME")
 _ensure_sqlite_column(engine, "employees", "login_email", "TEXT")
 _ensure_sqlite_column(engine, "employees", "login_code", "TEXT")
 _ensure_sqlite_column(engine, "employees", "login_pin_hash", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_phone", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_emergency_name", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_emergency_phone", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_address", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_notes", "TEXT")
+_ensure_sqlite_column(engine, "employees", "profile_image_path", "TEXT")
 _ensure_sqlite_column(engine, "shifts", "instructions", "TEXT")
 _ensure_sqlite_column(engine, "shifts", "clock_in_at", "DATETIME")
 _ensure_sqlite_column(engine, "shifts", "clock_in_lat", "FLOAT")
@@ -5049,6 +5469,21 @@ _ensure_sqlite_column(engine, "sites", "hourly_rate", "FLOAT")
 _ensure_sqlite_column(engine, "sites", "contact_name", "TEXT")
 _ensure_sqlite_column(engine, "sites", "contact_email", "TEXT")
 _ensure_sqlite_column(engine, "sites", "is_active", "INTEGER NOT NULL DEFAULT 1")
+_ensure_sqlite_column(engine, "sites", "profile_company_name", "TEXT")
+_ensure_sqlite_column(engine, "sites", "profile_contact_name", "TEXT")
+_ensure_sqlite_column(engine, "sites", "profile_contact_email", "TEXT")
+_ensure_sqlite_column(engine, "sites", "profile_phone", "TEXT")
+_ensure_sqlite_column(engine, "sites", "profile_billing_address", "TEXT")
+_ensure_sqlite_column(engine, "sites", "profile_tax_id", "TEXT")
+_ensure_sqlite_column(engine, "sites", "profile_default_hourly_rate", "FLOAT")
+_ensure_sqlite_column(engine, "sites", "profile_notes", "TEXT")
+_ensure_sqlite_column(engine, "sites", "profile_image_path", "TEXT")
+_ensure_sqlite_column(engine, "sites", "contract_partner_name", "TEXT")
+_ensure_sqlite_column(engine, "sites", "contract_contact_details", "TEXT")
+_ensure_sqlite_column(engine, "invoices", "site_company_name", "TEXT")
+_ensure_sqlite_column(engine, "invoices", "site_phone", "TEXT")
+_ensure_sqlite_column(engine, "invoices", "site_billing_address", "TEXT")
+_ensure_sqlite_column(engine, "invoices", "site_tax_id", "TEXT")
 _ensure_sqlite_column(engine, "invoices", "paid_at", "DATETIME")
 _ensure_sqlite_column(engine, "invoices", "billing_month", "TEXT")
 
@@ -5078,6 +5513,31 @@ def _remove_photo(path: str | None) -> None:
       os.remove(absolute)
   except OSError:
     logging.debug("Failed to remove photo %s", path)
+
+
+def _save_profile_image(file_obj, prefix: str, replace_path: str | None = None) -> str | None:
+  if not file_obj or not getattr(file_obj, "filename", None):
+    return None
+  if not _allowed_image(file_obj.filename):
+    return None
+
+  ext = os.path.splitext(file_obj.filename)[1].lower()
+  if not ext:
+    return None
+
+  safe_name = secure_filename(f"{prefix}_{secrets.token_hex(8)}{ext}")
+  profile_dir = os.path.join(app.config["UPLOAD_FOLDER"], "profiles")
+  os.makedirs(profile_dir, exist_ok=True)
+  destination = os.path.join(profile_dir, safe_name)
+  try:
+    file_obj.save(destination)
+  except Exception:
+    logging.exception("Failed to save profile image for %s", prefix)
+    return None
+
+  if replace_path:
+    _remove_photo(replace_path)
+  return os.path.join("uploads", "profiles", safe_name).replace(os.sep, "/")
 
 
 def _generate_employee_pin(length: int = 4) -> str:
@@ -6990,8 +7450,6 @@ def admin_sites():
           name = (request.form.get("name") or "").strip()
           address = (request.form.get("address") or "").strip()
           hourly_rate = request.form.get("hourly_rate", type=float)
-          contact_name = (request.form.get("contact_name") or "").strip() or None
-          contact_email = (request.form.get("contact_email") or "").strip() or None
           is_active = (request.form.get("is_active", "1") or "1").strip() != "0"
           if name and address:
             if _site_exists(db, name, address):
@@ -7005,8 +7463,6 @@ def admin_sites():
                   name=name,
                   address=address,
                   hourly_rate=hourly_rate or 50.0,
-                  contact_name=contact_name,
-                  contact_email=contact_email,
                   is_active=is_active,
                 )
               )
@@ -7017,8 +7473,6 @@ def admin_sites():
             name = (request.form.get("name") or "").strip() or site.name
             address = (request.form.get("address") or "").strip() or site.address
             hourly_rate = request.form.get("hourly_rate", type=float)
-            contact_name = (request.form.get("contact_name") or "").strip() or None
-            contact_email = (request.form.get("contact_email") or "").strip() or None
             is_active = (request.form.get("is_active", "1") or "1").strip() != "0"
             if _site_exists(db, name, address, exclude_id=site.id):
               flash(
@@ -7030,8 +7484,6 @@ def admin_sites():
               site.address = address
               if hourly_rate is not None:
                 site.hourly_rate = hourly_rate
-              site.contact_name = contact_name
-              site.contact_email = contact_email
               site.is_active = is_active
               db.commit()
         elif action == "delete" and site_id:
@@ -7044,17 +7496,13 @@ def admin_sites():
         names = request.form.getlist("site_name")
         addresses = request.form.getlist("site_address")
         hourly_rates = request.form.getlist("site_hourly_rate")
-        contact_names = request.form.getlist("site_contact_name")
-        contact_emails = request.form.getlist("site_contact_email")
         active_flags = request.form.getlist("site_is_active")
         seen_pairs = set()
-        for sid, n, a, rate, contact_name, contact_email, active_flag in zip(
+        for sid, n, a, rate, active_flag in zip(
           ids,
           names,
           addresses,
           hourly_rates,
-          contact_names,
-          contact_emails,
           active_flags,
         ):
           n = (n or "").strip()
@@ -7075,8 +7523,6 @@ def admin_sites():
               parsed_rate = None
             if parsed_rate is not None:
               site.hourly_rate = parsed_rate
-            site.contact_name = (contact_name or "").strip() or None
-            site.contact_email = (contact_email or "").strip() or None
             site.is_active = (active_flag or "1").strip() != "0"
         db.commit()
 
@@ -7178,6 +7624,111 @@ def admin_sites():
       prev_page=prev_page,
       next_page=next_page,
       page_sites=page_sites,
+    )
+  finally:
+    db.close()
+
+
+@app.route("/admin/profiles", methods=["GET", "POST"])
+@login_required
+def admin_profiles():
+  db = SessionLocal()
+  try:
+    active_tab = (request.args.get("tab") or request.form.get("tab") or "employees").strip().lower()
+    if active_tab not in {"employees", "clients"}:
+      active_tab = "employees"
+
+    if request.method == "POST":
+      entity = (request.form.get("entity") or "").strip().lower()
+      target_id = request.form.get("id", type=int)
+      profile_action = (request.form.get("profile_action") or "save").strip().lower()
+
+      if entity == "employee_profile" and target_id:
+        emp = db.get(Employee, target_id)
+        if emp:
+          image_file = request.files.get("employee_profile_image")
+          saved_image = _save_profile_image(image_file, f"employee_{emp.id}", replace_path=emp.profile_image_path)
+          if image_file and getattr(image_file, "filename", "") and not saved_image:
+            flash("Invalid employee image format. Use png/jpg/jpeg/gif/webp/heic.", "warning")
+            return redirect(url_for("admin_profiles", tab=active_tab))
+          emp.profile_phone = (request.form.get("profile_phone") or "").strip() or None
+          emp.profile_emergency_name = (request.form.get("profile_emergency_name") or "").strip() or None
+          emp.profile_emergency_phone = (request.form.get("profile_emergency_phone") or "").strip() or None
+          emp.profile_address = (request.form.get("profile_address") or "").strip() or None
+          emp.profile_notes = (request.form.get("profile_notes") or "").strip() or None
+          if saved_image:
+            emp.profile_image_path = saved_image
+          db.commit()
+          flash(f"Profile updated for {emp.name}.")
+      elif entity == "site_profile" and target_id:
+        site = db.get(Site, target_id)
+        if site:
+          image_file = request.files.get("site_profile_image")
+          saved_image = _save_profile_image(image_file, f"site_{site.id}", replace_path=site.profile_image_path)
+          if image_file and getattr(image_file, "filename", "") and not saved_image:
+            flash("Invalid client logo format. Use png/jpg/jpeg/gif/webp/heic.", "warning")
+            return redirect(url_for("admin_profiles", tab=active_tab))
+          site.profile_company_name = (request.form.get("profile_company_name") or "").strip() or None
+          site.profile_contact_name = (request.form.get("profile_contact_name") or "").strip() or None
+          site.profile_contact_email = (request.form.get("profile_contact_email") or "").strip() or None
+          site.profile_phone = (request.form.get("profile_phone") or "").strip() or None
+          if "profile_billing_address" in request.form:
+            site.profile_billing_address = (request.form.get("profile_billing_address") or "").strip() or None
+          submitted_customer_id = (request.form.get("profile_tax_id") or "").strip()
+          site.profile_tax_id = submitted_customer_id or site.profile_tax_id
+          _ensure_site_customer_id(db, site)
+          site.profile_notes = (request.form.get("profile_notes") or "").strip() or None
+          site.contract_partner_name = (request.form.get("contract_partner_name") or "").strip() or None
+          site.contract_contact_details = (request.form.get("contract_contact_details") or "").strip() or None
+          if "profile_default_hourly_rate" in request.form:
+            default_rate_raw = request.form.get("profile_default_hourly_rate")
+            parsed_rate = _coerce_float(default_rate_raw)
+            site.profile_default_hourly_rate = parsed_rate
+          if saved_image:
+            site.profile_image_path = saved_image
+
+          if profile_action == "generate_contract":
+            partner_name = (site.contract_partner_name or "").strip()
+            company_name = (site.profile_company_name or site.name or "").strip()
+            contact_details = (site.contract_contact_details or "").strip()
+            if not partner_name or not company_name or not contact_details:
+              flash("Please fill Name des partners, Firma, and Tel./ Fax / E-Mail before generating contract.", "warning")
+              return redirect(url_for("admin_profiles", tab=active_tab))
+
+            session_date = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            db.commit()
+            pdf_buffer = generate_contract_pdf(
+              partner_name,
+              company_name,
+              contact_details,
+            )
+            return send_file(
+              pdf_buffer,
+              mimetype="application/pdf",
+              as_attachment=True,
+              download_name=f"client_contract_{site.id}_{session_date}.pdf",
+            )
+
+          db.commit()
+          flash(f"Client profile updated for {site.name}.")
+
+      return redirect(url_for("admin_profiles", tab=active_tab))
+
+    employees = db.query(Employee).order_by(Employee.name.asc()).all()
+    sites = db.query(Site).order_by(Site.name.asc()).all()
+    generated_any_customer_ids = False
+    for site in sites:
+      if not (site.profile_tax_id or "").strip():
+        _ensure_site_customer_id(db, site)
+        generated_any_customer_ids = True
+    if generated_any_customer_ids:
+      db.commit()
+    return render_template_string(
+      ADMIN_PROFILES_TEMPLATE,
+      active_page="profiles",
+      active_tab=active_tab,
+      employees=employees,
+      sites=sites,
     )
   finally:
     db.close()
@@ -7515,6 +8066,59 @@ def _generate_invoice_number(session_obj) -> str:
   return candidate
 
 
+def _parse_customer_id_sequence(raw_value: str | None) -> int | None:
+  """Parse UT customer ID sequence from strings like 'UT- 0001' or 'UT-1'."""
+  value = (raw_value or "").strip().upper()
+  match = re.fullmatch(r"UT-\s*(\d+)", value)
+  if not match:
+    return None
+  return int(match.group(1))
+
+
+def _format_customer_id(sequence: int) -> str:
+  return f"UT- {sequence:04d}"
+
+
+def _generate_customer_id(session_obj) -> str:
+  """Generate continuous customer IDs: UT- 0001, UT- 0002, ..."""
+  start_sequence = 1
+  highest = start_sequence - 1
+
+  existing_site_ids = session_obj.query(Site.profile_tax_id).all()
+  existing_invoice_ids = session_obj.query(Invoice.site_tax_id).all()
+
+  for (raw_value,) in [*existing_site_ids, *existing_invoice_ids]:
+    parsed = _parse_customer_id_sequence(raw_value)
+    if parsed is None:
+      continue
+    if parsed > highest:
+      highest = parsed
+
+  next_sequence = max(start_sequence, highest + 1)
+  candidate = _format_customer_id(next_sequence)
+
+  while (
+    session_obj.query(Site.id).filter(Site.profile_tax_id == candidate).first()
+    or session_obj.query(Invoice.id).filter(Invoice.site_tax_id == candidate).first()
+  ):
+    next_sequence += 1
+    candidate = _format_customer_id(next_sequence)
+
+  return candidate
+
+
+def _ensure_site_customer_id(session_obj, site: Site | None) -> str:
+  """Return a site's customer ID, creating one when missing."""
+  if not site:
+    return ""
+  current_value = (site.profile_tax_id or "").strip()
+  if current_value:
+    return current_value
+  generated = _generate_customer_id(session_obj)
+  site.profile_tax_id = generated
+  return generated
+
+
 def _previous_month_range(reference_day: date | None = None) -> tuple[date, date]:
   """Return first/last day of previous month."""
   ref = reference_day or date.today()
@@ -7527,7 +8131,7 @@ def _previous_month_range(reference_day: date | None = None) -> tuple[date, date
 def _auto_generate_monthly_invoices(
   session_obj,
   billing_month: str | None = None,
-  tax_rate_percent: float = 0.0,
+  tax_rate_percent: float = 20.0,
   days_until_due: int = 30,
 ) -> dict[str, int | str]:
   """Generate one draft invoice per site for the target month (idempotent by site+month)."""
@@ -7560,7 +8164,7 @@ def _auto_generate_monthly_invoices(
       skipped_zero_hours += 1
       continue
 
-    hourly_rate = site.hourly_rate or 50.0
+    hourly_rate = site.hourly_rate or site.profile_default_hourly_rate or 50.0
     subtotal = total_hours * hourly_rate
     tax_decimal = (tax_rate_percent or 0.0) / 100
     tax_amount = subtotal * tax_decimal
@@ -7569,8 +8173,12 @@ def _auto_generate_monthly_invoices(
     invoice = Invoice(
       invoice_number=_generate_invoice_number(session_obj),
       site_id=site.id,
-      site_contact_name=(site.contact_name or "").strip(),
-      site_contact_email=(site.contact_email or "").strip(),
+      site_company_name=((site.profile_company_name or "").strip() or (site.name or "").strip()),
+      site_contact_name=((site.profile_contact_name or "").strip() or (site.contact_name or "").strip()),
+      site_contact_email=((site.profile_contact_email or "").strip() or (site.contact_email or "").strip()),
+      site_phone=(site.profile_phone or "").strip(),
+      site_billing_address=((site.profile_billing_address or "").strip() or (site.address or "").strip()),
+      site_tax_id=_ensure_site_customer_id(session_obj, site),
       hourly_rate=hourly_rate,
       tax_rate=tax_decimal,
       total_hours=total_hours,
@@ -7698,22 +8306,35 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     invoice_date = current_date
     delivery_date = current_date
     
-    # Customer number (using site_id as customer number)
-    customer_number = str(invoice.site_id) if invoice.site_id else "1000"
+    # Customer number from profile-generated customer ID
+    customer_number = (
+      (invoice.site_tax_id or "").strip()
+      or ((invoice.site.profile_tax_id or "").strip() if invoice.site else "")
+      or (str(invoice.site_id) if invoice.site_id else "")
+    )
 
     # Client profile for recipient block
     recipient_name = (
       (invoice.site_contact_name or "").strip()
+      or (invoice.site_company_name or "").strip()
       or (invoice.site.name if invoice.site else "")
       or ""
     )
-    recipient_address_raw = (invoice.site.address if invoice.site and invoice.site.address else "").strip()
+    recipient_contact_line = (invoice.site_contact_name or "").strip()
+    recipient_address_raw = (
+      (invoice.site_billing_address or "").strip()
+      or (invoice.site.address if invoice.site and invoice.site.address else "").strip()
+    )
     recipient_address_lines: list[str] = []
     if recipient_address_raw:
       if "\n" in recipient_address_raw:
         recipient_address_lines = [line.strip() for line in recipient_address_raw.splitlines() if line.strip()]
       else:
         recipient_address_lines = [part.strip() for part in recipient_address_raw.split(",") if part.strip()]
+
+    recipient_extra_lines: list[str] = []
+    if recipient_contact_line and recipient_contact_line != recipient_name:
+      recipient_extra_lines.append(recipient_contact_line)
     
     # Logo path (drawn on canvas to avoid layout shifts)
     logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'stafflogo.png')
@@ -7755,6 +8376,10 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
       ],
       [
         Paragraph(f'<font size=10>{"<br/>".join(recipient_address_lines) if recipient_address_lines else ""}</font>', address_style),
+        ''
+      ],
+      [
+        Paragraph(f'<font size=10>{"<br/>".join(recipient_extra_lines) if recipient_extra_lines else ""}</font>', address_style),
         ''
       ],
     ]
@@ -7988,7 +8613,10 @@ def send_invoice_email(invoice: Invoice, pdf_buffer: io.BytesIO) -> Tuple[bool, 
             app.logger.warning(msg)
             return False, msg
         
-        recipient_email = invoice.site_contact_email
+        recipient_email = (
+          (invoice.site_contact_email or "").strip()
+          or ((invoice.site.profile_contact_email or "").strip() if invoice.site else "")
+        )
         if not recipient_email:
             msg = f"No recipient email set for invoice {invoice.invoice_number}."
             app.logger.warning(msg)
@@ -7998,20 +8626,22 @@ def send_invoice_email(invoice: Invoice, pdf_buffer: io.BytesIO) -> Tuple[bool, 
         msg = MIMEMultipart()
         msg['From'] = f"{sender_name} <{sender_email}>" if sender_name else sender_email
         msg['To'] = recipient_email
-        msg['Subject'] = f'Invoice {invoice.invoice_number} - {invoice.site.name}'
+        msg['Subject'] = f'Invoice {invoice.invoice_number} - {(invoice.site_company_name or invoice.site.name)}'
         
         # Body
         body = f"""
-Dear {invoice.site_contact_name or 'Customer'},
+Dear {invoice.site_contact_name or invoice.site_company_name or 'Customer'},
 
 Please find attached your invoice {invoice.invoice_number}.
 
 Invoice Details:
 - Site: {invoice.site.name}
+- Company: {invoice.site_company_name or invoice.site.name}
 - Hours Worked: {invoice.total_hours}
 - Hourly Rate: ${invoice.hourly_rate:.2f}
 - Total Amount: ${invoice.total_amount:.2f}
 - Due Date: {invoice.due_date.strftime("%d/%m/%Y") if invoice.due_date else "Upon receipt"}
+{f"- Customer ID: {invoice.site_tax_id}" if invoice.site_tax_id else ""}
 
 {f"Additional Notes: {invoice.notes}" if invoice.notes else ""}
 
@@ -8256,13 +8886,13 @@ def admin_generate_monthly_invoices():
   session_obj = SessionLocal()
   try:
     month = (request.form.get("month") or "").strip()
-    tax_rate = request.form.get("tax_rate", type=float, default=0.0)
+    tax_rate = request.form.get("tax_rate", type=float, default=20.0)
     due_days = request.form.get("days_until_due", type=int, default=30)
 
     result = _auto_generate_monthly_invoices(
       session_obj,
       billing_month=month or None,
-      tax_rate_percent=tax_rate or 0.0,
+      tax_rate_percent=tax_rate or 20.0,
       days_until_due=due_days or 30,
     )
     flash(
@@ -8337,9 +8967,13 @@ def admin_create_invoice():
     try:
         if request.method == "POST":
             site_id = request.form.get("site_id", type=int)
+            site_company_name = (request.form.get("site_company_name") or "").strip()
             site_contact_name = (request.form.get("site_contact_name") or "").strip()
             site_contact_email = (request.form.get("site_contact_email") or "").strip()
-            tax_rate = request.form.get("tax_rate", type=float, default=0.0)
+            site_phone = (request.form.get("site_phone") or "").strip()
+            site_billing_address = (request.form.get("site_billing_address") or "").strip()
+            site_tax_id = (request.form.get("site_tax_id") or "").strip()
+            tax_rate = request.form.get("tax_rate", type=float, default=20.0)
             invoice_month = (request.form.get("invoice_month") or "").strip()
             notes = request.form.get("notes", "")
             days_until_due = request.form.get("days_until_due", type=int, default=30)
@@ -8349,10 +8983,30 @@ def admin_create_invoice():
                 flash("Please select a valid site.", "warning")
                 return redirect(url_for("admin_create_invoice"))
 
+            if not site_company_name:
+              site_company_name = (
+                (site.profile_company_name or "").strip()
+                or (site.name or "").strip()
+              )
             if not site_contact_name:
-                site_contact_name = (site.contact_name or "").strip()
+              site_contact_name = (
+                (site.profile_contact_name or "").strip()
+                or (site.contact_name or "").strip()
+              )
             if not site_contact_email:
-                site_contact_email = (site.contact_email or "").strip()
+              site_contact_email = (
+                (site.profile_contact_email or "").strip()
+                or (site.contact_email or "").strip()
+              )
+            if not site_phone:
+              site_phone = (site.profile_phone or "").strip()
+            if not site_billing_address:
+              site_billing_address = (
+                (site.profile_billing_address or "").strip()
+                or (site.address or "").strip()
+              )
+            if not site_tax_id:
+              site_tax_id = _ensure_site_customer_id(session_obj, site)
 
             month_range = _month_range(invoice_month)
             if not month_range:
@@ -8365,7 +9019,7 @@ def admin_create_invoice():
                 month_start,
                 month_end,
             )
-            hourly_rate = site.hourly_rate or 50.0
+            hourly_rate = site.hourly_rate or site.profile_default_hourly_rate or 50.0
             
             # Calculate totals
             subtotal = total_hours * hourly_rate
@@ -8375,8 +9029,12 @@ def admin_create_invoice():
             invoice = Invoice(
               invoice_number=_generate_invoice_number(session_obj),
                 site_id=site.id,
+                site_company_name=site_company_name,
                 site_contact_name=site_contact_name,
                 site_contact_email=site_contact_email,
+                site_phone=site_phone,
+                site_billing_address=site_billing_address,
+                site_tax_id=site_tax_id,
                 hourly_rate=hourly_rate,
                 tax_rate=tax_rate / 100,  # Convert percentage to decimal
                 total_hours=total_hours,
@@ -8395,6 +9053,13 @@ def admin_create_invoice():
             return redirect(url_for("admin_invoices"))
         
         sites = session_obj.query(Site).all()
+        generated_any_customer_ids = False
+        for site in sites:
+          if not (site.profile_tax_id or "").strip():
+            _ensure_site_customer_id(session_obj, site)
+            generated_any_customer_ids = True
+        if generated_any_customer_ids:
+          session_obj.commit()
         current_month = datetime.utcnow().strftime("%Y-%m")
         return render_template_string(
             INVOICE_FORM_TEMPLATE,
@@ -8437,11 +9102,15 @@ def admin_edit_invoice(invoice_id):
         if request.method == "POST":
             site_id = request.form.get("site_id", type=int)
             status = (request.form.get("status") or "draft").strip().lower()
+            site_company_name = (request.form.get("site_company_name") or "").strip()
             site_contact_name = (request.form.get("site_contact_name") or "").strip()
             site_contact_email = (request.form.get("site_contact_email") or "").strip()
+            site_phone = (request.form.get("site_phone") or "").strip()
+            site_billing_address = (request.form.get("site_billing_address") or "").strip()
+            site_tax_id = (request.form.get("site_tax_id") or "").strip()
             hourly_rate = request.form.get("hourly_rate", type=float)
             total_hours = request.form.get("total_hours", type=float)
-            tax_rate_percent = request.form.get("tax_rate", type=float)
+            tax_rate_percent = request.form.get("tax_rate", type=float, default=20.0)
             due_date_raw = (request.form.get("due_date") or "").strip()
             paid_at_raw = (request.form.get("paid_at") or "").strip()
             notes = request.form.get("notes", "")
@@ -8451,13 +9120,38 @@ def admin_edit_invoice(invoice_id):
                 flash("Please select a valid site.", "warning")
                 return redirect(url_for("admin_edit_invoice", invoice_id=invoice_id))
 
+            if not site_company_name:
+              site_company_name = (
+                (site.profile_company_name or "").strip()
+                or (site.name or "").strip()
+              )
+            if not site_contact_name:
+              site_contact_name = (
+                (site.profile_contact_name or "").strip()
+                or (site.contact_name or "").strip()
+              )
+            if not site_contact_email:
+              site_contact_email = (
+                (site.profile_contact_email or "").strip()
+                or (site.contact_email or "").strip()
+              )
+            if not site_phone:
+              site_phone = (site.profile_phone or "").strip()
+            if not site_billing_address:
+              site_billing_address = (
+                (site.profile_billing_address or "").strip()
+                or (site.address or "").strip()
+              )
+            if not site_tax_id:
+              site_tax_id = _ensure_site_customer_id(session_obj, site)
+
             if status not in {"draft", "sent", "paid", "overdue"}:
                 flash("Invalid status selected.", "warning")
                 return redirect(url_for("admin_edit_invoice", invoice_id=invoice_id))
 
-            if hourly_rate is None or total_hours is None or tax_rate_percent is None:
-                flash("Hourly rate, total hours and tax rate are required.", "warning")
-                return redirect(url_for("admin_edit_invoice", invoice_id=invoice_id))
+            if hourly_rate is None or total_hours is None:
+              flash("Hourly rate and total hours are required.", "warning")
+              return redirect(url_for("admin_edit_invoice", invoice_id=invoice_id))
 
             due_date = None
             if due_date_raw:
@@ -8476,14 +9170,18 @@ def admin_edit_invoice(invoice_id):
                     return redirect(url_for("admin_edit_invoice", invoice_id=invoice_id))
 
             subtotal = total_hours * hourly_rate
-            tax_rate_decimal = tax_rate_percent / 100
+            tax_rate_decimal = (tax_rate_percent or 20.0) / 100
             tax_amount = subtotal * tax_rate_decimal
             total_amount = subtotal + tax_amount
 
             invoice.site_id = site.id
             invoice.status = status
+            invoice.site_company_name = site_company_name
             invoice.site_contact_name = site_contact_name
             invoice.site_contact_email = site_contact_email
+            invoice.site_phone = site_phone
+            invoice.site_billing_address = site_billing_address
+            invoice.site_tax_id = site_tax_id
             invoice.hourly_rate = hourly_rate
             invoice.total_hours = total_hours
             invoice.tax_rate = tax_rate_decimal
@@ -8734,7 +9432,7 @@ def admin_delete_invoice(invoice_id):
 def _run_monthly_invoice_generation_from_cli() -> int:
     """CLI entrypoint to support cron-based monthly invoice generation."""
     month = None
-    tax_rate = 0.0
+    tax_rate = 20.0
     due_days = 30
     for arg in sys.argv[1:]:
         if arg.startswith("--month="):
