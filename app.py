@@ -2575,7 +2575,7 @@ CONTRACT_BUILDER_TEMPLATE = """
             <div class="col-12">
               <label class="form-label">Upload contract PDF</label>
               <input type="file" class="form-control" name="contract_pdf" accept="application/pdf,.pdf">
-              <div class="form-text">Optional if server template exists at uploads/contract_template.pdf. If uploaded, this file is used.</div>
+              <div class="form-text">Optional if a server template exists at uploads/contract_template.pdf or static/uploads/contract_template.pdf (or set CONTRACT_TEMPLATE_PATH). If uploaded, this file is used.</div>
             </div>
             <div class="col-md-6">
               <label class="form-label">Name des partners</label>
@@ -4839,15 +4839,26 @@ try:
   from pypdf import PdfReader, PdfWriter
   PYPDF_AVAILABLE = True
 except Exception:  # pragma: no cover - optional dependency
-  PdfReader = None
-  PdfWriter = None
-  PYPDF_AVAILABLE = False
+  try:
+    _pypdf2 = __import__("PyPDF2", fromlist=["PdfReader", "PdfWriter"])
+    PdfReader = getattr(_pypdf2, "PdfReader", None)
+    PdfWriter = getattr(_pypdf2, "PdfWriter", None)
+    PYPDF_AVAILABLE = True
+  except Exception:
+    PdfReader = None
+    PdfWriter = None
+    PYPDF_AVAILABLE = False
 
 try:
   from pypdf.generic import BooleanObject, NameObject
 except Exception:  # pragma: no cover - optional dependency / version differences
-  BooleanObject = None
-  NameObject = None
+  try:
+    _pypdf2_generic = __import__("PyPDF2.generic", fromlist=["BooleanObject", "NameObject"])
+    BooleanObject = getattr(_pypdf2_generic, "BooleanObject", None)
+    NameObject = getattr(_pypdf2_generic, "NameObject", None)
+  except Exception:
+    BooleanObject = None
+    NameObject = None
 
 try:
   from openai import OpenAI
@@ -8680,6 +8691,23 @@ Your Company
         return False, str(e)
 
 
+def _resolve_contract_template_path() -> str | None:
+  configured = (os.getenv("CONTRACT_TEMPLATE_PATH") or "").strip()
+  if configured:
+    candidate = configured if os.path.isabs(configured) else os.path.join(APP_ROOT, configured)
+    if os.path.exists(candidate):
+      return candidate
+
+  candidates = [
+    os.path.join(APP_ROOT, "uploads", "contract_template.pdf"),
+    os.path.join(APP_ROOT, "static", "uploads", "contract_template.pdf"),
+  ]
+  for candidate in candidates:
+    if os.path.exists(candidate):
+      return candidate
+  return None
+
+
 def generate_contract_pdf(
   partner_name: str,
   company_name: str,
@@ -8719,8 +8747,8 @@ def generate_contract_pdf(
     if template_pdf_bytes and PYPDF_AVAILABLE:
       template_reader = PdfReader(io.BytesIO(template_pdf_bytes))
     elif PYPDF_AVAILABLE:
-      template_path = os.path.join(APP_ROOT, "uploads", "contract_template.pdf")
-      if os.path.exists(template_path):
+      template_path = _resolve_contract_template_path()
+      if template_path:
         template_reader = PdfReader(template_path)
 
     def _contains_any(value: str, tokens: list[str]) -> bool:
@@ -8824,7 +8852,7 @@ def admin_contract_builder():
         company_name = (request.form.get("company_name") or "").strip()
         contact_details = (request.form.get("contact_details") or "").strip()
         contract_pdf_file = request.files.get("contract_pdf")
-        template_path = os.path.join(APP_ROOT, "uploads", "contract_template.pdf")
+    template_path = _resolve_contract_template_path()
 
         if not partner_name or not company_name or not contact_details:
             flash("Please fill all contract fields.", "warning")
@@ -8854,8 +8882,17 @@ def admin_contract_builder():
                   company_name=company_name,
                   contact_details=contact_details,
                 )
-        elif not os.path.exists(template_path):
-            flash("Upload a contract PDF or place a template at uploads/contract_template.pdf.", "warning")
+        elif not template_path:
+            flash("Upload a contract PDF or place a template at uploads/contract_template.pdf or static/uploads/contract_template.pdf.", "warning")
+            return render_template_string(
+              CONTRACT_BUILDER_TEMPLATE,
+              partner_name=partner_name,
+              company_name=company_name,
+              contact_details=contact_details,
+            )
+
+        if (uploaded_pdf_bytes or template_path) and not PYPDF_AVAILABLE:
+            flash("PDF template merge is unavailable on this server. Install pypdf (or PyPDF2) in production.", "warning")
             return render_template_string(
               CONTRACT_BUILDER_TEMPLATE,
               partner_name=partner_name,
