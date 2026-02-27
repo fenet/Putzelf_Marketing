@@ -10,7 +10,7 @@ from collections import deque
 from datetime import datetime, date, timedelta
 from functools import wraps
 from typing import Any, Tuple
-from urllib.parse import urljoin, urldefrag, urlparse, quote_plus
+from urllib.parse import urljoin, urldefrag, urlparse, quote_plus, urlencode
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -4787,6 +4787,265 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
 AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "admin")
 
+SUPPORTED_LANGUAGES = {"en", "de"}
+DEFAULT_LANGUAGE = "en"
+
+# Phrase-level translations applied app-wide on HTML responses.
+# This keeps the single-file app maintainable without rewriting every template.
+DE_HTML_REPLACEMENTS: dict[str, str] = {
+  "Overview": "Übersicht",
+  "Manage employees": "Mitarbeiter verwalten",
+  "Manage sites": "Standorte verwalten",
+  "Profiles": "Profile",
+  "Invoices": "Rechnungen",
+  "Log out": "Abmelden",
+  "Profile Center": "Profilzentrum",
+  "Employee profiles": "Mitarbeiterprofile",
+  "Client profiles": "Kundenprofile",
+  "Employee registration": "Mitarbeiterprofil",
+  "Client registration": "Kundenprofil",
+  "Billing contact name": "Name der Rechnungs-Kontaktperson",
+  "Billing contact email": "E-Mail Rechnungs-Kontakt",
+  "Billing phone": "Rechnungstelefon",
+  "Customer ID": "Kundennummer",
+  "Notes": "Notizen",
+  "Upload photo": "Foto hochladen",
+  "Upload logo": "Logo hochladen",
+  "Save profile": "Profil speichern",
+  "Create New Invoice": "Neue Rechnung erstellen",
+  "Generate an invoice for work completed": "Rechnung für erbrachte Arbeit erstellen",
+  "Company Name": "Firmenname",
+  "Contact Name": "Kontaktname",
+  "Contact Email": "Kontakt-E-Mail",
+  "Contact Phone": "Kontakttelefon",
+  "Billing Address": "Rechnungsadresse",
+  "Invoice Month": "Rechnungsmonat",
+  "Total Hours": "Gesamtstunden",
+  "Days Until Due": "Tage bis Fälligkeit",
+  "Tax Rate (%)": "Steuersatz (%)",
+  "Create Invoice": "Rechnung erstellen",
+  "Edit Invoice": "Rechnung bearbeiten",
+  "Invoice Details": "Rechnungsdetails",
+  "Bill To:": "Rechnung an:",
+  "Billing Contact Person:": "Rechnungs-Kontaktperson:",
+  "Address:": "Adresse:",
+  "Hourly Rate": "Stundensatz",
+  "Due Date": "Fälligkeitsdatum",
+  "Paid Date": "Bezahlt am",
+  "Subtotal": "Zwischensumme",
+  "TOTAL": "GESAMT",
+  "Draft": "Entwurf",
+  "Sent": "Gesendet",
+  "Paid": "Bezahlt",
+  "Overdue": "Überfällig",
+  "Delete": "Löschen",
+  "Back": "Zurück",
+  "Send Email": "E-Mail senden",
+  "Mark as Paid": "Als bezahlt markieren",
+  "Mark as Unpaid": "Als unbezahlt markieren",
+  "Monthly Income": "Monatseinnahmen",
+  "Auto Generate": "Automatisch erstellen",
+  "Created From": "Erstellt von",
+  "Created To": "Erstellt bis",
+  "Apply Filters": "Filter anwenden",
+  "Clear": "Zurücksetzen",
+  "Lead-Center": "Lead-Center",
+  "Assign coverage": "Einsätze zuweisen",
+  "Crawler": "Crawler",
+  "No sites found.": "Keine Standorte gefunden.",
+  "No employees found.": "Keine Mitarbeiter gefunden.",
+  "No invoices found.": "Keine Rechnungen gefunden.",
+  "Client Contract": "Kundenvertrag",
+  "Operations overview": "Betriebsübersicht",
+  "This week at a glance": "Diese Woche im Überblick",
+  "Employees": "Mitarbeiter",
+  "Sites": "Standorte",
+  "Unassigned sites": "Unzugewiesene Standorte",
+  "Newest sites": "Neueste Standorte",
+  "Sites without coverage": "Standorte ohne Abdeckung",
+  "All sites are covered for the current week.": "Alle Standorte sind für die aktuelle Woche abgedeckt.",
+  "Manage": "Verwalten",
+  "Team directory": "Teamverzeichnis",
+  "Location library": "Standortübersicht",
+  "Billing & Invoicing": "Abrechnung & Rechnungen",
+  "Financial Overview": "Finanzübersicht",
+  "Invoice": "Rechnung",
+  "Invoice #": "Rechnungsnr.",
+  "Date:": "Datum:",
+  "Date": "Datum",
+  "Description": "Beschreibung",
+  "Quantity": "Menge",
+  "Rate": "Satz",
+  "Amount": "Betrag",
+  "hours": "Stunden",
+  "hr": "Std",
+  "Work at": "Arbeit bei",
+  "Upon receipt": "Bei Erhalt",
+  "Status": "Status",
+  "Save Changes": "Änderungen speichern",
+  "Cancel": "Abbrechen",
+  "Paid": "Bezahlt",
+  "DRAFT": "ENTWURF",
+  "SENT": "GESENDET",
+  "PAID": "BEZAHLT",
+  "Generate contract PDF": "Vertrags-PDF erstellen",
+  "Please fill all contract fields.": "Bitte alle Vertragsfelder ausfüllen.",
+  "Please upload a valid PDF contract file.": "Bitte eine gültige PDF-Vertragsdatei hochladen.",
+  "Uploaded PDF is empty.": "Hochgeladene PDF ist leer.",
+  "Upload a contract PDF or place a template at uploads/contract_template.pdf or static/uploads/contract_template.pdf.": "Laden Sie eine Vertrags-PDF hoch oder legen Sie eine Vorlage unter uploads/contract_template.pdf oder static/uploads/contract_template.pdf ab.",
+  "Please fill Name des partners, Firma, and Tel./ Fax / E-Mail before generating contract.": "Bitte füllen Sie Name des Partners, Firma und Tel./ Fax / E-Mail aus, bevor Sie den Vertrag erstellen.",
+  "Name des partners": "Name des Partners",
+  "Firma": "Firma",
+  "Tel./ Fax / E-Mail": "Tel./ Fax / E-Mail",
+  "Upload contract PDF": "Vertrags-PDF hochladen",
+  "Optional if a server template exists at uploads/contract_template.pdf or static/uploads/contract_template.pdf (or set CONTRACT_TEMPLATE_PATH). If uploaded, this file is used.": "Optional, wenn eine Servervorlage unter uploads/contract_template.pdf oder static/uploads/contract_template.pdf existiert (oder CONTRACT_TEMPLATE_PATH gesetzt ist). Bei Upload wird diese Datei verwendet.",
+  "Download PDF": "PDF herunterladen",
+  "Back to manage sites": "Zurück zu Standorte verwalten",
+  "No address": "Keine Adresse",
+  "No role": "Keine Rolle",
+  "Phone": "Telefon",
+  "Emergency contact name": "Name Notfallkontakt",
+  "Emergency contact phone": "Telefon Notfallkontakt",
+  "Address": "Adresse",
+  "Page": "Seite",
+  "Prev": "Zurück",
+  "Next": "Weiter",
+  "clients": "Kunden",
+  "Lead-Center": "Lead-Center",
+  "Leads": "Leads",
+  "New Leads": "Neue Leads",
+  "In Contact": "In Kontakt",
+  "Qualified": "Qualifiziert",
+  "Closed": "Abgeschlossen",
+  "Source": "Quelle",
+  "Stage": "Phase",
+  "Add lead": "Lead hinzufügen",
+  "Delete selected": "Ausgewählte löschen",
+  "Send selected emails": "Ausgewählte E-Mails senden",
+  "total invoices": "Rechnungen gesamt",
+  "Create": "Erstellen",
+  "Create New": "Neu erstellen",
+  "Select a site": "Standort auswählen",
+  "Site": "Standort",
+  "Site *": "Standort *",
+  "Please select a valid site.": "Bitte einen gültigen Standort auswählen.",
+  "Please choose a valid invoice month.": "Bitte einen gültigen Rechnungsmonat auswählen.",
+  "created successfully!": "erfolgreich erstellt!",
+  "updated successfully.": "erfolgreich aktualisiert.",
+  "deleted": "gelöscht",
+  "Invalid status selected.": "Ungültiger Status ausgewählt.",
+  "Invalid due date format.": "Ungültiges Fälligkeitsdatum.",
+  "Invalid paid date format.": "Ungültiges Bezahldatum.",
+  "Hourly rate and total hours are required.": "Stundensatz und Gesamtstunden sind erforderlich.",
+  "No recipient email set for invoice": "Keine Empfänger-E-Mail für Rechnung gesetzt",
+  "Email configuration missing. Set sender email and SMTP password.": "E-Mail-Konfiguration fehlt. Bitte Absender-E-Mail und SMTP-Passwort setzen.",
+  "Thank you for your business!": "Vielen Dank für Ihr Vertrauen!",
+  "Best regards,": "Mit freundlichen Grüßen,",
+  "Your Company": "Ihr Unternehmen",
+  "Language switcher": "Sprachauswahl",
+}
+
+
+def _get_current_language() -> str:
+  value = (session.get("lang") or DEFAULT_LANGUAGE).strip().lower()
+  return value if value in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGE
+
+
+def _t(text: str) -> str:
+  if _get_current_language() != "de":
+    return text
+  return DE_HTML_REPLACEMENTS.get(text, text)
+
+
+def _translate_text_fragment(text: str) -> str:
+  translated = text
+  for source, target in sorted(DE_HTML_REPLACEMENTS.items(), key=lambda pair: len(pair[0]), reverse=True):
+    translated = translated.replace(source, target)
+  return translated
+
+
+def _translate_html_content(content: str) -> str:
+  if _get_current_language() != "de":
+    return content
+  try:
+    soup = BeautifulSoup(content, "html.parser")
+    for node in soup.find_all(string=True):
+      parent_name = (node.parent.name or "").lower() if node.parent else ""
+      if parent_name in {"script", "style"}:
+        continue
+      original = str(node)
+      replaced = _translate_text_fragment(original)
+      if replaced != original:
+        node.replace_with(replaced)
+    return str(soup)
+  except Exception:
+    return content
+
+
+def _build_language_switcher_markup() -> str:
+  args_next = request.args.to_dict(flat=True)
+  args_next.pop("lang", None)
+  next_query = urlencode(args_next)
+  next_path = f"{request.path}?{next_query}" if next_query else request.path
+  href_en = url_for("set_language", lang_code="en", next=next_path)
+  href_de = url_for("set_language", lang_code="de", next=next_path)
+  current = _get_current_language()
+  en_active = "active" if current == "en" else ""
+  de_active = "active" if current == "de" else ""
+  return f"""
+  <style>
+    .lang-switcher{{position:fixed;right:14px;top:14px;z-index:9999;background:#ffffff;border:1px solid #cbd5e1;border-radius:999px;box-shadow:0 8px 22px rgba(15,23,42,.15);padding:4px;display:flex;gap:4px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}}
+    .lang-switcher a{{text-decoration:none;color:#0f172a;padding:6px 10px;border-radius:999px;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;min-width:34px}}
+    .lang-switcher a.active{{background:#0f766e;color:#fff}}
+  </style>
+  <div class="lang-switcher" aria-label="Language switcher">
+    <a href="{href_en}" class="{en_active}" title="English" aria-label="English">🇬🇧</a>
+    <a href="{href_de}" class="{de_active}" title="Deutsch" aria-label="Deutsch">🇩🇪</a>
+  </div>
+  """
+
+
+@app.before_request
+def _language_before_request():
+  requested = (request.args.get("lang") or "").strip().lower()
+  if requested in SUPPORTED_LANGUAGES:
+    session["lang"] = requested
+
+
+@app.route("/set-language/<lang_code>")
+def set_language(lang_code: str):
+  normalized = (lang_code or "").strip().lower()
+  if normalized in SUPPORTED_LANGUAGES:
+    session["lang"] = normalized
+  next_target = (request.args.get("next") or "").strip()
+  if not next_target.startswith("/"):
+    next_target = url_for("admin_dashboard")
+  return redirect(next_target)
+
+
+@app.context_processor
+def _language_context_processor():
+  return {
+    "t": _t,
+    "current_lang": _get_current_language(),
+  }
+
+
+@app.after_request
+def _language_after_request(response):
+  content_type = (response.content_type or "").lower()
+  if "text/html" not in content_type:
+    return response
+  try:
+    html = response.get_data(as_text=True)
+  except Exception:
+    return response
+  if "</body>" in html:
+    html = html.replace("</body>", _build_language_switcher_markup() + "</body>", 1)
+  html = _translate_html_content(html)
+  response.set_data(html)
+  return response
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
   DATABASE_URL = "sqlite:///" + os.path.join(APP_ROOT, "schedule.db")
@@ -5239,12 +5498,26 @@ ADMIN_PROFILES_TEMPLATE = """
         <div class="card-surface">
           <h2 class="h6 text-uppercase text-secondary mb-3">Client registration</h2>
           {% if sites %}
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span class="small text-secondary">Page {{ clients_page }} of {{ clients_total_pages }} · {{ clients_total_count }} clients</span>
+              <div class="d-flex gap-2">
+                <a
+                  class="btn btn-sm btn-outline-secondary {% if not clients_has_prev %}disabled{% endif %}"
+                  href="{{ url_for('admin_profiles', tab='clients', clients_page=clients_prev_page) if clients_has_prev else '#' }}"
+                >Prev</a>
+                <a
+                  class="btn btn-sm btn-outline-secondary {% if not clients_has_next %}disabled{% endif %}"
+                  href="{{ url_for('admin_profiles', tab='clients', clients_page=clients_next_page) if clients_has_next else '#' }}"
+                >Next</a>
+              </div>
+            </div>
             <div class="vstack gap-3">
               {% for site in sites %}
                 <form method="post" enctype="multipart/form-data" class="registration-card">
                   <input type="hidden" name="entity" value="site_profile">
                   <input type="hidden" name="id" value="{{ site.id }}">
                   <input type="hidden" name="tab" value="clients">
+                  <input type="hidden" name="clients_page" value="{{ clients_page }}">
                   <div class="registration-grid">
                     <div class="avatar-wrap">
                       <label class="avatar-uploader" title="Upload logo">
@@ -7646,6 +7919,10 @@ def admin_profiles():
   db = SessionLocal()
   try:
     active_tab = (request.args.get("tab") or request.form.get("tab") or "employees").strip().lower()
+    clients_page = request.args.get("clients_page", type=int)
+    if clients_page is None:
+      clients_page = request.form.get("clients_page", type=int)
+    clients_page = max(clients_page or 1, 1)
     if active_tab not in {"employees", "clients"}:
       active_tab = "employees"
 
@@ -7723,23 +8000,48 @@ def admin_profiles():
           db.commit()
           flash(f"Client profile updated for {site.name}.")
 
-      return redirect(url_for("admin_profiles", tab=active_tab))
+      redirect_args = {"tab": active_tab}
+      if active_tab == "clients":
+        redirect_args["clients_page"] = clients_page
+      return redirect(url_for("admin_profiles", **redirect_args))
 
     employees = db.query(Employee).order_by(Employee.name.asc()).all()
-    sites = db.query(Site).order_by(Site.name.asc()).all()
+    sites_all = db.query(Site).order_by(Site.name.asc()).all()
     generated_any_customer_ids = False
-    for site in sites:
+    for site in sites_all:
       if not (site.profile_tax_id or "").strip():
         _ensure_site_customer_id(db, site)
         generated_any_customer_ids = True
     if generated_any_customer_ids:
       db.commit()
+
+    clients_per_page = 5
+    clients_total_count = len(sites_all)
+    clients_total_pages = max(1, math.ceil(clients_total_count / clients_per_page))
+    if clients_page > clients_total_pages:
+      clients_page = clients_total_pages
+    clients_start = (clients_page - 1) * clients_per_page
+    clients_end = clients_start + clients_per_page
+    sites = sites_all[clients_start:clients_end]
+
+    clients_has_prev = clients_page > 1
+    clients_has_next = clients_page < clients_total_pages
+    clients_prev_page = clients_page - 1 if clients_has_prev else 1
+    clients_next_page = clients_page + 1 if clients_has_next else clients_total_pages
+
     return render_template_string(
       ADMIN_PROFILES_TEMPLATE,
       active_page="profiles",
       active_tab=active_tab,
       employees=employees,
       sites=sites,
+      clients_page=clients_page,
+      clients_total_pages=clients_total_pages,
+      clients_total_count=clients_total_count,
+      clients_has_prev=clients_has_prev,
+      clients_has_next=clients_has_next,
+      clients_prev_page=clients_prev_page,
+      clients_next_page=clients_next_page,
     )
   finally:
     db.close()
