@@ -2,6 +2,7 @@ import math
 import re
 import io
 import csv
+import json
 import logging
 import os
 import sys
@@ -421,6 +422,8 @@ ADMIN_EMPLOYEES_TEMPLATE = """
     .credential-actions { display:flex; flex-wrap:wrap; gap:0.5rem; }
     .employee-action-buttons { display:flex; flex-wrap:wrap; gap:0.5rem; justify-content:flex-end; }
     .employee-action-buttons .btn { flex:1 1 120px; }
+    .flatpickr-calendar { z-index: 9999 !important; }
+    .flatpickr-calendar.inline { display: none !important; }
     @media(max-width:768px){ .employee-action-buttons { justify-content:flex-start; } .employee-action-buttons .btn { flex:1 1 100%; } }
     .assignment-section { border-radius:0.75rem; border:1px dashed #cbd5f5; background:#f8fafc; padding:0.85rem; }
     .assignment-collapse { margin:0; border-radius:0.6rem; overflow:hidden; background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 8px 16px rgba(15,23,42,0.05); }
@@ -916,6 +919,8 @@ ADMIN_EMPLOYEES_TEMPLATE = """
         locale: {
           firstDayOfWeek: 1,
         },
+        static: false,
+        disableMobile: false,
       });
     }
   </script>
@@ -3553,6 +3558,9 @@ LEADS_TEMPLATE = """
     .lead-card.dragging { opacity:0.6; }
     .kanban-column.drop-target { border-color:#0f766e; box-shadow:inset 0 0 0 2px rgba(15,118,110,0.35); }
     .lead-meta { font-size:0.8rem; color:#64748b; }
+    .lead-email-copy { border:0; background:none; padding:0; color:#0f766e; text-decoration:underline; cursor:pointer; font-size:0.8rem; }
+    .lead-email-copy:hover { color:#0c615b; }
+    .copy-status { min-height:1.2rem; }
     .mobile-nav-toggle { display:none; }
     .mobile-nav-backdrop { display:none; }
     @media (max-width: 992px) {
@@ -3728,8 +3736,10 @@ LEADS_TEMPLATE = """
                   <button class="btn btn-sm btn-outline-primary" type="submit">Apply</button>
                   <a href="{{ url_for('leads_dashboard') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
                 </form>
+                <button id="copy-page-emails-btn" type="button" class="btn btn-sm btn-outline-primary">Copy page emails</button>
               </div>
             </div>
+            <div id="copy-status" class="small-note copy-status mb-2" aria-live="polite"></div>
             <div class="kanban">
               {% for stage, stage_leads in grouped_leads.items() %}
                 <div class="kanban-column" data-stage="{{ stage }}">
@@ -3743,7 +3753,11 @@ LEADS_TEMPLATE = """
                         <div class="d-flex justify-content-between align-items-start gap-2">
                           <div>
                             <strong>{{ lead.name }}</strong><br>
-                            <span class="lead-meta">{{ (lead.email or '—') }}</span>
+                            {% if lead.email %}
+                              <button type="button" class="lead-email-copy" data-email="{{ lead.email|e }}" title="Copy email">{{ lead.email }}</button>
+                            {% else %}
+                              <span class="lead-meta">—</span>
+                            {% endif %}
                           </div>
                           <div class="text-end">
                             <span class="small-note d-block">{{ lead.created_at.strftime('%d.%m.%Y') }}</span>
@@ -3942,6 +3956,69 @@ LEADS_TEMPLATE = """
 
     // Lead modals and actions
     (() => {
+      const copyStatus = document.getElementById('copy-status');
+      const showCopyStatus = (text) => {
+        if (!copyStatus) return;
+        copyStatus.textContent = text;
+        setTimeout(() => {
+          if (copyStatus.textContent === text) copyStatus.textContent = '';
+        }, 2500);
+      };
+      const copyToClipboard = async (text) => {
+        const payload = (text || '').trim();
+        if (!payload) return false;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(payload);
+            return true;
+          }
+        } catch (err) {
+          console.warn('Clipboard API failed', err);
+        }
+        try {
+          const area = document.createElement('textarea');
+          area.value = payload;
+          area.setAttribute('readonly', '');
+          area.style.position = 'absolute';
+          area.style.left = '-9999px';
+          document.body.appendChild(area);
+          area.select();
+          const ok = document.execCommand('copy');
+          area.remove();
+          return ok;
+        } catch (err) {
+          console.warn('execCommand copy failed', err);
+          return false;
+        }
+      };
+
+      document.querySelectorAll('.lead-email-copy').forEach(btn => {
+        btn.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          const email = (btn.dataset.email || '').trim();
+          if (!email) return;
+          const ok = await copyToClipboard(email);
+          showCopyStatus(ok ? `Copied: ${email}` : 'Unable to copy email');
+        });
+      });
+
+      const copyAllBtn = document.getElementById('copy-page-emails-btn');
+      if (copyAllBtn) {
+        copyAllBtn.addEventListener('click', async () => {
+          const emails = [...document.querySelectorAll('.lead-card[data-lead-email]')]
+            .map(card => (card.dataset.leadEmail || '').trim())
+            .filter(Boolean);
+          const uniqueEmails = [...new Set(emails)];
+          if (!uniqueEmails.length) {
+            showCopyStatus('No emails on this page');
+            return;
+          }
+          const payload = uniqueEmails.join(';');
+          const ok = await copyToClipboard(payload);
+          showCopyStatus(ok ? `Copied ${uniqueEmails.length} emails` : 'Unable to copy emails');
+        });
+      }
+
       const editForm = document.getElementById('lead-edit-form');
       const deleteForm = document.getElementById('lead-delete-form');
       if (!editForm || !deleteForm) return;
@@ -4290,7 +4367,7 @@ HTML_TEMPLATE = """
         status.textContent = 'Crawling… this may take a while';
         try {
           const formData = new FormData(form);
-          const resp = await fetch('/', { method: 'POST', body: formData });
+          const resp = await fetch('/crawler', { method: 'POST', body: formData });
           if (!resp.ok) throw new Error('Server returned ' + resp.status);
           const blob = await resp.blob();
           let filename = 'contacts.pdf';
@@ -4458,8 +4535,23 @@ SCHEDULE_TEMPLATE = """
     .schedule-table tbody tr:nth-child(odd) { background:#ffffff; }
     .schedule-table tbody tr:nth-child(even) { background:#f8fafc; }
     .shift-pill { display:inline-flex; align-items:center; gap:0.3rem; padding:0.18rem 0.6rem; border-radius:999px; background:#ecfdf5; border:1px solid #16a34a26; color:#0f766e; font-size:0.74rem; margin-bottom:0.25rem; white-space:nowrap; }
+    .shift-pill[draggable="true"] { cursor:grab; }
+    .shift-pill.dragging { opacity:0.55; }
+    .schedule-drop-target { outline:2px dashed #0ea5e9; outline-offset:-2px; background:#e0f2fe !important; }
+    .shift-checkbox { cursor:pointer; margin:0; width:14px; height:14px; flex-shrink:0; }
     .shift-delete { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; background:#ef4444; color:#ffffff; font-size:0.85rem; line-height:1; text-decoration:none; opacity:0.7; transition:opacity 0.15s ease; }
     .shift-delete:hover { opacity:1; color:#ffffff; }
+    .batch-actions { display:flex; justify-content:flex-end; align-items:center; gap:0.55rem; margin-bottom:0.55rem; }
+    .btn-batch-delete,
+    .btn-batch-delete:hover,
+    .btn-batch-delete:focus,
+    .btn-batch-delete:active {
+      background-image:var(--btn-grad-danger) !important;
+      color:#ffffff !important;
+      border:0 !important;
+      text-shadow:none;
+    }
+    .btn-batch-delete:disabled { opacity:0.55; color:#ffffff !important; }
     .free-pill { display:inline-flex; align-items:center; padding:0.18rem 0.6rem; border-radius:999px; border:1px dashed #cbd5f5; color:#94a3b8; font-size:0.74rem; }
     .form-card .section-subtitle { max-width:600px; }
     .form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.1rem; }
@@ -4630,48 +4722,60 @@ SCHEDULE_TEMPLATE = """
               </select>
             </div>
           </form>
-          <div class="table-wrapper">
-            <div class="table-scroll">
-              <table class="table table-bordered table-sm align-middle schedule-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Employee</th>
-                    {% for d in week_days %}
-                      <th scope="col">
-                        {{ d.strftime('%a') }}<br>
-                        <span class="small-note">{{ d.strftime('%d.%m') }}</span>
-                      </th>
-                    {% endfor %}
-                  </tr>
-                </thead>
-                <tbody>
-              {% for emp in visible_employees %}
+          <form id="batch-delete-form" method="post" action="{{ url_for('batch_delete_shifts') }}">
+            <div class="batch-actions">
+              <button type="button" class="btn btn-sm btn-outline-primary" id="edit-selected-btn" disabled>
+                <i class="bi bi-pencil-square"></i> Edit Selected (<span id="edit-selected-count">0</span>)
+              </button>
+              <button type="submit" class="btn btn-sm btn-batch-delete" id="delete-selected-btn" disabled>
+                <i class="bi bi-trash"></i> Delete Selected (<span id="selected-count">0</span>)
+              </button>
+            </div>
+            <div class="table-wrapper">
+              <div class="table-scroll">
+                <table class="table table-bordered table-sm align-middle schedule-table">
+                  <thead>
                     <tr>
-                      <th scope="row">
-                        {{ emp.name }}<br>
-                        <span class="small-note">{{ emp.role or '' }}</span>
-                      </th>
+                      <th scope="col">Employee</th>
                       {% for d in week_days %}
-                        {% set cell = cells.get((emp.id, d)) %}
-                        <td>
-                          {% if cell %}
-                            {% for shift in cell %}
-                              <div class="shift-pill">
-                                {{ shift.label }}
-                                <a href="{{ url_for('delete_shift', shift_id=shift.id) }}" class="shift-delete" onclick="return confirm('Delete this shift?')" title="Delete shift">×</a>
-                              </div>
-                            {% endfor %}
-                          {% else %}
-                            <span class="free-pill">Free</span>
-                          {% endif %}
-                        </td>
+                        <th scope="col">
+                          {{ d.strftime('%a') }}<br>
+                          <span class="small-note">{{ d.strftime('%d.%m') }}</span>
+                        </th>
                       {% endfor %}
                     </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {% for emp in visible_employees %}
+                      <tr data-employee-id="{{ emp.id }}">
+                        <th scope="row">
+                          {{ emp.name }}<br>
+                          <span class="small-note">{{ emp.role or '' }}</span>
+                        </th>
+                        {% for d in week_days %}
+                          {% set cell = cells.get((emp.id, d)) %}
+                          <td data-day="{{ d.isoformat() }}">
+                            {% if cell %}
+                              {% for shift in cell %}
+                                <div class="shift-pill" draggable="true" data-shift-id="{{ shift.id }}">
+                                  <input type="checkbox" class="shift-checkbox" name="shift_ids[]" value="{{ shift.id }}" title="Select for deletion">
+                                  {{ shift.label }}
+                                  <button type="button" class="shift-edit btn-icon-tiny" data-shift-id="{{ shift.id }}" data-day="{{ shift.day }}" data-start="{{ shift.start_time }}" data-end="{{ shift.end_time }}" data-instructions="{{ shift.instructions or '' }}" title="Edit shift" style="background:none; border:none; padding:0; cursor:pointer; color:#0f766e; font-size:0.9rem; margin:0 2px;">✎</button>
+                                  <a href="{{ url_for('delete_shift', shift_id=shift.id) }}" class="shift-delete" onclick="return confirm('Delete this shift?')" title="Delete shift">×</a>
+                                </div>
+                              {% endfor %}
+                            {% else %}
+                              <span class="free-pill">Free</span>
+                            {% endif %}
+                          </td>
+                        {% endfor %}
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          </form>
         </section>
 
         <section class="section-card form-card">
@@ -4735,6 +4839,76 @@ SCHEDULE_TEMPLATE = """
       </main>
     </div>
   </div>
+
+  <!-- Edit Shift Modal -->
+  <div id="edit-shift-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:1rem; padding:1.5rem; max-width:500px; width:90%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+        <h3 style="margin:0; font-size:1.3rem; color:#0f172a;">Edit Shift</h3>
+        <button type="button" onclick="document.getElementById('edit-shift-modal').style.display='none'" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#94a3b8;">×</button>
+      </div>
+      <form id="edit-shift-form" method="post" action="" style="display:flex; flex-direction:column; gap:1rem;">
+        <input type="hidden" id="edit-shift-id" name="shift_id" value="">
+        <div>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Day</label>
+          <input type="date" id="edit-shift-day" name="day" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;" required>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Start Time</label>
+          <input type="time" id="edit-shift-start" name="start_time" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;" required>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">End Time</label>
+          <input type="time" id="edit-shift-end" name="end_time" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;" required>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Instructions (optional)</label>
+          <textarea id="edit-shift-instructions" name="instructions" rows="3" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem; font-family:inherit; resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1rem;">
+          <button type="button" onclick="document.getElementById('edit-shift-modal').style.display='none'" style="padding:0.65rem 1.15rem; border:1px solid #cbd5f5; border-radius:0.75rem; background:#f8fafc; color:#0f172a; cursor:pointer; font-size:0.95rem;">Cancel</button>
+          <button type="submit" style="padding:0.65rem 1.15rem; border:none; border-radius:0.75rem; background:#0f766e; color:white; cursor:pointer; font-size:0.95rem; font-weight:500;">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Batch Edit Shifts Modal -->
+  <div id="batch-edit-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:1rem; padding:1.5rem; max-width:520px; width:90%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h3 style="margin:0; font-size:1.2rem; color:#0f172a;">Batch edit shifts</h3>
+        <button type="button" id="batch-edit-close" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#94a3b8;">×</button>
+      </div>
+      <p class="small-note" style="margin-bottom:1rem;">Editing <strong id="batch-edit-count">0</strong> selected shift(s).</p>
+      <form id="batch-edit-form" method="post" action="{{ url_for('batch_edit_shifts') }}" style="display:flex; flex-direction:column; gap:0.9rem;">
+        <div id="batch-edit-hidden-inputs" hidden></div>
+        <div>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">New day (optional)</label>
+          <input type="date" id="batch-edit-day" name="day" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+          <div>
+            <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">New start (optional)</label>
+            <input type="time" id="batch-edit-start" name="start_time" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
+          </div>
+          <div>
+            <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">New end (optional)</label>
+            <input type="time" id="batch-edit-end" name="end_time" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
+          </div>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">New instructions (optional)</label>
+          <textarea id="batch-edit-instructions" name="instructions" rows="3" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem; font-family:inherit; resize:vertical;" placeholder="Leave empty to keep current instructions"></textarea>
+        </div>
+        <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:0.5rem;">
+          <button type="button" id="batch-edit-cancel" style="padding:0.65rem 1.15rem; border:1px solid #cbd5f5; border-radius:0.75rem; background:#f8fafc; color:#0f172a; cursor:pointer; font-size:0.95rem;">Cancel</button>
+          <button type="submit" style="padding:0.65rem 1.15rem; border:none; border-radius:0.75rem; background:#0f766e; color:white; cursor:pointer; font-size:0.95rem; font-weight:500;">Apply changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
     (function () {
@@ -4816,6 +4990,232 @@ SCHEDULE_TEMPLATE = """
           renderSelections(picker.selectedDates, picker);
         });
       }
+    });
+
+    // Batch selection/actions functionality
+    const batchDeleteForm = document.getElementById('batch-delete-form');
+    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+    const editSelectedBtn = document.getElementById('edit-selected-btn');
+    const selectedCountSpan = document.getElementById('selected-count');
+    const editSelectedCountSpan = document.getElementById('edit-selected-count');
+
+    const getSelectedShiftCheckboxes = () => Array.from(document.querySelectorAll('.shift-checkbox:checked'));
+    const getSelectedShiftIds = () => getSelectedShiftCheckboxes().map(cb => cb.value);
+
+    function updateBatchActionButtons() {
+      const checkboxes = document.querySelectorAll('.shift-checkbox');
+      const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+      selectedCountSpan.textContent = checkedCount;
+      if (editSelectedCountSpan) {
+        editSelectedCountSpan.textContent = checkedCount;
+      }
+      deleteSelectedBtn.disabled = checkedCount === 0;
+      if (editSelectedBtn) {
+        editSelectedBtn.disabled = checkedCount === 0;
+      }
+    }
+
+    if (batchDeleteForm) {
+      batchDeleteForm.addEventListener('change', function(e) {
+        if (e.target.classList.contains('shift-checkbox')) {
+          updateBatchActionButtons();
+        }
+      });
+
+      batchDeleteForm.addEventListener('submit', function(e) {
+        const checkedCount = getSelectedShiftIds().length;
+        if (checkedCount === 0) {
+          e.preventDefault();
+          return false;
+        }
+        if (!confirm(`Delete ${checkedCount} selected shift(s)?`)) {
+          e.preventDefault();
+          return false;
+        }
+      });
+
+      updateBatchActionButtons();
+    }
+
+    // Batch edit functionality
+    const batchEditModal = document.getElementById('batch-edit-modal');
+    const batchEditForm = document.getElementById('batch-edit-form');
+    const batchEditHiddenInputs = document.getElementById('batch-edit-hidden-inputs');
+    const batchEditCount = document.getElementById('batch-edit-count');
+
+    function closeBatchEditModal() {
+      if (batchEditModal) {
+        batchEditModal.style.display = 'none';
+      }
+    }
+
+    if (editSelectedBtn && batchEditModal && batchEditForm) {
+      editSelectedBtn.addEventListener('click', function() {
+        const selectedIds = getSelectedShiftIds();
+        if (!selectedIds.length) {
+          return;
+        }
+
+        if (batchEditHiddenInputs) {
+          batchEditHiddenInputs.innerHTML = '';
+          selectedIds.forEach((id) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'shift_ids[]';
+            input.value = id;
+            batchEditHiddenInputs.appendChild(input);
+          });
+        }
+
+        if (batchEditCount) {
+          batchEditCount.textContent = String(selectedIds.length);
+        }
+
+        batchEditForm.reset();
+        batchEditModal.style.display = 'flex';
+      });
+
+      batchEditForm.addEventListener('submit', function(e) {
+        const day = (document.getElementById('batch-edit-day')?.value || '').trim();
+        const start = (document.getElementById('batch-edit-start')?.value || '').trim();
+        const end = (document.getElementById('batch-edit-end')?.value || '').trim();
+        const instructions = (document.getElementById('batch-edit-instructions')?.value || '').trim();
+
+        if (!day && !start && !end && !instructions) {
+          e.preventDefault();
+          alert('Please set at least one field to update.');
+          return false;
+        }
+        if ((start && !end) || (!start && end)) {
+          e.preventDefault();
+          alert('Please provide both start and end time together.');
+          return false;
+        }
+        if (start && end && end <= start) {
+          e.preventDefault();
+          alert('End time must be after start time.');
+          return false;
+        }
+      });
+
+      document.getElementById('batch-edit-close')?.addEventListener('click', closeBatchEditModal);
+      document.getElementById('batch-edit-cancel')?.addEventListener('click', closeBatchEditModal);
+      batchEditModal.addEventListener('click', function(e) {
+        if (e.target === batchEditModal) {
+          closeBatchEditModal();
+        }
+      });
+    }
+
+    // Edit shift functionality
+    const editModal = document.getElementById('edit-shift-modal');
+    const editForm = document.getElementById('edit-shift-form');
+    const editButtons = document.querySelectorAll('.shift-edit');
+
+    editButtons.forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const shiftId = this.getAttribute('data-shift-id');
+        const day = this.getAttribute('data-day');
+        const start = this.getAttribute('data-start');
+        const end = this.getAttribute('data-end');
+        const instructions = this.getAttribute('data-instructions');
+
+        document.getElementById('edit-shift-id').value = shiftId;
+        document.getElementById('edit-shift-day').value = day;
+        document.getElementById('edit-shift-start').value = start;
+        document.getElementById('edit-shift-end').value = end;
+        document.getElementById('edit-shift-instructions').value = instructions || '';
+        
+        editForm.action = '/shift/' + shiftId + '/edit';
+        editModal.style.display = 'flex';
+      });
+    });
+
+    // Close modal when clicking outside
+    editModal.addEventListener('click', function(e) {
+      if (e.target === editModal) {
+        editModal.style.display = 'none';
+      }
+    });
+
+    // Drag and drop shifts between days
+    let draggedShiftId = null;
+    let draggedFromEmployeeId = null;
+
+    document.querySelectorAll('.shift-pill[draggable="true"]').forEach((pill) => {
+      pill.addEventListener('dragstart', (e) => {
+        draggedShiftId = pill.getAttribute('data-shift-id');
+        draggedFromEmployeeId = pill.closest('tr')?.getAttribute('data-employee-id') || null;
+        pill.classList.add('dragging');
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', draggedShiftId || '');
+        }
+      });
+
+      pill.addEventListener('dragend', () => {
+        pill.classList.remove('dragging');
+        document.querySelectorAll('.schedule-drop-target').forEach((cell) => {
+          cell.classList.remove('schedule-drop-target');
+        });
+        draggedShiftId = null;
+        draggedFromEmployeeId = null;
+      });
+    });
+
+    document.querySelectorAll('.schedule-table tbody td[data-day]').forEach((cell) => {
+      cell.addEventListener('dragover', (e) => {
+        if (!draggedShiftId) {
+          return;
+        }
+        const targetEmployeeId = cell.closest('tr')?.getAttribute('data-employee-id') || null;
+        if (!targetEmployeeId || targetEmployeeId !== draggedFromEmployeeId) {
+          return;
+        }
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = 'move';
+        }
+        cell.classList.add('schedule-drop-target');
+      });
+
+      cell.addEventListener('dragleave', () => {
+        cell.classList.remove('schedule-drop-target');
+      });
+
+      cell.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        cell.classList.remove('schedule-drop-target');
+        if (!draggedShiftId) {
+          return;
+        }
+
+        const targetEmployeeId = cell.closest('tr')?.getAttribute('data-employee-id') || null;
+        if (!targetEmployeeId || targetEmployeeId !== draggedFromEmployeeId) {
+          return;
+        }
+
+        const targetDay = cell.getAttribute('data-day');
+        if (!targetDay) {
+          return;
+        }
+
+        try {
+          const resp = await fetch(`/shift/${draggedShiftId}/move`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ day: targetDay }).toString(),
+          });
+          if (!resp.ok) {
+            throw new Error(`Server returned ${resp.status}`);
+          }
+          window.location.reload();
+        } catch (err) {
+          console.error(err);
+          alert('Could not move shift. Please try again.');
+        }
+      });
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
@@ -5153,6 +5553,13 @@ except Exception:  # pragma: no cover - degrade gracefully when missing
   REPORTLAB_AVAILABLE = False
 
 try:
+  import pandas as pd
+  PANDAS_AVAILABLE = True
+except Exception:  # pragma: no cover - optional dependency
+  pd = None
+  PANDAS_AVAILABLE = False
+
+try:
   from pypdf import PdfReader, PdfWriter
   PYPDF_AVAILABLE = True
 except Exception:  # pragma: no cover - optional dependency
@@ -5207,6 +5614,14 @@ else:
 # --- Business constants --------------------------------------------------------
 
 DEFAULT_PHONE_REGION = os.getenv("CRAWLER_DEFAULT_REGION", "US").upper()
+
+EU_COUNTRY_CODES = {
+  "30", "31", "32", "33", "34", "36", "39",
+  "40", "41", "43", "44", "45", "46", "47", "48", "49",
+  "350", "351", "352", "353", "354", "355", "356", "357", "358", "359",
+  "370", "371", "372", "373", "374", "375", "376", "377", "378", "380", "381", "382", "383", "385", "386", "387", "389",
+  "420", "421", "423",
+}
 
 LEAD_STAGES = ["New Leads", "Qualified", "Contacted", "Converted"]
 
@@ -5468,6 +5883,8 @@ ADMIN_PROFILES_TEMPLATE = """
       padding:0;
     }
     .btn { border:1px solid rgba(15,23,42,0.18); }
+    .flatpickr-calendar { z-index: 9999 !important; }
+    .flatpickr-calendar.inline { display: none !important; }
     @media(max-width:992px){
       .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{display:none;}
       .registration-grid{ grid-template-columns:minmax(0,1fr); }
@@ -5508,6 +5925,33 @@ ADMIN_PROFILES_TEMPLATE = """
       {% if active_tab == 'employees' %}
         <div class="card-surface">
           <h2 class="h6 text-uppercase text-secondary mb-3">Employee registration</h2>
+          <form method="get" class="mb-3">
+            <input type="hidden" name="tab" value="employees">
+            <div class="row g-2">
+              <div class="col-md-4">
+                <input type="text" class="form-control form-control-sm" name="emp_search" value="{{ emp_search or '' }}" placeholder="Search name, phone, address, city...">
+              </div>
+              <div class="col-md-3">
+                <select class="form-select form-select-sm" name="emp_work_type">
+                  <option value="">All Work Types</option>
+                  <option value="Teilzeit" {% if emp_work_type_filter == 'Teilzeit' %}selected{% endif %}>Teilzeit</option>
+                  <option value="Vollzeit" {% if emp_work_type_filter == 'Vollzeit' %}selected{% endif %}>Vollzeit</option>
+                  <option value="Geringfügige" {% if emp_work_type_filter == 'Geringfügige' %}selected{% endif %}>Geringfügige / Minijobs</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" name="emp_role" value="{{ emp_role_filter or '' }}" placeholder="Filter by role...">
+              </div>
+              <div class="col-md-2">
+                <button type="submit" class="btn btn-sm btn-primary w-100">Filter</button>
+              </div>
+            </div>
+            {% if emp_search or emp_work_type_filter or emp_role_filter %}
+              <div class="mt-2">
+                <a href="{{ url_for('admin_profiles', tab='employees') }}" class="btn btn-sm btn-outline-secondary">Clear Filters</a>
+              </div>
+            {% endif %}
+          </form>
           {% if employees %}
             <div class="vstack gap-3">
               {% for emp in employees %}
@@ -5530,14 +5974,6 @@ ADMIN_PROFILES_TEMPLATE = """
                         <div class="col-md-4 col-12">
                           <label class="form-label">Phone</label>
                           <input type="text" class="form-control form-control-sm" name="profile_phone" value="{{ emp.profile_phone or '' }}">
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Emergency contact name</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_emergency_name" value="{{ emp.profile_emergency_name or '' }}">
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Emergency contact phone</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_emergency_phone" value="{{ emp.profile_emergency_phone or '' }}">
                         </div>
                         <div class="col-md-6 col-12">
                           <label class="form-label">Street / Address</label>
@@ -5576,6 +6012,7 @@ ADMIN_PROFILES_TEMPLATE = """
                           <select class="form-select form-select-sm" name="profile_work_type">
                             <option value="Teilzeit" {% if (emp.profile_work_type or 'Teilzeit') == 'Teilzeit' %}selected{% endif %}>Teilzeit</option>
                             <option value="Vollzeit" {% if (emp.profile_work_type or '') == 'Vollzeit' %}selected{% endif %}>Vollzeit</option>
+                            <option value="Geringfügige" {% if (emp.profile_work_type or '') == 'Geringfügige' %}selected{% endif %}>Geringfügige / Minijobs</option>
                           </select>
                         </div>
                         <div class="col-md-4 col-12">
@@ -5609,6 +6046,26 @@ ADMIN_PROFILES_TEMPLATE = """
       {% else %}
         <div class="card-surface">
           <h2 class="h6 text-uppercase text-secondary mb-3">Client registration</h2>
+          <form method="get" class="mb-3">
+            <input type="hidden" name="tab" value="clients">
+            <input type="hidden" name="clients_page" value="{{ clients_page }}">
+            <div class="row g-2">
+              <div class="col-md-5">
+                <input type="text" class="form-control form-control-sm" name="client_search" value="{{ client_search or '' }}" placeholder="Search name, address, company, contact...">
+              </div>
+              <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" name="client_vat" value="{{ client_vat_filter or '' }}" placeholder="Filter by VAT ID...">
+              </div>
+              <div class="col-md-2">
+                <button type="submit" class="btn btn-sm btn-primary w-100">Filter</button>
+              </div>
+              <div class="col-md-2">
+                {% if client_search or client_vat_filter %}
+                  <a href="{{ url_for('admin_profiles', tab='clients') }}" class="btn btn-sm btn-outline-secondary w-100">Clear</a>
+                {% endif %}
+              </div>
+            </div>
+          </form>
           {% if sites %}
             <div class="d-flex justify-content-between align-items-center mb-3">
               <span class="small text-secondary">Page {{ clients_page }} of {{ clients_total_pages }} · {{ clients_total_count }} clients</span>
@@ -5722,6 +6179,8 @@ ADMIN_PROFILES_TEMPLATE = """
         locale: {
           firstDayOfWeek: 1,
         },
+        static: false,
+        disableMobile: false,
       });
     }
   </script>
@@ -6134,6 +6593,77 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
 
     VISIBLE_TAGS = ["p", "span", "div", "li", "address", "td", "th"]
 
+    def extract_business_name_from_soup(soup_obj: BeautifulSoup | None) -> str:
+      if not soup_obj:
+        return ""
+
+      preferred_schema_types = {
+        "organization",
+        "localbusiness",
+        "corporation",
+        "professionalservice",
+        "store",
+      }
+
+      # 1) Structured data (preferred): JSON-LD Organization/LocalBusiness name
+      for script in soup_obj.find_all("script", attrs={"type": "application/ld+json"}):
+        content = (script.string or script.get_text("", strip=True) or "").strip()
+        if not content:
+          continue
+        try:
+          payload = json.loads(content)
+        except Exception:
+          continue
+
+        def _walk(node):
+          if isinstance(node, dict):
+            raw_types = node.get("@type")
+            if isinstance(raw_types, str):
+              types = {raw_types.lower()}
+            elif isinstance(raw_types, list):
+              types = {str(t).lower() for t in raw_types}
+            else:
+              types = set()
+
+            if types & preferred_schema_types:
+              name_val = node.get("legalName") or node.get("name")
+              if isinstance(name_val, str) and name_val.strip():
+                return name_val.strip()
+
+            for key in ("publisher", "brand", "provider", "organization"):
+              if key in node:
+                found = _walk(node.get(key))
+                if found:
+                  return found
+            for val in node.values():
+              found = _walk(val)
+              if found:
+                return found
+          elif isinstance(node, list):
+            for item in node:
+              found = _walk(item)
+              if found:
+                return found
+          return ""
+
+        found_name = _walk(payload)
+        if found_name:
+          return found_name
+
+      # 2) Meta tags often carrying brand/site name
+      for attrs in (
+        {"property": "og:site_name"},
+        {"name": "application-name"},
+        {"name": "og:site_name"},
+      ):
+        tag = soup_obj.find("meta", attrs=attrs)
+        if tag:
+          candidate = (tag.get("content") or "").strip()
+          if candidate:
+            return candidate
+
+      return ""
+
     def is_probable_detail_path(path: str) -> bool:
         segs = [s for s in path.split("/") if s]
         if not segs:
@@ -6151,6 +6681,18 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
             queue.appendleft(u)
         else:
             queue.append(u)
+
+    def fallback_business_name_from_url(raw_url: str) -> str:
+      netloc = (urlparse(raw_url).netloc or "").lower().strip()
+      if netloc.startswith("www."):
+        netloc = netloc[4:]
+      if not netloc:
+        return ""
+      host_label = netloc.split(".")[0]
+      if not host_label:
+        return ""
+      cleaned = re.sub(r"[^a-z0-9]+", " ", host_label, flags=re.IGNORECASE).strip()
+      return cleaned.title() if cleaned else ""
 
     while queue and len(visited) < max_pages:
         url = urldefrag(queue.popleft()).url
@@ -6177,6 +6719,8 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
             continue
 
         soup = BeautifulSoup(html or "", "html.parser")
+
+        business_name = extract_business_name_from_soup(soup)
 
         emails = set(EMAIL_REGEX.findall(html or ""))
         phones = set()
@@ -6232,15 +6776,17 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
             app.logger.debug("Fetched %s status=%s len=%d (playwright)", url, status_js, len(html_js or ""))
             if html_js:
                 soup_js = BeautifulSoup(html_js, "html.parser")
+                if not business_name:
+                    business_name = extract_business_name_from_soup(soup_js)
                 for e in EMAIL_REGEX.findall(html_js or ""):
                     emails.add(e)
                 for a in soup_js.find_all("a", href=True):
-                  href = a["href"].strip()
-                  if href.lower().startswith("tel:"):
-                    num = href.split("tel:")[1].split("?")[0].strip()
-                    n = normalize_phone(num, region=phone_region)
-                    if n:
-                      phones.add(n)
+                    href = a["href"].strip()
+                    if href.lower().startswith("tel:"):
+                        num = href.split("tel:")[1].split("?")[0].strip()
+                        n = normalize_phone(num, region=phone_region)
+                        if n:
+                            phones.add(n)
                     elif href.lower().startswith("mailto:"):
                         addr = href.split("mailto:")[1].split("?")[0].strip()
                         if EMAIL_REGEX.match(addr):
@@ -6254,9 +6800,11 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
                             phones.add(n)
 
         if emails or phones:
-            grp = url_map.setdefault(url, {"emails": set(), "phones": set()})
+            grp = url_map.setdefault(url, {"emails": set(), "phones": set(), "business_names": set()})
             grp["emails"].update(emails)
             grp["phones"].update(phones)
+            if business_name:
+                grp["business_names"].add(business_name)
             for e in emails:
                 app.logger.info("Found email %s on %s", e, url)
             for p in phones:
@@ -6303,6 +6851,10 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
     for url, grp in url_map.items():
       emails = grp.get("emails", set())
       phones = grp.get("phones", set())
+      business_names = grp.get("business_names", set())
+      business_name = next(iter(business_names), "")
+      if not business_name:
+        business_name = fallback_business_name_from_url(url)
 
       normalized_phones: list[str] = []
       for phone in phones:
@@ -6323,13 +6875,79 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
       if new_emails:
         phone_sample = normalized_phones[0] if normalized_phones else ""
         for email in new_emails:
-          rows.append({"url": url, "email": email, "phone": phone_sample})
+          rows.append({"url": url, "business_name": business_name, "email": email, "phone": phone_sample})
       else:
         for phone in normalized_phones:
-          rows.append({"url": url, "email": "", "phone": phone})
+          rows.append({"url": url, "business_name": business_name, "email": "", "phone": phone})
 
     app.logger.info("Crawl finished: found %d contact rows", len(rows))
     return rows
+
+
+def _sanitize_text_value(value: Any, *, strip_punctuation: bool = True) -> str:
+  text = str(value or "").strip()
+  if not text:
+    return ""
+  if text.lower() in {"nan", "na", "n/a", "none", "null", "-"}:
+    return ""
+  if strip_punctuation:
+    text = text.replace(",", "").replace(".", "")
+  return text.strip()
+
+
+def _normalize_report_phone(raw_phone: str) -> str:
+  digits = re.sub(r"\D", "", raw_phone or "")
+  if not digits:
+    return ""
+  if len(digits) < 9 or len(digits) > 13:
+    return ""
+
+  starts_local = digits.startswith("0")
+  starts_eu_code = any(digits.startswith(code) for code in EU_COUNTRY_CODES)
+  if not (starts_local or starts_eu_code):
+    return ""
+
+  return f"{digits[:2]}-{digits[2:5]}-{digits[5:]}"
+
+
+def clean_contacts_with_pandas(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+  if not PANDAS_AVAILABLE or pd is None:
+    raise ValueError("pandas is required for contact data cleaning")
+
+  df = pd.DataFrame(rows or [])
+  for col in ("url", "business_name", "email", "phone"):
+    if col not in df.columns:
+      df[col] = ""
+
+  df["url"] = df["url"].astype(str).fillna("")
+  df["business_name"] = df["business_name"].astype(str).fillna("")
+  df["email"] = df["email"].astype(str).fillna("")
+  df["phone"] = df["phone"].astype(str).fillna("")
+
+  df["business_name"] = df["business_name"].map(_sanitize_text_value)
+  df["email"] = df["email"].map(lambda value: _sanitize_text_value(value, strip_punctuation=False))
+  df["phone"] = df["phone"].map(lambda value: _sanitize_text_value(value, strip_punctuation=False))
+
+  df["phone"] = df["phone"].map(_normalize_report_phone)
+
+  # Remove rows where both contact channels are empty.
+  df = df[
+    (df["email"] != "")
+    | (df["phone"] != "")
+  ]
+
+  # Remove duplicate full rows first.
+  df = df.drop_duplicates(subset=["business_name", "email", "phone"], keep="first")
+
+  # Remove duplicate emails and phones (keep first non-empty value occurrence).
+  duplicate_email = (df["email"] != "") & df["email"].duplicated(keep="first")
+  duplicate_phone = (df["phone"] != "") & df["phone"].duplicated(keep="first")
+  df = df[~(duplicate_email | duplicate_phone)]
+
+  df = df.reset_index(drop=True)
+  df.insert(0, "contact_id", range(1, len(df) + 1))
+
+  return df[["contact_id", "business_name", "email", "phone"]].to_dict(orient="records")
 
 
 def _get_day_range(start: date | None = None, weeks: int = 1):
@@ -6925,21 +7543,78 @@ def _generate_contacts_pdf(rows: list[dict[str, str]]):
         textColor=colors.HexColor("#475569"),
         spaceAfter=12,
     )
+    bulk_email_label_style = ParagraphStyle(
+      "ContactsBulkEmailLabel",
+      parent=styles["Normal"],
+      fontSize=9,
+      textColor=colors.HexColor("#0f172a"),
+      spaceAfter=2,
+    )
+    bulk_email_style = ParagraphStyle(
+      "ContactsBulkEmail",
+      parent=styles["Normal"],
+      fontSize=9,
+      textColor=colors.HexColor("#0f766e"),
+      spaceAfter=10,
+    )
+    email_cell_style = ParagraphStyle(
+      "ContactsEmailCell",
+      parent=styles["BodyText"],
+      fontSize=10,
+      textColor=colors.HexColor("#0f766e"),
+    )
+
+    logo_path = os.path.join(app.root_path, "static", "logo.png")
+
+    def _draw_logo(canvas_obj, pdf_doc):
+      if not os.path.exists(logo_path):
+        return
+      logo_width = 0.85 * inch
+      logo_height = 0.85 * inch
+      x = pdf_doc.leftMargin
+      y = A4[1] - logo_height - 14
+      try:
+        canvas_obj.drawImage(
+          logo_path,
+          x,
+          y,
+          width=logo_width,
+          height=logo_height,
+          preserveAspectRatio=True,
+          mask="auto",
+        )
+      except Exception:
+        app.logger.debug("Unable to draw logo on contacts PDF page", exc_info=True)
 
     elements: list = []
     generated_at = datetime.utcnow().strftime("%d %b %Y %H:%M UTC")
     elements.append(Paragraph("Putzelf Marketing - Contact Crawl", title_style))
     elements.append(Paragraph(f"Generated {generated_at}", subtitle_style))
 
-    table_data = [["Email", "Phone"]]
+    bulk_emails = sorted({(row.get("email") or "").strip() for row in rows if (row.get("email") or "").strip()})
+    if bulk_emails:
+      elements.append(Paragraph("All emails (semicolon separated):", bulk_email_label_style))
+      elements.append(Paragraph(";".join(bulk_emails), bulk_email_style))
+
+    table_data = [["ID", "Business / Customer", "Email", "Phone"]]
     for row in rows:
+        contact_id = str(row.get("contact_id") or "-").strip() or "-"
+        business_name = (row.get("business_name") or "").strip() or "-"
         email = (row.get("email") or "").strip() or "-"
         phone = (row.get("phone") or "").strip() or "-"
-        table_data.append([email, phone])
+        if email != "-":
+            email_cell = Paragraph(f'<link href="mailto:{email}">{email}</link>', email_cell_style)
+        else:
+            email_cell = "-"
+        table_data.append([contact_id, business_name, email_cell, phone])
     if len(table_data) == 1:
-        table_data.append(["-", "-"])
+        table_data.append(["-", "-", "-", "-"])
 
-    table = Table(table_data, colWidths=[doc.width * 0.6, doc.width * 0.4], hAlign="LEFT")
+    table = Table(
+        table_data,
+        colWidths=[doc.width * 0.08, doc.width * 0.27, doc.width * 0.35, doc.width * 0.30],
+        hAlign="LEFT",
+    )
     table.setStyle(
         TableStyle(
             [
@@ -6961,7 +7636,7 @@ def _generate_contacts_pdf(rows: list[dict[str, str]]):
     )
 
     elements.append(table)
-    doc.build(elements)
+    doc.build(elements, onFirstPage=_draw_logo, onLaterPages=_draw_logo)
     buf.seek(0)
     return buf
 
@@ -7440,6 +8115,202 @@ def employee_complete_shift(shift_id: int):
     db.close()
 
   return redirect(url_for("employee_dashboard"))
+
+
+@app.route("/shift/<int:shift_id>/edit", methods=["POST"])
+@login_required
+def edit_shift(shift_id: int):
+    db = SessionLocal()
+    try:
+        shift = db.get(Shift, shift_id)
+        if not shift:
+            flash("Shift not found.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+        
+        # Get form data
+        day_str = (request.form.get("day") or "").strip()
+        start_str = (request.form.get("start_time") or "").strip()
+        end_str = (request.form.get("end_time") or "").strip()
+        instructions = (request.form.get("instructions") or "").strip() or None
+        
+        # Parse and validate inputs
+        try:
+            day = datetime.strptime(day_str, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            flash("Invalid day format.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+        
+        try:
+            start_time = datetime.strptime(start_str, "%H:%M").time()
+        except (ValueError, TypeError):
+            flash("Invalid start time format.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+        
+        try:
+            end_time = datetime.strptime(end_str, "%H:%M").time()
+        except (ValueError, TypeError):
+            flash("Invalid end time format.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+        
+        # Validate that end time is after start time
+        if end_time <= start_time:
+            flash("End time must be after start time.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+        
+        # Update shift
+        shift.day = day
+        shift.start_time = start_time
+        shift.end_time = end_time
+        shift.instructions = instructions
+        
+        db.commit()
+        flash("Shift updated successfully!")
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"Error editing shift {shift_id}: {e}")
+        flash("Error updating shift.", "warning")
+    finally:
+        db.close()
+    
+    return redirect(request.referrer or url_for("schedule_dashboard"))
+
+
+@app.route("/shift/<int:shift_id>/move", methods=["POST"])
+@login_required
+def move_shift_day(shift_id: int):
+    db = SessionLocal()
+    try:
+        shift = db.get(Shift, shift_id)
+        if not shift:
+            return jsonify({"ok": False, "error": "Shift not found"}), 404
+
+        day_str = (request.form.get("day") or "").strip()
+        if not day_str:
+            return jsonify({"ok": False, "error": "Missing day"}), 400
+
+        try:
+            new_day = datetime.strptime(day_str, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "Invalid day format"}), 400
+
+        shift.day = new_day
+        db.commit()
+        return jsonify({"ok": True})
+    except Exception as exc:
+        db.rollback()
+        app.logger.error("Error moving shift %s: %s", shift_id, exc)
+        return jsonify({"ok": False, "error": "Failed to move shift"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/shift/batch-edit", methods=["POST"])
+@login_required
+def batch_edit_shifts():
+    db = SessionLocal()
+    try:
+        raw_shift_ids = request.form.getlist("shift_ids[]")
+        shift_ids: list[int] = []
+        for raw_id in raw_shift_ids:
+            try:
+                value = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            if value not in shift_ids:
+                shift_ids.append(value)
+
+        if not shift_ids:
+            flash("No shifts selected for batch edit.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+
+        day_str = (request.form.get("day") or "").strip()
+        start_str = (request.form.get("start_time") or "").strip()
+        end_str = (request.form.get("end_time") or "").strip()
+        instructions_str = (request.form.get("instructions") or "").strip()
+
+        if not day_str and not start_str and not end_str and not instructions_str:
+            flash("Please set at least one field for batch edit.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+
+        new_day = None
+        if day_str:
+            try:
+                new_day = datetime.strptime(day_str, "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                flash("Invalid day format.", "warning")
+                return redirect(request.referrer or url_for("schedule_dashboard"))
+
+        new_start = None
+        new_end = None
+        if start_str or end_str:
+            if not (start_str and end_str):
+                flash("For batch time updates, please provide both start and end time.", "warning")
+                return redirect(request.referrer or url_for("schedule_dashboard"))
+            try:
+                new_start = datetime.strptime(start_str, "%H:%M").time()
+                new_end = datetime.strptime(end_str, "%H:%M").time()
+            except (ValueError, TypeError):
+                flash("Invalid time format.", "warning")
+                return redirect(request.referrer or url_for("schedule_dashboard"))
+
+            if new_end <= new_start:
+                flash("End time must be after start time.", "warning")
+                return redirect(request.referrer or url_for("schedule_dashboard"))
+
+        shifts = db.query(Shift).filter(Shift.id.in_(shift_ids)).all()
+        if not shifts:
+            flash("No valid shifts found.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+
+        updated_count = 0
+        for shift in shifts:
+            if new_day is not None:
+                shift.day = new_day
+            if new_start is not None and new_end is not None:
+                shift.start_time = new_start
+                shift.end_time = new_end
+            if instructions_str:
+                shift.instructions = instructions_str
+            updated_count += 1
+
+        if updated_count > 0:
+            db.commit()
+            flash(f"{updated_count} shift(s) updated successfully.")
+        else:
+            flash("No shifts were updated.", "warning")
+
+        return redirect(request.referrer or url_for("schedule_dashboard"))
+    except Exception as exc:
+        db.rollback()
+        app.logger.error("Error during batch shift edit: %s", exc)
+        flash("Error updating selected shifts.", "warning")
+        return redirect(request.referrer or url_for("schedule_dashboard"))
+    finally:
+        db.close()
+
+
+@app.route("/shift/batch-delete", methods=["POST"])
+@login_required
+def batch_delete_shifts():
+    db = SessionLocal()
+    try:
+        shift_ids = request.form.getlist("shift_ids[]")
+        if shift_ids:
+            deleted_count = 0
+            for shift_id in shift_ids:
+                try:
+                    shift = db.get(Shift, int(shift_id))
+                    if shift:
+                        db.delete(shift)
+                        deleted_count += 1
+                except (ValueError, TypeError):
+                    continue
+            if deleted_count > 0:
+                db.commit()
+                flash(f"{deleted_count} shift(s) deleted successfully.")
+        return redirect(request.referrer or url_for("schedule_dashboard"))
+    finally:
+        db.close()
 
 
 @app.route("/shift/delete/<int:shift_id>")
@@ -8131,6 +9002,13 @@ def admin_profiles():
     if active_tab not in {"employees", "clients"}:
       active_tab = "employees"
 
+    # Get search and filter parameters
+    emp_search = (request.args.get("emp_search") or "").strip()
+    emp_work_type_filter = (request.args.get("emp_work_type") or "").strip()
+    emp_role_filter = (request.args.get("emp_role") or "").strip()
+    client_search = (request.args.get("client_search") or "").strip()
+    client_vat_filter = (request.args.get("client_vat") or "").strip()
+
     if request.method == "POST":
       entity = (request.form.get("entity") or "").strip().lower()
       target_id = request.form.get("id", type=int)
@@ -8145,8 +9023,6 @@ def admin_profiles():
             flash("Invalid employee image format. Use png/jpg/jpeg/gif/webp/heic.", "warning")
             return redirect(url_for("admin_profiles", tab=active_tab))
           emp.profile_phone = (request.form.get("profile_phone") or "").strip() or None
-          emp.profile_emergency_name = (request.form.get("profile_emergency_name") or "").strip() or None
-          emp.profile_emergency_phone = (request.form.get("profile_emergency_phone") or "").strip() or None
           emp.profile_address = (request.form.get("profile_address") or "").strip() or None
           emp.profile_zip_code = (request.form.get("profile_zip_code") or "").strip() or None
           emp.profile_city = (request.form.get("profile_city") or "").strip() or None
@@ -8154,7 +9030,7 @@ def admin_profiles():
           emp.profile_contract_end_date = (request.form.get("profile_contract_end_date") or "").strip() or None
           profile_employment_type = (request.form.get("profile_employment_type") or "").strip()
           profile_work_type = (request.form.get("profile_work_type") or "").strip()
-          if profile_work_type not in {"Teilzeit", "Vollzeit"}:
+          if profile_work_type not in {"Teilzeit", "Vollzeit", "Geringfügige"}:
             profile_work_type = "Teilzeit"
           profile_group_type = (request.form.get("profile_group_type") or "").strip()
           if profile_group_type not in {"Lohngruppe", "Verwendungsgruppe"}:
@@ -8226,10 +9102,53 @@ def admin_profiles():
       redirect_args = {"tab": active_tab}
       if active_tab == "clients":
         redirect_args["clients_page"] = clients_page
+      # Preserve search/filter parameters
+      if emp_search:
+        redirect_args["emp_search"] = emp_search
+      if emp_work_type_filter:
+        redirect_args["emp_work_type"] = emp_work_type_filter
+      if emp_role_filter:
+        redirect_args["emp_role"] = emp_role_filter
+      if client_search:
+        redirect_args["client_search"] = client_search
+      if client_vat_filter:
+        redirect_args["client_vat"] = client_vat_filter
       return redirect(url_for("admin_profiles", **redirect_args))
 
-    employees = db.query(Employee).order_by(Employee.name.asc()).all()
-    sites_all = db.query(Site).order_by(Site.name.asc()).all()
+    # Build employee query with filters
+    emp_query = db.query(Employee)
+    if emp_search:
+      like = f"%{emp_search}%"
+      emp_query = emp_query.filter(
+        or_(
+          Employee.name.ilike(like),
+          Employee.profile_phone.ilike(like),
+          Employee.profile_address.ilike(like),
+          Employee.profile_city.ilike(like)
+        )
+      )
+    if emp_work_type_filter:
+      emp_query = emp_query.filter(Employee.profile_work_type == emp_work_type_filter)
+    if emp_role_filter:
+      emp_query = emp_query.filter(Employee.role.ilike(f"%{emp_role_filter}%"))
+    employees = emp_query.order_by(Employee.name.asc()).all()
+
+    # Build sites query with filters
+    sites_query = db.query(Site)
+    if client_search:
+      like = f"%{client_search}%"
+      sites_query = sites_query.filter(
+        or_(
+          Site.name.ilike(like),
+          Site.address.ilike(like),
+          Site.profile_company_name.ilike(like),
+          Site.profile_contact_name.ilike(like),
+          Site.profile_contact_email.ilike(like)
+        )
+      )
+    if client_vat_filter:
+      sites_query = sites_query.filter(Site.profile_vat_id.ilike(f"%{client_vat_filter}%"))
+    sites_all = sites_query.order_by(Site.name.asc()).all()
     generated_any_customer_ids = False
     for site in sites_all:
       if not (site.profile_tax_id or "").strip():
@@ -8265,6 +9184,11 @@ def admin_profiles():
       clients_has_next=clients_has_next,
       clients_prev_page=clients_prev_page,
       clients_next_page=clients_next_page,
+      emp_search=emp_search,
+      emp_work_type_filter=emp_work_type_filter,
+      emp_role_filter=emp_role_filter,
+      client_search=client_search,
+      client_vat_filter=client_vat_filter,
     )
   finally:
     db.close()
@@ -8492,6 +9416,11 @@ def index():
             jsonify({"error": "reportlab not installed; cannot generate PDF output."}),
             503,
         )
+    if not PANDAS_AVAILABLE:
+      return (
+        jsonify({"error": "pandas not installed; cannot clean contact output."}),
+        503,
+      )
 
     start_url = (request.form.get("start_url") or "").strip()
     if not start_url:
@@ -8506,8 +9435,9 @@ def index():
     render_js = bool(request.form.get("render_js"))
 
     data = crawl(start_url, max_pages=max_pages, render_js=render_js)
+    cleaned_data = clean_contacts_with_pandas(data)
 
-    pdf_buffer = _generate_contacts_pdf(data)
+    pdf_buffer = _generate_contacts_pdf(cleaned_data)
     filename = f"putzelf_contacts_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf"
 
     return send_file(
@@ -9278,7 +10208,7 @@ def _build_employee_docx(employee: Employee, template_path: str) -> io.BytesIO:
   euros_per_hour = euros_per_hour_raw.replace(".", ",")
   working_hours = (employee.profile_working_hours or "").strip() or "3"
   work_type = (employee.profile_work_type or "").strip()
-  if work_type not in {"Teilzeit", "Vollzeit"}:
+  if work_type not in {"Teilzeit", "Vollzeit", "Geringfügige"}:
     work_type = "Teilzeit"
   group_type = (employee.profile_group_type or "").strip()
   if group_type not in {"Lohngruppe", "Verwendungsgruppe"}:
@@ -9307,16 +10237,78 @@ def _build_employee_docx(employee: Employee, template_path: str) -> io.BytesIO:
   def _apply_to_paragraph(paragraph) -> None:
     if not paragraph.text:
       return
-    new_text = paragraph.text
+    original_text = paragraph.text
+    
+    # Track all replacements with their positions
+    replacements_made = []
+    
+    # Apply direct string replacements
+    working_text = original_text
     for source, target in replacements.items():
-      if source in new_text:
-        new_text = new_text.replace(source, target)
-    new_text = re.sub(r"Stundenlohn\s+von\s+brutto\s+€\s*\d+[\.,]\d+", f"Stundenlohn von brutto € {euros_per_hour}", new_text)
-    new_text = re.sub(r"\b\d+\s*Stunden\b", f"{working_hours} Stunden", new_text)
-    new_text = re.sub(r"geringf[uü]gige", work_type, new_text, flags=re.IGNORECASE)
-    new_text = re.sub(r"(Lohngruppe|Verwendungsgruppe|Verwendungsgruupe)\s*\d+", group_label, new_text)
-    if new_text != paragraph.text:
-      paragraph.text = new_text
+      if source in working_text:
+        start_idx = working_text.find(source)
+        while start_idx != -1:
+          replacements_made.append((start_idx, start_idx + len(source), target))
+          working_text = working_text[:start_idx] + target + working_text[start_idx + len(source):]
+          start_idx = working_text.find(source, start_idx + len(target))
+    
+    # Apply regex replacements
+    # Stundenlohn pattern
+    pattern = re.compile(r"Stundenlohn\s+von\s+brutto\s+€\s*\d+[\.,]\d+")
+    for match in pattern.finditer(working_text):
+      replacement = f"Stundenlohn von brutto € {euros_per_hour}"
+      replacements_made.append((match.start(), match.end(), replacement))
+    working_text = pattern.sub(f"Stundenlohn von brutto € {euros_per_hour}", working_text)
+    
+    # Hours pattern
+    pattern = re.compile(r"\b\d+\s*Stunden\b")
+    for match in pattern.finditer(working_text):
+      replacement = f"{working_hours} Stunden"
+      replacements_made.append((match.start(), match.end(), replacement))
+    working_text = pattern.sub(f"{working_hours} Stunden", working_text)
+    
+    # Geringfügige pattern
+    pattern = re.compile(r"geringf[uü]gige", re.IGNORECASE)
+    for match in pattern.finditer(working_text):
+      replacements_made.append((match.start(), match.end(), work_type))
+    working_text = pattern.sub(work_type, working_text)
+    
+    # Group pattern
+    pattern = re.compile(r"(Lohngruppe|Verwendungsgruppe|Verwendungsgruupe)\s*\d+")
+    for match in pattern.finditer(working_text):
+      replacements_made.append((match.start(), match.end(), group_label))
+    working_text = pattern.sub(group_label, working_text)
+    
+    if working_text != original_text:
+      # Sort replacements by position to build text with selective bold
+      replacements_made.sort(key=lambda x: x[0])
+      
+      # Merge overlapping replacements and build final text with bold markers
+      merged_ranges = []
+      for start, end, text in replacements_made:
+        if not merged_ranges or start >= merged_ranges[-1][1]:
+          merged_ranges.append([start, end])
+        else:
+          merged_ranges[-1][1] = max(merged_ranges[-1][1], end)
+      
+      # Clear paragraph and rebuild with selective bold
+      paragraph.clear()
+      last_pos = 0
+      
+      for bold_start, bold_end in merged_ranges:
+        # Add normal text before bold section
+        if last_pos < bold_start:
+          paragraph.add_run(working_text[last_pos:bold_start])
+        
+        # Add bold text
+        bold_run = paragraph.add_run(working_text[bold_start:bold_end])
+        bold_run.bold = True
+        
+        last_pos = bold_end
+      
+      # Add any remaining normal text
+      if last_pos < len(working_text):
+        paragraph.add_run(working_text[last_pos:])
 
   for paragraph in doc.paragraphs:
     _apply_to_paragraph(paragraph)
