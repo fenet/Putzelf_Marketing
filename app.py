@@ -4368,7 +4368,10 @@ HTML_TEMPLATE = """
         try {
           const formData = new FormData(form);
           const resp = await fetch('/crawler', { method: 'POST', body: formData });
-          if (!resp.ok) throw new Error('Server returned ' + resp.status);
+          if (!resp.ok) {
+            const errText = await resp.text();
+            throw new Error('Server returned ' + resp.status + (errText ? ' – ' + errText : ''));
+          }
           const blob = await resp.blob();
           let filename = 'contacts.pdf';
           const cd = resp.headers.get('content-disposition');
@@ -4725,10 +4728,10 @@ SCHEDULE_TEMPLATE = """
           <form id="batch-delete-form" method="post" action="{{ url_for('batch_delete_shifts') }}">
             <div class="batch-actions">
               <button type="button" class="btn btn-sm btn-outline-primary" id="edit-selected-btn" disabled>
-                <i class="bi bi-pencil-square"></i> Edit Selected (<span id="edit-selected-count">0</span>)
+                <i class="bi bi-pencil-square"></i> Ausgewählte bearbeiten (<span id="edit-selected-count">0</span>)
               </button>
               <button type="submit" class="btn btn-sm btn-batch-delete" id="delete-selected-btn" disabled>
-                <i class="bi bi-trash"></i> Delete Selected (<span id="selected-count">0</span>)
+                <i class="bi bi-trash"></i> Ausgewählte löschen (<span id="selected-count">0</span>)
               </button>
             </div>
             <div class="table-wrapper">
@@ -4760,7 +4763,7 @@ SCHEDULE_TEMPLATE = """
                                 <div class="shift-pill" draggable="true" data-shift-id="{{ shift.id }}">
                                   <input type="checkbox" class="shift-checkbox" name="shift_ids[]" value="{{ shift.id }}" title="Select for deletion">
                                   {{ shift.label }}
-                                  <button type="button" class="shift-edit btn-icon-tiny" data-shift-id="{{ shift.id }}" data-day="{{ shift.day }}" data-start="{{ shift.start_time }}" data-end="{{ shift.end_time }}" data-instructions="{{ shift.instructions or '' }}" title="Edit shift" style="background:none; border:none; padding:0; cursor:pointer; color:#0f766e; font-size:0.9rem; margin:0 2px;">✎</button>
+                                  <button type="button" class="shift-edit btn-icon-tiny" data-shift-id="{{ shift.id }}" data-day="{{ shift.day }}" data-start="{{ shift.start_time }}" data-end="{{ shift.end_time }}" data-instructions="{{ shift.instructions or '' }}" title="Einsatz bearbeiten" style="background:none; border:none; padding:0; cursor:pointer; color:#0f766e; font-size:0.9rem; margin:0 2px;">✎</button>
                                   <a href="{{ url_for('delete_shift', shift_id=shift.id) }}" class="shift-delete" onclick="return confirm('Delete this shift?')" title="Delete shift">×</a>
                                 </div>
                               {% endfor %}
@@ -4844,7 +4847,7 @@ SCHEDULE_TEMPLATE = """
   <div id="edit-shift-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
     <div style="background:white; border-radius:1rem; padding:1.5rem; max-width:500px; width:90%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
-        <h3 style="margin:0; font-size:1.3rem; color:#0f172a;">Edit Shift</h3>
+        <h3 style="margin:0; font-size:1.3rem; color:#0f172a;">Einsatz bearbeiten</h3>
         <button type="button" onclick="document.getElementById('edit-shift-modal').style.display='none'" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#94a3b8;">×</button>
       </div>
       <form id="edit-shift-form" method="post" action="" style="display:flex; flex-direction:column; gap:1rem;">
@@ -4873,37 +4876,37 @@ SCHEDULE_TEMPLATE = """
     </div>
   </div>
 
-  <!-- Batch Edit Shifts Modal -->
+  <!-- Sammelbearbeitung Einsätze Modal -->
   <div id="batch-edit-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
     <div style="background:white; border-radius:1rem; padding:1.5rem; max-width:520px; width:90%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-        <h3 style="margin:0; font-size:1.2rem; color:#0f172a;">Batch edit shifts</h3>
+        <h3 style="margin:0; font-size:1.2rem; color:#0f172a;">Mehrere Einsätze bearbeiten</h3>
         <button type="button" id="batch-edit-close" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#94a3b8;">×</button>
       </div>
-      <p class="small-note" style="margin-bottom:1rem;">Editing <strong id="batch-edit-count">0</strong> selected shift(s).</p>
+      <p class="small-note" style="margin-bottom:1rem;">Bearbeite <strong id="batch-edit-count">0</strong> ausgewählte Einsätze.</p>
       <form id="batch-edit-form" method="post" action="{{ url_for('batch_edit_shifts') }}" style="display:flex; flex-direction:column; gap:0.9rem;">
         <div id="batch-edit-hidden-inputs" hidden></div>
         <div>
-          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">New day (optional)</label>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Neuer Tag (optional)</label>
           <input type="date" id="batch-edit-day" name="day" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
           <div>
-            <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">New start (optional)</label>
+            <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Neue Startzeit (optional)</label>
             <input type="time" id="batch-edit-start" name="start_time" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
           </div>
           <div>
-            <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">New end (optional)</label>
+            <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Neue Endzeit (optional)</label>
             <input type="time" id="batch-edit-end" name="end_time" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
           </div>
         </div>
         <div>
-          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">New instructions (optional)</label>
-          <textarea id="batch-edit-instructions" name="instructions" rows="3" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem; font-family:inherit; resize:vertical;" placeholder="Leave empty to keep current instructions"></textarea>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Neue Hinweise (optional)</label>
+          <textarea id="batch-edit-instructions" name="instructions" rows="3" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem; font-family:inherit; resize:vertical;" placeholder="Leer lassen, um bestehende Hinweise beizubehalten"></textarea>
         </div>
         <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:0.5rem;">
           <button type="button" id="batch-edit-cancel" style="padding:0.65rem 1.15rem; border:1px solid #cbd5f5; border-radius:0.75rem; background:#f8fafc; color:#0f172a; cursor:pointer; font-size:0.95rem;">Cancel</button>
-          <button type="submit" style="padding:0.65rem 1.15rem; border:none; border-radius:0.75rem; background:#0f766e; color:white; cursor:pointer; font-size:0.95rem; font-weight:500;">Apply changes</button>
+          <button type="submit" style="padding:0.65rem 1.15rem; border:none; border-radius:0.75rem; background:#0f766e; color:white; cursor:pointer; font-size:0.95rem; font-weight:500;">Änderungen anwenden</button>
         </div>
       </form>
     </div>
@@ -5028,7 +5031,7 @@ SCHEDULE_TEMPLATE = """
           e.preventDefault();
           return false;
         }
-        if (!confirm(`Delete ${checkedCount} selected shift(s)?`)) {
+        if (!confirm(`${checkedCount} ausgewählte Einsätze löschen?`)) {
           e.preventDefault();
           return false;
         }
@@ -5083,12 +5086,12 @@ SCHEDULE_TEMPLATE = """
 
         if (!day && !start && !end && !instructions) {
           e.preventDefault();
-          alert('Please set at least one field to update.');
+          alert('Bitte mindestens ein Feld zum Aktualisieren setzen.');
           return false;
         }
         if ((start && !end) || (!start && end)) {
           e.preventDefault();
-          alert('Please provide both start and end time together.');
+          alert('Bitte Start- und Endzeit gemeinsam angeben.');
           return false;
         }
         if (start && end && end <= start) {
@@ -5213,7 +5216,7 @@ SCHEDULE_TEMPLATE = """
           window.location.reload();
         } catch (err) {
           console.error(err);
-          alert('Could not move shift. Please try again.');
+          alert('Einsatz konnte nicht verschoben werden. Bitte erneut versuchen.');
         }
       });
     });
@@ -6597,15 +6600,44 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
       if not soup_obj:
         return ""
 
-      preferred_schema_types = {
-        "organization",
-        "localbusiness",
-        "corporation",
-        "professionalservice",
-        "store",
+      aggregator_markers = {
+        "herold", "yelp", "google", "maps", "tripadvisor", "foursquare", "yellowpages", "gelbeseiten",
       }
+      base_label = (base_domain.split(".")[0] if base_domain else "").lower().strip()
+      is_aggregator_domain = any(marker in (base_domain or "") for marker in aggregator_markers)
 
-      # 1) Structured data (preferred): JSON-LD Organization/LocalBusiness name
+      def _normalize_name(value: str | None) -> str:
+        text = re.sub(r"\s+", " ", str(value or "")).strip()
+        if not text or len(text) < 2:
+          return ""
+        lowered = text.lower()
+        if lowered in {"home", "startseite", "homepage"}:
+          return ""
+        if base_label and lowered == base_label:
+          return ""
+        if is_aggregator_domain and any(marker == lowered for marker in aggregator_markers):
+          return ""
+        return text
+
+      def _types_from_node(node: dict) -> set[str]:
+        raw_types = node.get("@type")
+        if isinstance(raw_types, str):
+          return {raw_types.lower()}
+        if isinstance(raw_types, list):
+          return {str(t).lower() for t in raw_types}
+        return set()
+
+      def _is_business_like_schema(types: set[str]) -> bool:
+        if "localbusiness" in types:
+          return True
+        business_tokens = (
+          "business", "store", "restaurant", "cafe", "hotel", "bar", "bakery", "lodging", "foodestablishment",
+        )
+        return any(any(token in t for token in business_tokens) for t in types)
+
+      candidates: list[tuple[int, str]] = []
+
+      # 1) JSON-LD (prefer listing-level business entities over portal org)
       for script in soup_obj.find_all("script", attrs={"type": "application/ld+json"}):
         content = (script.string or script.get_text("", strip=True) or "").strip()
         if not content:
@@ -6615,52 +6647,83 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
         except Exception:
           continue
 
-        def _walk(node):
-          if isinstance(node, dict):
-            raw_types = node.get("@type")
-            if isinstance(raw_types, str):
-              types = {raw_types.lower()}
-            elif isinstance(raw_types, list):
-              types = {str(t).lower() for t in raw_types}
-            else:
-              types = set()
+        stack = [payload]
+        while stack:
+          node = stack.pop()
+          if isinstance(node, list):
+            stack.extend(node)
+            continue
+          if not isinstance(node, dict):
+            continue
 
-            if types & preferred_schema_types:
-              name_val = node.get("legalName") or node.get("name")
-              if isinstance(name_val, str) and name_val.strip():
-                return name_val.strip()
+          node_types = _types_from_node(node)
+          name_val = node.get("legalName") or node.get("name")
+          name = _normalize_name(name_val if isinstance(name_val, str) else "")
+          if name:
+            score = 0
+            if _is_business_like_schema(node_types):
+              score += 120
+            elif "organization" in node_types:
+              score += 20
+            if node.get("address") or node.get("telephone") or node.get("email"):
+              score += 20
+            if score > 0:
+              candidates.append((score, name))
 
-            for key in ("publisher", "brand", "provider", "organization"):
-              if key in node:
-                found = _walk(node.get(key))
-                if found:
-                  return found
-            for val in node.values():
-              found = _walk(val)
-              if found:
-                return found
-          elif isinstance(node, list):
-            for item in node:
-              found = _walk(item)
-              if found:
-                return found
-          return ""
+          item_list = node.get("itemListElement")
+          if isinstance(item_list, list):
+            for item in item_list:
+              entry = item.get("item") if isinstance(item, dict) else None
+              if isinstance(entry, dict):
+                entry_name = _normalize_name(entry.get("name") if isinstance(entry.get("name"), str) else "")
+                if entry_name:
+                  candidates.append((110, entry_name))
 
-        found_name = _walk(payload)
-        if found_name:
-          return found_name
+          stack.extend(node.values())
 
-      # 2) Meta tags often carrying brand/site name
-      for attrs in (
-        {"property": "og:site_name"},
-        {"name": "application-name"},
-        {"name": "og:site_name"},
-      ):
-        tag = soup_obj.find("meta", attrs=attrs)
-        if tag:
-          candidate = (tag.get("content") or "").strip()
-          if candidate:
-            return candidate
+      if candidates:
+        candidates.sort(key=lambda pair: (pair[0], len(pair[1])), reverse=True)
+        return candidates[0][1]
+
+      # 2) Visible listing content fallback (h1/itemprop/class-based)
+      selector_candidates = [
+        ('[itemprop="name"]', 95),
+        ("h1", 90),
+        ('[class*="business"][class*="name"]', 85),
+        ('[class*="company"][class*="name"]', 85),
+        ('[class*="listing"][class*="title"]', 80),
+        ('[class*="entry"][class*="title"]', 80),
+        ('[class*="result"][class*="title"]', 75),
+      ]
+      for selector, score in selector_candidates:
+        for el in soup_obj.select(selector):
+          text = _normalize_name(el.get_text(" ", strip=True))
+          if text:
+            candidates.append((score, text))
+            break
+        if candidates:
+          break
+
+      # 3) Title fallback (avoid site/platform labels)
+      title_tag = soup_obj.find("title")
+      if title_tag:
+        title_text = _normalize_name(title_tag.get_text(" ", strip=True))
+        if title_text:
+          for sep in ("|", " - ", " – ", " :: "):
+            parts = [p.strip() for p in title_text.split(sep) if p.strip()]
+            for part in parts:
+              normalized_part = _normalize_name(part)
+              if normalized_part and normalized_part.lower() != base_label:
+                candidates.append((70, normalized_part))
+                break
+            if candidates:
+              break
+          if not candidates:
+            candidates.append((60, title_text))
+
+      if candidates:
+        candidates.sort(key=lambda pair: (pair[0], len(pair[1])), reverse=True)
+        return candidates[0][1]
 
       return ""
 
@@ -6686,6 +6749,8 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
       netloc = (urlparse(raw_url).netloc or "").lower().strip()
       if netloc.startswith("www."):
         netloc = netloc[4:]
+      if any(marker in netloc for marker in ("herold", "yelp", "google", "maps", "tripadvisor", "foursquare", "yellowpages", "gelbeseiten")):
+        return ""
       if not netloc:
         return ""
       host_label = netloc.split(".")[0]
@@ -6948,6 +7013,53 @@ def clean_contacts_with_pandas(rows: list[dict[str, str]]) -> list[dict[str, str
   df.insert(0, "contact_id", range(1, len(df) + 1))
 
   return df[["contact_id", "business_name", "email", "phone"]].to_dict(orient="records")
+
+
+def clean_contacts_without_pandas(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+  cleaned: list[dict[str, str]] = []
+  seen_rows: set[tuple[str, str, str]] = set()
+  seen_emails: set[str] = set()
+  seen_phones: set[str] = set()
+
+  for row in rows or []:
+    business_name = _sanitize_text_value((row or {}).get("business_name"))
+    email = _sanitize_text_value((row or {}).get("email"), strip_punctuation=False)
+    phone = _normalize_report_phone(_sanitize_text_value((row or {}).get("phone"), strip_punctuation=False))
+
+    if not email and not phone:
+      continue
+
+    row_key = (business_name, email, phone)
+    if row_key in seen_rows:
+      continue
+
+    if email and email in seen_emails:
+      continue
+    if phone and phone in seen_phones:
+      continue
+
+    seen_rows.add(row_key)
+    if email:
+      seen_emails.add(email)
+    if phone:
+      seen_phones.add(phone)
+
+    cleaned.append(
+      {
+        "contact_id": len(cleaned) + 1,
+        "business_name": business_name,
+        "email": email,
+        "phone": phone,
+      }
+    )
+
+  return cleaned
+
+
+def clean_contacts(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+  if PANDAS_AVAILABLE and pd is not None:
+    return clean_contacts_with_pandas(rows)
+  return clean_contacts_without_pandas(rows)
 
 
 def _get_day_range(start: date | None = None, weeks: int = 1):
@@ -7556,6 +7668,7 @@ def _generate_contacts_pdf(rows: list[dict[str, str]]):
       fontSize=9,
       textColor=colors.HexColor("#0f766e"),
       spaceAfter=10,
+      leading=11,
     )
     email_cell_style = ParagraphStyle(
       "ContactsEmailCell",
@@ -7594,7 +7707,7 @@ def _generate_contacts_pdf(rows: list[dict[str, str]]):
     bulk_emails = sorted({(row.get("email") or "").strip() for row in rows if (row.get("email") or "").strip()})
     if bulk_emails:
       elements.append(Paragraph("All emails (semicolon separated):", bulk_email_label_style))
-      elements.append(Paragraph(";".join(bulk_emails), bulk_email_style))
+      elements.append(Paragraph("; ".join(bulk_emails), bulk_email_style))
 
     table_data = [["ID", "Business / Customer", "Email", "Phone"]]
     for row in rows:
@@ -8207,86 +8320,86 @@ def move_shift_day(shift_id: int):
 @app.route("/shift/batch-edit", methods=["POST"])
 @login_required
 def batch_edit_shifts():
-    db = SessionLocal()
-    try:
-        raw_shift_ids = request.form.getlist("shift_ids[]")
-        shift_ids: list[int] = []
-        for raw_id in raw_shift_ids:
-            try:
-                value = int(raw_id)
-            except (TypeError, ValueError):
-                continue
-            if value not in shift_ids:
-                shift_ids.append(value)
+  db = SessionLocal()
+  try:
+    raw_shift_ids = request.form.getlist("shift_ids[]")
+    shift_ids: list[int] = []
+    for raw_id in raw_shift_ids:
+      try:
+        value = int(raw_id)
+      except (TypeError, ValueError):
+        continue
+      if value not in shift_ids:
+        shift_ids.append(value)
 
-        if not shift_ids:
-            flash("No shifts selected for batch edit.", "warning")
-            return redirect(request.referrer or url_for("schedule_dashboard"))
+    if not shift_ids:
+      flash("Keine Einsätze für Sammelbearbeitung ausgewählt.", "warning")
+      return redirect(request.referrer or url_for("schedule_dashboard"))
 
-        day_str = (request.form.get("day") or "").strip()
-        start_str = (request.form.get("start_time") or "").strip()
-        end_str = (request.form.get("end_time") or "").strip()
-        instructions_str = (request.form.get("instructions") or "").strip()
+    day_str = (request.form.get("day") or "").strip()
+    start_str = (request.form.get("start_time") or "").strip()
+    end_str = (request.form.get("end_time") or "").strip()
+    instructions_str = (request.form.get("instructions") or "").strip()
 
-        if not day_str and not start_str and not end_str and not instructions_str:
-            flash("Please set at least one field for batch edit.", "warning")
-            return redirect(request.referrer or url_for("schedule_dashboard"))
+    if not day_str and not start_str and not end_str and not instructions_str:
+      flash("Bitte mindestens ein Feld für die Sammelbearbeitung setzen.", "warning")
+      return redirect(request.referrer or url_for("schedule_dashboard"))
 
-        new_day = None
-        if day_str:
-            try:
-                new_day = datetime.strptime(day_str, "%Y-%m-%d").date()
-            except (ValueError, TypeError):
-                flash("Invalid day format.", "warning")
-                return redirect(request.referrer or url_for("schedule_dashboard"))
-
-        new_start = None
-        new_end = None
-        if start_str or end_str:
-            if not (start_str and end_str):
-                flash("For batch time updates, please provide both start and end time.", "warning")
-                return redirect(request.referrer or url_for("schedule_dashboard"))
-            try:
-                new_start = datetime.strptime(start_str, "%H:%M").time()
-                new_end = datetime.strptime(end_str, "%H:%M").time()
-            except (ValueError, TypeError):
-                flash("Invalid time format.", "warning")
-                return redirect(request.referrer or url_for("schedule_dashboard"))
-
-            if new_end <= new_start:
-                flash("End time must be after start time.", "warning")
-                return redirect(request.referrer or url_for("schedule_dashboard"))
-
-        shifts = db.query(Shift).filter(Shift.id.in_(shift_ids)).all()
-        if not shifts:
-            flash("No valid shifts found.", "warning")
-            return redirect(request.referrer or url_for("schedule_dashboard"))
-
-        updated_count = 0
-        for shift in shifts:
-            if new_day is not None:
-                shift.day = new_day
-            if new_start is not None and new_end is not None:
-                shift.start_time = new_start
-                shift.end_time = new_end
-            if instructions_str:
-                shift.instructions = instructions_str
-            updated_count += 1
-
-        if updated_count > 0:
-            db.commit()
-            flash(f"{updated_count} shift(s) updated successfully.")
-        else:
-            flash("No shifts were updated.", "warning")
-
+    new_day = None
+    if day_str:
+      try:
+        new_day = datetime.strptime(day_str, "%Y-%m-%d").date()
+      except (ValueError, TypeError):
+        flash("Ungültiges Datumsformat.", "warning")
         return redirect(request.referrer or url_for("schedule_dashboard"))
-    except Exception as exc:
-        db.rollback()
-        app.logger.error("Error during batch shift edit: %s", exc)
-        flash("Error updating selected shifts.", "warning")
+
+    new_start = None
+    new_end = None
+    if start_str or end_str:
+      if not (start_str and end_str):
+        flash("Für Sammelzeit-Updates bitte Start- und Endzeit angeben.", "warning")
         return redirect(request.referrer or url_for("schedule_dashboard"))
-    finally:
-        db.close()
+      try:
+        new_start = datetime.strptime(start_str, "%H:%M").time()
+        new_end = datetime.strptime(end_str, "%H:%M").time()
+      except (ValueError, TypeError):
+        flash("Ungültiges Zeitformat.", "warning")
+        return redirect(request.referrer or url_for("schedule_dashboard"))
+
+      if new_end <= new_start:
+        flash("Endzeit muss nach der Startzeit liegen.", "warning")
+        return redirect(request.referrer or url_for("schedule_dashboard"))
+
+    shifts = db.query(Shift).filter(Shift.id.in_(shift_ids)).all()
+    if not shifts:
+      flash("Keine gültigen Einsätze gefunden.", "warning")
+      return redirect(request.referrer or url_for("schedule_dashboard"))
+
+    updated_count = 0
+    for shift in shifts:
+      if new_day is not None:
+        shift.day = new_day
+      if new_start is not None and new_end is not None:
+        shift.start_time = new_start
+        shift.end_time = new_end
+      if instructions_str:
+        shift.instructions = instructions_str
+      updated_count += 1
+
+    if updated_count > 0:
+      db.commit()
+      flash(f"{updated_count} Einsatz/Einsätze erfolgreich aktualisiert.")
+    else:
+      flash("Es wurden keine Einsätze aktualisiert.", "warning")
+
+    return redirect(request.referrer or url_for("schedule_dashboard"))
+  except Exception as exc:
+    db.rollback()
+    app.logger.error("Error during batch shift edit: %s", exc)
+    flash("Fehler beim Aktualisieren der ausgewählten Einsätze.", "warning")
+    return redirect(request.referrer or url_for("schedule_dashboard"))
+  finally:
+    db.close()
 
 
 @app.route("/shift/batch-delete", methods=["POST"])
@@ -9416,12 +9529,6 @@ def index():
             jsonify({"error": "reportlab not installed; cannot generate PDF output."}),
             503,
         )
-    if not PANDAS_AVAILABLE:
-      return (
-        jsonify({"error": "pandas not installed; cannot clean contact output."}),
-        503,
-      )
-
     start_url = (request.form.get("start_url") or "").strip()
     if not start_url:
         return jsonify({"error": "Missing start URL"}), 400
@@ -9435,7 +9542,7 @@ def index():
     render_js = bool(request.form.get("render_js"))
 
     data = crawl(start_url, max_pages=max_pages, render_js=render_js)
-    cleaned_data = clean_contacts_with_pandas(data)
+    cleaned_data = clean_contacts(data)
 
     pdf_buffer = _generate_contacts_pdf(cleaned_data)
     filename = f"putzelf_contacts_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf"
