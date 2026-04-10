@@ -177,12 +177,12 @@ ADMIN_TEMPLATE = """
       <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Overview</span></a>
       <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Manage employees</span></a>
       <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Manage sites</span></a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">Profiles</span></a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">Profile</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Assign coverage</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
       <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">Invoices</span></a>
-      <div class="sidebar-section-title">Account</div>
+      <div class="sidebar-section-title">Konto</div>
       <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
@@ -360,11 +360,11 @@ ADMIN_TEMPLATE = """
 
 ADMIN_EMPLOYEES_TEMPLATE = """
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing — Employees</title>
+  <title>Putzelf Marketing — Mitarbeiter</title>
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -514,20 +514,20 @@ ADMIN_EMPLOYEES_TEMPLATE = """
   <div class="app-shell">
     <aside id="admin-sidebar" class="sidebar">
       <div class="sidebar-section-title">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Overview</span></a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Manage employees</span></a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Manage sites</span></a>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Übersicht</span></a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Mitarbeiter verwalten</span></a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Standorte verwalten</span></a>
       <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">Profiles</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Assign coverage</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Einsatzplanung</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">Invoices</span></a>
-      <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">Rechnungen</span></a>
+      <div class="sidebar-section-title">Konto</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Abmelden</span></a>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
     <main class="main-shell">
-      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
+      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menü</button>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="mb-3">
@@ -539,36 +539,36 @@ ADMIN_EMPLOYEES_TEMPLATE = """
       {% endwith %}
 
       <header class="mb-4">
-        <div class="badge-soft mb-2">Team directory</div>
-        <h1 class="h4 text-dark mb-1">Manage employees</h1>
+        <div class="badge-soft mb-2">Teamverzeichnis</div>
+        <h1 class="h4 text-dark mb-1">Mitarbeiter verwalten</h1>
         <p class="text-secondary mb-0">
           {% if filtered_employees %}
-            Showing {{ page_employees }} of {{ filtered_employees }} matching
+            Zeige {{ page_employees }} von {{ filtered_employees }} passenden Mitarbeitern
           {% else %}
-            No employees match the current filters
+            Keine Mitarbeiter passen zu den aktuellen Filtern
           {% endif %}
-          · {{ total_employees }} total · {{ today_shifts }} shifts today
+          · {{ total_employees }} insgesamt · {{ today_shifts }} Schichten heute
         </p>
       </header>
       <div class="mb-3 d-flex justify-content-end">
-        <a href="{{ url_for('admin_profiles', tab='employees') }}" class="btn btn-sm btn-outline-primary">Open employee profiles</a>
+        <a href="{{ url_for('admin_profiles', tab='employees') }}" class="btn btn-sm btn-outline-primary">Mitarbeiterprofile öffnen</a>
       </div>
 
       <section class="stats-grid">
         <div class="stat-card">
-          <div class="stat-label">Total employees</div>
+          <div class="stat-label">Mitarbeiter gesamt</div>
           <div class="stat-value">{{ total_employees }}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Showing now</div>
+          <div class="stat-label">Aktuell angezeigt</div>
           <div class="stat-value">{{ page_employees }}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">On schedule today</div>
+          <div class="stat-label">Heute eingeplant</div>
           <div class="stat-value">{{ today_shifts }}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Unassigned this week</div>
+          <div class="stat-label">Diese Woche ohne Einsatz</div>
           <div class="stat-value">{{ unassigned_employees }}</div>
         </div>
       </section>
@@ -576,14 +576,14 @@ ADMIN_EMPLOYEES_TEMPLATE = """
       <section class="card-surface mb-4">
         <form method="get" class="row g-2 align-items-end">
           <div class="col-sm-8">
-            <label class="form-label" for="employee_search">Search employees</label>
+            <label class="form-label" for="employee_search">Mitarbeiter suchen</label>
             <div class="input-group input-group-sm">
-              <input type="text" class="form-control" id="employee_search" name="q" value="{{ search_q or '' }}" placeholder="Search by name or role">
-              <button class="btn btn-outline-primary" type="submit" title="Search"><i class="bi bi-search"></i></button>
+              <input type="text" class="form-control" id="employee_search" name="q" value="{{ search_q or '' }}" placeholder="Nach Name oder Rolle suchen">
+              <button class="btn btn-outline-primary" type="submit" title="Suchen"><i class="bi bi-search"></i></button>
             </div>
           </div>
           <div class="col-sm-4">
-            <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-secondary w-100" title="Clear filters"><i class="bi bi-x-circle"></i></a>
+            <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-secondary w-100" title="Filter zurücksetzen"><i class="bi bi-x-circle"></i></a>
           </div>
         </form>
       </section>
@@ -591,7 +591,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
       <div class="row g-3">
         <div class="col-12 col-lg-4">
           <div class="card-surface mb-3">
-            <h2 class="h6 text-uppercase text-secondary mb-3">Add employee</h2>
+            <h2 class="h6 text-uppercase text-secondary mb-3">Mitarbeiter hinzufügen</h2>
             <form method="post" class="row g-3">
               <input type="hidden" name="action" value="create">
               <div class="col-12">
@@ -599,11 +599,11 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                 <input type="text" class="form-control form-control-sm" id="new_employee_name" name="name" required>
               </div>
               <div class="col-12">
-                <label class="form-label" for="new_employee_role">Role</label>
-                <input type="text" class="form-control form-control-sm" id="new_employee_role" name="role" value="Cleaner">
+                <label class="form-label" for="new_employee_role">Rolle</label>
+                <input type="text" class="form-control form-control-sm" id="new_employee_role" name="role" value="Reinigungskraft">
               </div>
               <div class="col-12">
-                <button type="submit" class="btn btn-sm btn-primary w-100" title="Add employee"><i class="bi bi-person-plus"></i></button>
+                <button type="submit" class="btn btn-sm btn-primary w-100" title="Mitarbeiter hinzufügen"><i class="bi bi-person-plus"></i></button>
               </div>
             </form>
           </div>
@@ -624,46 +624,46 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                         <input type="text" class="form-control form-control-sm" name="name" value="{{ emp.name }}" required>
                       </div>
                       <div class="col-md-5 col-12">
-                        <label class="form-label">Role</label>
+                        <label class="form-label">Rolle</label>
                         <input type="text" class="form-control form-control-sm" name="role" value="{{ emp.role or '' }}">
                       </div>
                       <div class="col-md-3 col-12">
-                        <label class="form-label">ZIP Code</label>
+                        <label class="form-label">PLZ</label>
                         <input type="text" class="form-control form-control-sm" name="profile_zip_code" value="{{ emp.profile_zip_code or '' }}">
                       </div>
                       <div class="col-md-3 col-12">
-                        <label class="form-label">City</label>
+                        <label class="form-label">Stadt</label>
                         <input type="text" class="form-control form-control-sm" name="profile_city" value="{{ emp.profile_city or '' }}">
                       </div>
                       <div class="col-md-3 col-12">
-                        <label class="form-label">Beginning Date</label>
+                        <label class="form-label">Beginndatum</label>
                         <input type="text" class="form-control form-control-sm js-contract-date" name="profile_contract_start_date" value="{{ emp.profile_contract_start_date or '' }}" placeholder="YYYY-MM-DD">
                       </div>
                       <div class="col-md-3 col-12">
-                        <label class="form-label">End Date</label>
+                        <label class="form-label">Enddatum</label>
                         <input type="text" class="form-control form-control-sm js-contract-date" name="profile_contract_end_date" value="{{ emp.profile_contract_end_date or '' }}" placeholder="YYYY-MM-DD">
                       </div>
                       <div class="col-md-4 col-12">
-                        <label class="form-label">Type of Employment</label>
+                        <label class="form-label">Beschäftigungsart</label>
                         <input type="text" class="form-control form-control-sm" name="profile_employment_type" value="{{ emp.profile_employment_type or 'Reinigungskraft' }}">
                       </div>
                       <div class="col-md-3 col-12">
-                        <label class="form-label">Euros/hr</label>
+                        <label class="form-label">Euro/Std</label>
                         <input type="text" class="form-control form-control-sm" name="profile_euros_per_hour" value="{{ emp.profile_euros_per_hour or '12,37' }}" placeholder="12,37">
                       </div>
                       <div class="col-md-3 col-12">
-                        <label class="form-label">Working Hours</label>
+                        <label class="form-label">Arbeitsstunden</label>
                         <input type="text" class="form-control form-control-sm" name="profile_working_hours" value="{{ emp.profile_working_hours or '3' }}" placeholder="3">
                       </div>
                       <div class="col-md-3 col-12">
-                        <label class="form-label">Work Type</label>
+                        <label class="form-label">Arbeitszeitmodell</label>
                         <select class="form-select form-select-sm" name="profile_work_type">
                           <option value="Teilzeit" {% if (emp.profile_work_type or 'Teilzeit') == 'Teilzeit' %}selected{% endif %}>Teilzeit</option>
                           <option value="Vollzeit" {% if (emp.profile_work_type or '') == 'Vollzeit' %}selected{% endif %}>Vollzeit</option>
                         </select>
                       </div>
                       <div class="col-md-4 col-12">
-                        <label class="form-label">Groups</label>
+                        <label class="form-label">Gruppen</label>
                         <div class="input-group input-group-sm">
                           <select class="form-select" name="profile_group_type">
                             <option value="Lohngruppe" {% if (emp.profile_group_type or 'Lohngruppe') == 'Lohngruppe' %}selected{% endif %}>Lohngruppe</option>
@@ -673,21 +673,21 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                         </div>
                       </div>
                       <div class="col-md-2 col-12 employee-action-buttons">
-                        <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Save"><i class="bi bi-check2"></i></button>
-                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ emp.name }}?')" title="Delete"><i class="bi bi-trash"></i></button>
-                        <a href="{{ url_for('admin_employee_docx', employee_id=emp.id) }}" class="btn btn-sm btn-outline-primary" title="Download employee document"><i class="bi bi-file-earmark-word"></i></a>
+                        <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Speichern"><i class="bi bi-check2"></i></button>
+                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('{{ emp.name }} löschen?')" title="Löschen"><i class="bi bi-trash"></i></button>
+                        <a href="{{ url_for('admin_employee_docx', employee_id=emp.id) }}" class="btn btn-sm btn-outline-primary" title="Mitarbeiterdokument herunterladen"><i class="bi bi-file-earmark-word"></i></a>
                       </div>
                     </form>
-                    <div class="small text-secondary mt-2">Shifts scheduled: <span class="text-primary">{{ shift_counts.get(emp.id, 0) }}</span></div>
+                    <div class="small text-secondary mt-2">Geplante Schichten: <span class="text-primary">{{ shift_counts.get(emp.id, 0) }}</span></div>
 
                     {% set snippet = (credential_snippets|default({})).get(emp.id|string) %}
-                    {% set code_display = snippet.code if snippet and snippet.code else (emp.login_code or 'Pending') %}
+                    {% set code_display = snippet.code if snippet and snippet.code else (emp.login_code or 'Ausstehend') %}
                     {% set pin_display = snippet.pin if snippet and snippet.pin else None %}
 
                     <div class="credential-box mt-3">
                       <div class="credential-grid">
                         <div>
-                          <div class="credential-label">Login code</div>
+                          <div class="credential-label">Anmeldecode</div>
                           <div class="credential-value">{{ code_display }}</div>
                         </div>
                         <div>
@@ -696,19 +696,19 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                             {% if pin_display %}
                               {{ pin_display }}
                             {% elif emp.login_pin_hash %}
-                              Hidden — use Share to refresh
+                              Verborgen — mit „Teilen“ aktualisieren
                             {% else %}
-                              Generating…
+                              Wird erstellt…
                             {% endif %}
                           </div>
                         </div>
                         <div>
-                          <div class="credential-label">Login email</div>
-                          <div class="credential-value">{{ emp.login_email or 'Not set' }}</div>
+                          <div class="credential-label">Anmelde-E-Mail</div>
+                          <div class="credential-value">{{ emp.login_email or 'Nicht gesetzt' }}</div>
                         </div>
                       </div>
                       {% if pin_display %}
-                        <div class="credential-note mt-2">New PIN generated — share it with {{ emp.name }} soon.</div>
+                        <div class="credential-note mt-2">Neue PIN erstellt — bitte zeitnah mit {{ emp.name }} teilen.</div>
                       {% endif %}
                     </div>
 
@@ -720,13 +720,13 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                           <input type="hidden" name="redirect_q" value="{{ search_q }}">
                         {% endif %}
                         <input type="hidden" name="redirect_page" value="{{ page }}">
-                        <button type="submit" class="btn btn-sm btn-outline-info">Share new PIN</button>
+                        <button type="submit" class="btn btn-sm btn-outline-info">Neue PIN teilen</button>
                       </form>
                       {% if pin_display %}
-                        {% set share_text = 'Login code: ' ~ code_display ~ ' · PIN: ' ~ pin_display %}
-                        <button type="button" class="btn btn-sm btn-outline-light cred-copy-btn" data-credentials="{{ share_text }}">Copy details</button>
+                        {% set share_text = 'Anmeldecode: ' ~ code_display ~ ' · PIN: ' ~ pin_display %}
+                        <button type="button" class="btn btn-sm btn-outline-light cred-copy-btn" data-credentials="{{ share_text }}">Details kopieren</button>
                       {% endif %}
-                      <button type="button" class="btn btn-sm btn-outline-secondary cred-edit-btn" data-edit-target="cred-edit-{{ emp.id }}" aria-expanded="false">Edit</button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary cred-edit-btn" data-edit-target="cred-edit-{{ emp.id }}" aria-expanded="false">Bearbeiten</button>
                     </div>
 
                     <div class="credential-edit d-none mt-3" id="cred-edit-{{ emp.id }}">
@@ -738,19 +738,19 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                         {% endif %}
                         <input type="hidden" name="redirect_page" value="{{ page }}">
                         <div class="col-md-4 col-12">
-                          <label class="form-label">Login email</label>
-                          <input type="email" class="form-control form-control-sm" name="login_email" value="{{ emp.login_email or '' }}" placeholder="Optional email">
+                          <label class="form-label">Anmelde-E-Mail</label>
+                          <input type="email" class="form-control form-control-sm" name="login_email" value="{{ emp.login_email or '' }}" placeholder="Optionale E-Mail">
                         </div>
                         <div class="col-md-4 col-12">
-                          <label class="form-label">Login code</label>
+                          <label class="form-label">Anmeldecode</label>
                           <input type="text" class="form-control form-control-sm" name="login_code" value="{{ code_display }}" required>
                         </div>
                         <div class="col-md-4 col-12">
-                          <label class="form-label">New PIN (4 digits)</label>
-                          <input type="text" class="form-control form-control-sm" name="login_pin" pattern="\d{4}" placeholder="Leave blank to keep">
+                          <label class="form-label">Neue PIN (4 Ziffern)</label>
+                          <input type="text" class="form-control form-control-sm" name="login_pin" pattern="\d{4}" placeholder="Leer lassen zum Beibehalten">
                         </div>
                         <div class="col-12 d-flex justify-content-end gap-2">
-                          <button type="submit" class="btn btn-sm btn-success">Save credentials</button>
+                          <button type="submit" class="btn btn-sm btn-success">Zugangsdaten speichern</button>
                         </div>
                       </form>
                     </div>
@@ -761,7 +761,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                     <div class="assignment-section mt-3">
                       <details class="assignment-collapse">
                         <summary>
-                          <span>Upcoming jobs</span>
+                          <span>Kommende Einsätze</span>
                           <span class="assignment-count">{{ future_jobs|length }}</span>
                         </summary>
                         {% if future_jobs %}
@@ -775,12 +775,12 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                             {% endfor %}
                           </ul>
                         {% else %}
-                          <div class="placeholder px-3 pb-3">No upcoming jobs yet.</div>
+                          <div class="placeholder px-3 pb-3">Noch keine kommenden Einsätze.</div>
                         {% endif %}
                       </details>
                       <details class="assignment-collapse">
                         <summary>
-                          <span>Previous jobs</span>
+                          <span>Vergangene Einsätze</span>
                           <span class="assignment-count">{{ past_jobs|length }}</span>
                         </summary>
                         {% if past_jobs %}
@@ -794,7 +794,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                             {% endfor %}
                           </ul>
                         {% else %}
-                          <div class="placeholder px-3 pb-3">No completed jobs yet.</div>
+                          <div class="placeholder px-3 pb-3">Noch keine abgeschlossenen Einsätze.</div>
                         {% endif %}
                       </details>
                     </div>
@@ -803,16 +803,16 @@ ADMIN_EMPLOYEES_TEMPLATE = """
               </div>
               {% if total_pages > 1 %}
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-4">
-                  <span class="text-secondary small">Page {{ page }} of {{ total_pages }}</span>
-                  <div class="btn-group" role="group" aria-label="Employee pagination">
+                  <span class="text-secondary small">Seite {{ page }} von {{ total_pages }}</span>
+                  <div class="btn-group" role="group" aria-label="Mitarbeiter-Seitennavigation">
                     {% if has_prev %}
                       {% if search_q %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=prev_page, q=search_q) }}">Previous</a>
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=prev_page, q=search_q) }}">Zurück</a>
                       {% else %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=prev_page) }}">Previous</a>
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=prev_page) }}">Zurück</a>
                       {% endif %}
                     {% else %}
-                      <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Previous</span>
+                      <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Zurück</span>
                     {% endif %}
                     {% for page_num in range(1, total_pages + 1) %}
                       {% if page_num == page %}
@@ -827,19 +827,19 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                     {% endfor %}
                     {% if has_next %}
                       {% if search_q %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=next_page, q=search_q) }}">Next</a>
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=next_page, q=search_q) }}">Weiter</a>
                       {% else %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=next_page) }}">Next</a>
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=next_page) }}">Weiter</a>
                       {% endif %}
                     {% else %}
-                      <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Next</span>
+                      <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Weiter</span>
                     {% endif %}
                   </div>
                 </div>
               {% endif %}
             {% else %}
             <div class="card-surface">
-              <p class="placeholder mb-0">No employees match this filter. Try broadening your search.</p>
+              <p class="placeholder mb-0">Keine Mitarbeiter passen zu diesem Filter. Bitte Suche erweitern.</p>
             </div>
           {% endif %}
         </div>
@@ -883,13 +883,13 @@ ADMIN_EMPLOYEES_TEMPLATE = """
           const original = btn.textContent;
           if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(payload).then(() => {
-              btn.textContent = 'Copied!';
+              btn.textContent = 'Kopiert!';
               setTimeout(() => { btn.textContent = original; }, 1800);
             }).catch(() => {
-              window.prompt('Copy credentials:', payload);
+              window.prompt('Zugangsdaten kopieren:', payload);
             });
           } else {
-            window.prompt('Copy credentials:', payload);
+            window.prompt('Zugangsdaten kopieren:', payload);
           }
         });
       });
@@ -942,7 +942,7 @@ ADMIN_SITES_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing — Site Library</title>
+  <title>Putzelf Marketing — Standortübersicht</title>
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1087,20 +1087,20 @@ ADMIN_SITES_TEMPLATE = """
   <div class="app-shell">
     <aside id="admin-sidebar" class="sidebar">
       <div class="sidebar-section-title">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Overview</span></a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Manage employees</span></a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Manage sites</span></a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">Profiles</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Assign coverage</span></a>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Übersicht</span></a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Mitarbeiter verwalten</span></a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Standorte verwalten</span></a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">Profile</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Einsätze zuweisen</span></a>
       <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
       <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">Invoices</span></a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">Rechnungen</span></a>
       <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Abmelden</span></a>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
     <main class="main-shell">
-      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
+      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menü</button>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="mb-3">
@@ -1114,84 +1114,84 @@ ADMIN_SITES_TEMPLATE = """
       {% endwith %}
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
         <div>
-          <div class="badge-soft mb-2">Location library</div>
-          <h1 class="h3 mb-1 text-dark">Manage client sites</h1>
+          <div class="badge-soft mb-2">Standortübersicht</div>
+          <h1 class="h3 mb-1 text-dark">Kundenstandorte verwalten</h1>
           <p class="text-secondary mb-0">
             {% if filtered_sites %}
-              Showing {{ page_sites }} of {{ filtered_sites }} matching
+              Zeigt {{ page_sites }} von {{ filtered_sites }} Treffern
             {% else %}
-              No sites match the current filters
+              Keine Standorte entsprechen den aktuellen Filtern
             {% endif %}
-            · {{ total_sites }} total sites
+            · {{ total_sites }} Standorte gesamt
           </p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-          <a href="{{ url_for('admin_profiles', tab='clients') }}" class="btn btn-sm btn-outline-primary">Client profiles</a>
-          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Back to overview</a>
-          <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-primary">Open schedule</a>
+          <a href="{{ url_for('admin_profiles', tab='clients') }}" class="btn btn-sm btn-outline-primary">Kundenprofile</a>
+          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Zurück zur Übersicht</a>
+          <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-primary">Plan öffnen</a>
         </div>
       </div>
       <section class="stats-grid">
         <div class="stat-card">
-          <div class="stat-label">Total sites</div>
+          <div class="stat-label">Standorte gesamt</div>
           <div class="stat-value">{{ total_sites }}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Active sites with shifts this week</div>
+          <div class="stat-label">Aktive Standorte mit Einsätzen diese Woche</div>
           <div class="stat-value">{{ covered_sites }}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Unassigned active sites</div>
+          <div class="stat-label">Unzugewiesene aktive Standorte</div>
           <div class="stat-value">{{ unassigned_active_sites }}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Inactive clients</div>
+          <div class="stat-label">Inaktive Kunden</div>
           <div class="stat-value">{{ inactive_sites }}</div>
         </div>
       </section>
       <form method="get" class="row g-2 align-items-end mb-4">
         <div class="col-sm-8">
-          <label class="form-label" for="site_search">Search sites</label>
+          <label class="form-label" for="site_search">Standorte suchen</label>
           <div class="input-group input-group-sm">
-            <input type="text" class="form-control" id="site_search" name="q" value="{{ search_q or '' }}" placeholder="Search by name or address">
-              <button class="btn btn-outline-primary" type="submit" title="Search"><i class="bi bi-search"></i></button>
+            <input type="text" class="form-control" id="site_search" name="q" value="{{ search_q or '' }}" placeholder="Nach Name oder Adresse suchen">
+              <button class="btn btn-outline-primary" type="submit" title="Suchen"><i class="bi bi-search"></i></button>
           </div>
         </div>
         <div class="col-sm-4">
-          <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-clear-sites w-100" title="Clear filters"><i class="bi bi-x-circle"></i></a>
+          <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-clear-sites w-100" title="Filter zurücksetzen"><i class="bi bi-x-circle"></i></a>
         </div>
       </form>
       <div class="row g-3">
         <div class="col-12 col-lg-4">
           <div class="card-surface mb-3">
-            <h2 class="h6 text-uppercase text-secondary mb-3">Add site</h2>
+            <h2 class="h6 text-uppercase text-secondary mb-3">Standort hinzufügen</h2>
             <form method="post" class="row g-3">
               <input type="hidden" name="entity" value="site">
               <input type="hidden" name="action" value="create">
               <div class="col-12">
-                <label class="form-label" for="new_site_name">Site name</label>
+                <label class="form-label" for="new_site_name">Standortname</label>
                 <input type="text" class="form-control form-control-sm" id="new_site_name" name="name" required>
               </div>
               <div class="col-12">
-                <label class="form-label" for="new_site_address">Address</label>
-                <input type="text" class="form-control form-control-sm" id="new_site_address" name="address" placeholder="Street, city" required>
+                <label class="form-label" for="new_site_address">Adresse</label>
+                <input type="text" class="form-control form-control-sm" id="new_site_address" name="address" placeholder="Straße, Stadt" required>
               </div>
               <div class="col-12">
-                <label class="form-label" for="new_site_hourly_rate">Hourly rate ($)</label>
+                <label class="form-label" for="new_site_hourly_rate">Stundensatz (€)</label>
                 <input type="number" class="form-control form-control-sm" id="new_site_hourly_rate" name="hourly_rate" step="0.01" min="0" value="50.00" required>
               </div>
               <div class="col-12">
                 <label class="form-label" for="new_site_is_active">Status</label>
                 <select class="form-select form-select-sm" id="new_site_is_active" name="is_active">
-                  <option value="1" selected>Active</option>
-                  <option value="0">Inactive</option>
+                  <option value="1" selected>Aktiv</option>
+                  <option value="0">Inaktiv</option>
                 </select>
               </div>
               <div class="col-12">
-                <a href="{{ url_for('admin_profiles', tab='clients') }}" class="btn btn-sm btn-outline-secondary w-100">Manage client profile fields</a>
+                <a href="{{ url_for('admin_profiles', tab='clients') }}" class="btn btn-sm btn-outline-secondary w-100">Kundenprofilfelder verwalten</a>
               </div>
               <div class="col-12">
-                <button type="submit" class="btn btn-sm btn-primary w-100" title="Add site"><i class="bi bi-building-add"></i></button>
+                <button type="submit" class="btn btn-sm btn-primary w-100" title="Standort hinzufügen"><i class="bi bi-building-add"></i></button>
               </div>
             </form>
           </div>
@@ -1200,8 +1200,8 @@ ADMIN_SITES_TEMPLATE = """
           {% if sites %}
             <div class="card-surface mb-3">
               <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2 class="h6 text-uppercase text-secondary mb-0">Bulk update</h2>
-                <button form="bulk-site-update" type="submit" class="btn btn-sm btn-success">Save all</button>
+                <h2 class="h6 text-uppercase text-secondary mb-0">Sammelbearbeitung</h2>
+                <button form="bulk-site-update" type="submit" class="btn btn-sm btn-success">Alle speichern</button>
               </div>
               <form id="bulk-site-update" method="post" class="table-responsive" style="max-height:260px;">
                 <input type="hidden" name="entity" value="site_bulk">
@@ -1214,8 +1214,8 @@ ADMIN_SITES_TEMPLATE = """
                   <thead>
                     <tr>
                       <th scope="col">Name</th>
-                      <th scope="col">Address</th>
-                      <th scope="col">Hourly rate</th>
+                      <th scope="col">Adresse</th>
+                      <th scope="col">Stundensatz</th>
                       <th scope="col">Status</th>
                     </tr>
                   </thead>
@@ -1234,8 +1234,8 @@ ADMIN_SITES_TEMPLATE = """
                         </td>
                         <td>
                           <select class="form-select form-select-sm" name="site_is_active">
-                            <option value="1" {% if site.is_active != 0 %}selected{% endif %}>Active</option>
-                            <option value="0" {% if site.is_active == 0 %}selected{% endif %}>Inactive</option>
+                            <option value="1" {% if site.is_active != 0 %}selected{% endif %}>Aktiv</option>
+                            <option value="0" {% if site.is_active == 0 %}selected{% endif %}>Inaktiv</option>
                           </select>
                         </td>
                       </tr>
@@ -1259,43 +1259,43 @@ ADMIN_SITES_TEMPLATE = """
                       <input type="text" name="name" value="{{ site.name }}" class="form-control form-control-sm" required>
                     </div>
                     <div class="col-md-4 col-12">
-                      <label class="form-label">Address</label>
+                      <label class="form-label">Adresse</label>
                       <input type="text" name="address" value="{{ site.address or '' }}" class="form-control form-control-sm" required>
                     </div>
                     <div class="col-md-2 col-12">
-                      <label class="form-label">Hourly rate ($)</label>
+                      <label class="form-label">Stundensatz (€)</label>
                       <input type="number" name="hourly_rate" value="{{ '%.2f'|format(site.hourly_rate or 0) }}" class="form-control form-control-sm" step="0.01" min="0" required>
                     </div>
                     <div class="col-md-2 col-12">
                       <label class="form-label">Status</label>
                       <select name="is_active" class="form-select form-select-sm">
-                        <option value="1" {% if site.is_active != 0 %}selected{% endif %}>Active</option>
-                        <option value="0" {% if site.is_active == 0 %}selected{% endif %}>Inactive</option>
+                        <option value="1" {% if site.is_active != 0 %}selected{% endif %}>Aktiv</option>
+                        <option value="0" {% if site.is_active == 0 %}selected{% endif %}>Inaktiv</option>
                       </select>
                     </div>
                     <div class="col-md-2 col-12">
                       <div class="d-grid gap-2 site-row-actions">
-                        <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Save"><i class="bi bi-check2"></i></button>
-                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ site.name }}?')" title="Delete"><i class="bi bi-trash"></i></button>
+                        <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Speichern"><i class="bi bi-check2"></i></button>
+                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('{{ site.name }} löschen?')" title="Löschen"><i class="bi bi-trash"></i></button>
                       </div>
                     </div>
                   </div>
-                  <div class="small text-secondary mt-2">Shifts scheduled: <span class="text-primary">{{ shift_counts.get(site.id, 0) }}</span></div>
+                  <div class="small text-secondary mt-2">Geplante Einsätze: <span class="text-primary">{{ shift_counts.get(site.id, 0) }}</span></div>
                 </form>
               {% endfor %}
             </div>
             {% if total_pages > 1 %}
               <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-4">
-                <span class="text-secondary small">Page {{ page }} of {{ total_pages }}</span>
-                <div class="btn-group" role="group" aria-label="Site pagination">
+                <span class="text-secondary small">Seite {{ page }} von {{ total_pages }}</span>
+                <div class="btn-group" role="group" aria-label="Standort-Seitennavigation">
                   {% if has_prev %}
                     {% if search_q %}
-                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=prev_page, q=search_q) }}">Previous</a>
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=prev_page, q=search_q) }}">Zurück</a>
                     {% else %}
-                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=prev_page) }}">Previous</a>
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=prev_page) }}">Zurück</a>
                     {% endif %}
                   {% else %}
-                    <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Previous</span>
+                    <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Zurück</span>
                   {% endif %}
                   {% for page_num in range(1, total_pages + 1) %}
                     {% if page_num == page %}
@@ -1310,19 +1310,19 @@ ADMIN_SITES_TEMPLATE = """
                   {% endfor %}
                   {% if has_next %}
                     {% if search_q %}
-                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=next_page, q=search_q) }}">Next</a>
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=next_page, q=search_q) }}">Weiter</a>
                     {% else %}
-                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=next_page) }}">Next</a>
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=next_page) }}">Weiter</a>
                     {% endif %}
                   {% else %}
-                    <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Next</span>
+                    <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Weiter</span>
                   {% endif %}
                 </div>
               </div>
             {% endif %}
           {% else %}
             <div class="card-surface">
-              <p class="placeholder mb-0">No sites match this filter. Add locations or adjust your search.</p>
+              <p class="placeholder mb-0">Keine Standorte entsprechen diesem Filter. Fügen Sie Standorte hinzu oder passen Sie Ihre Suche an.</p>
             </div>
           {% endif %}
         </div>
@@ -4461,7 +4461,7 @@ SCHEDULE_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing — Employee Schedule</title>
+  <title>Putzelf Marketing — Mitarbeiterplan</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
@@ -4641,86 +4641,86 @@ SCHEDULE_TEMPLATE = """
       <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
       <div class="sidebar-footer">
         <div>© <span id="year"></span> Putzelf Marketing</div>
-        <div class="mt-1">Simple schedule overview for field teams.</div>
+        <div class="mt-1">Einfache Einsatzübersicht für Außenteams.</div>
       </div>
     </aside>
     <div class="main-shell">
       <header class="page-header">
         <div>
-          <div class="topbar-title">People</div>
-          <h1 class="topbar-heading mb-0">Employee schedule</h1>
+          <div class="topbar-title">Personal</div>
+          <h1 class="topbar-heading mb-0">Mitarbeiterplan</h1>
           <p class="topbar-subtitle mb-0">
-            See who is on which site this week, when they are free, and assign new shifts.
+            Sehen Sie, wer diese Woche an welchem Standort arbeitet, wann Mitarbeitende frei sind und weisen Sie neue Einsätze zu.
           </p>
           <p class="small-note mb-0">
-            Showing {{ week_days[0].strftime('%d.%m.%Y') }} – {{ week_days[-1].strftime('%d.%m.%Y') }} ({{ weeks }} week{% if weeks > 1 %}s{% endif %})
+            Zeigt {{ week_days[0].strftime('%d.%m.%Y') }} – {{ week_days[-1].strftime('%d.%m.%Y') }} ({{ weeks }} Woche{% if weeks > 1 %}n{% endif %})
           </p>
         </div>
         <div class="page-header-actions">
-          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-secondary btn-icon" title="Toggle navigation">☰</button>
-          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Admin panel</a>
-          <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Logout</a>
+          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-secondary btn-icon" title="Navigation umschalten">☰</button>
+          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Admin-Bereich</a>
+          <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Abmelden</a>
         </div>
       </header>
       <main class="content-shell">
         <section class="section-card schedule-card">
           <div class="section-header">
             <div>
-              <div class="section-kicker">Team planner</div>
-              <h2 class="section-title">Schedule overview</h2>
+              <div class="section-kicker">Teamplanung</div>
+              <h2 class="section-title">Einsatzübersicht</h2>
               <p class="section-subtitle">
-                Manage weekly coverage and spot availability across every employee at a glance.
+                Verwalten Sie die Wochenabdeckung und erkennen Sie freie Kapazitäten aller Mitarbeitenden auf einen Blick.
               </p>
             </div>
             <div class="section-actions">
               {% if reportlab_available %}
-                <a href="{{ pdf_url }}" class="btn btn-sm btn-primary">Schedule PDF</a>
-                <a href="{{ hours_pdf_url }}" class="btn btn-sm btn-outline-secondary">Hours report</a>
+                <a href="{{ pdf_url }}" class="btn btn-sm btn-primary">Plan als PDF</a>
+                <a href="{{ hours_pdf_url }}" class="btn btn-sm btn-outline-secondary">Stundenbericht</a>
               {% else %}
-                <span class="tag-muted">Install reportlab to export PDF</span>
+                <span class="tag-muted">Installieren Sie reportlab für den PDF-Export</span>
               {% endif %}
             </div>
           </div>
           <div class="insight-badges">
-            <span class="insight-badge">Week {{ week_days[0].strftime('%d.%m') }} – {{ week_days[-1].strftime('%d.%m') }}</span>
-            <span class="insight-badge">Range {{ weeks }} week{% if weeks > 1 %}s{% endif %}</span>
+            <span class="insight-badge">Woche {{ week_days[0].strftime('%d.%m') }} – {{ week_days[-1].strftime('%d.%m') }}</span>
+            <span class="insight-badge">Zeitraum {{ weeks }} Woche{% if weeks > 1 %}n{% endif %}</span>
             {% if selected_employee %}
-              <span class="insight-badge">Focused: {{ selected_employee.name }}</span>
+              <span class="insight-badge">Fokus: {{ selected_employee.name }}</span>
             {% else %}
-              <span class="insight-badge">All employees</span>
+              <span class="insight-badge">Alle Mitarbeitenden</span>
             {% endif %}
             {% if selected_site %}
-              <span class="insight-badge">Site: {{ selected_site.name }}</span>
+              <span class="insight-badge">Standort: {{ selected_site.name }}</span>
             {% endif %}
           </div>
           <form method="get" action="{{ url_for('schedule_dashboard') }}" class="filter-toolbar">
             <div>
-              <label class="form-label" for="filter_employee_id">Focus on employee</label>
+              <label class="form-label" for="filter_employee_id">Mitarbeiterfokus</label>
               <select class="form-select form-select-sm" id="filter_employee_id" name="employee_id" onchange="this.form.submit()">
-                <option value="">All employees</option>
+                <option value="">Alle Mitarbeitenden</option>
                 {% for emp in employees %}
                   <option value="{{ emp.id }}" {% if selected_employee_id == emp.id %}selected{% endif %}>{{ emp.name }}{% if emp.role %} — {{ emp.role }}{% endif %}</option>
                 {% endfor %}
               </select>
             </div>
             <div>
-              <label class="form-label" for="filter_site_id">Focus on site</label>
+              <label class="form-label" for="filter_site_id">Standortfokus</label>
               <select class="form-select form-select-sm" id="filter_site_id" name="site_id" onchange="this.form.submit()">
-                <option value="">All sites</option>
+                <option value="">Alle Standorte</option>
                 {% for site in sites %}
                   <option value="{{ site.id }}" {% if selected_site_id == site.id %}selected{% endif %}>{{ site.name }}</option>
                 {% endfor %}
               </select>
             </div>
             <div>
-              <label class="form-label" for="start_date">Start week (Monday)</label>
+              <label class="form-label" for="start_date">Startwoche (Montag)</label>
               <input type="date" class="form-control form-control-sm" id="start_date" name="start_date" value="{{ start_date or week_days[0].isoformat() }}" onchange="this.form.submit()">
             </div>
             <div>
-              <label class="form-label" for="weeks">Range (weeks)</label>
+              <label class="form-label" for="weeks">Zeitraum (Wochen)</label>
               <select class="form-select form-select-sm" id="weeks" name="weeks" onchange="this.form.submit()">
                 {% for n in [1,2,4,8,12] %}
-                  <option value="{{ n }}" {% if weeks == n %}selected{% endif %}>{{ n }} week{% if n>1 %}s{% endif %}</option>
+                  <option value="{{ n }}" {% if weeks == n %}selected{% endif %}>{{ n }} Woche{% if n>1 %}n{% endif %}</option>
                 {% endfor %}
               </select>
             </div>
@@ -4739,10 +4739,10 @@ SCHEDULE_TEMPLATE = """
                 <table class="table table-bordered table-sm align-middle schedule-table">
                   <thead>
                     <tr>
-                      <th scope="col">Employee</th>
+                      <th scope="col">Mitarbeiter</th>
                       {% for d in week_days %}
                         <th scope="col">
-                          {{ d.strftime('%a') }}<br>
+                          {{ ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][d.weekday()] }}<br>
                           <span class="small-note">{{ d.strftime('%d.%m') }}</span>
                         </th>
                       {% endfor %}
@@ -4761,14 +4761,14 @@ SCHEDULE_TEMPLATE = """
                             {% if cell %}
                               {% for shift in cell %}
                                 <div class="shift-pill" draggable="true" data-shift-id="{{ shift.id }}">
-                                  <input type="checkbox" class="shift-checkbox" name="shift_ids[]" value="{{ shift.id }}" title="Select for deletion">
+                                  <input type="checkbox" class="shift-checkbox" name="shift_ids[]" value="{{ shift.id }}" title="Zum Löschen auswählen">
                                   {{ shift.label }}
-                                  <button type="button" class="shift-edit btn-icon-tiny" data-shift-id="{{ shift.id }}" data-day="{{ shift.day }}" data-start="{{ shift.start_time }}" data-end="{{ shift.end_time }}" data-instructions="{{ shift.instructions or '' }}" title="Einsatz bearbeiten" style="background:none; border:none; padding:0; cursor:pointer; color:#0f766e; font-size:0.9rem; margin:0 2px;">✎</button>
-                                  <a href="{{ url_for('delete_shift', shift_id=shift.id) }}" class="shift-delete" onclick="return confirm('Delete this shift?')" title="Delete shift">×</a>
+                                  <button type="button" class="shift-edit btn-icon-tiny" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}" data-day="{{ shift.day }}" data-start="{{ shift.start_time }}" data-end="{{ shift.end_time }}" data-instructions="{{ shift.instructions or '' }}" title="Einsatz bearbeiten" style="background:none; border:none; padding:0; cursor:pointer; color:#0f766e; font-size:0.9rem; margin:0 2px;">✎</button>
+                                  <a href="{{ url_for('delete_shift', shift_id=shift.id) }}" class="shift-delete" onclick="return confirm('Diesen Einsatz löschen?')" title="Einsatz löschen">×</a>
                                 </div>
                               {% endfor %}
                             {% else %}
-                              <span class="free-pill">Free</span>
+                              <span class="free-pill">Frei</span>
                             {% endif %}
                           </td>
                         {% endfor %}
@@ -4784,59 +4784,59 @@ SCHEDULE_TEMPLATE = """
         <section class="section-card form-card">
           <div class="section-header">
             <div>
-              <div class="section-kicker">Create shift</div>
-              <h2 class="section-title">Assign a new shift</h2>
+              <div class="section-kicker">Einsatz erstellen</div>
+              <h2 class="section-title">Neuen Einsatz zuweisen</h2>
               <p class="section-subtitle">
-                Choose an employee, match them to a site, then add the time window and days in one go.
+                Wählen Sie einen Mitarbeiter, ordnen Sie ihn einem Standort zu und hinterlegen Sie anschließend Zeitfenster und Tage.
               </p>
             </div>
           </div>
           <form method="post" class="small">
             <div class="form-grid">
               <div class="form-field">
-                <label class="form-label small-note text-uppercase" for="employee_id">Employee</label>
+                <label class="form-label small-note text-uppercase" for="employee_id">Mitarbeiter</label>
                 <select class="form-select form-select-sm" id="employee_id" name="employee_id" required>
-                  <option value="">Select employee…</option>
+                  <option value="">Mitarbeiter wählen…</option>
                   {% for emp in employees %}
                     <option value="{{ emp.id }}">{{ emp.name }}{% if emp.role %} — {{ emp.role }}{% endif %}</option>
                   {% endfor %}
                 </select>
               </div>
               <div class="form-field">
-                <label class="form-label small-note text-uppercase" for="site_id">Site</label>
+                <label class="form-label small-note text-uppercase" for="site_id">Standort</label>
                 <select class="form-select form-select-sm" id="site_id" name="site_id" required>
-                  <option value="">Select site…</option>
+                  <option value="">Standort wählen…</option>
                   {% for site in sites %}
                     <option value="{{ site.id }}">{{ site.name }}</option>
                   {% endfor %}
                 </select>
               </div>
               <div class="form-field form-field-span">
-                <label class="form-label small-note text-uppercase" for="day-picker">Day(s)</label>
-                <input type="text" class="form-control form-control-sm" id="day-picker" name="day_display" placeholder="Pick one or more days" required autocomplete="off">
+                <label class="form-label small-note text-uppercase" for="day-picker">Tag(e)</label>
+                <input type="text" class="form-control form-control-sm" id="day-picker" name="day_display" placeholder="Einen oder mehrere Tage wählen" required autocomplete="off">
                 <div id="selected-days" class="selected-days mt-2"></div>
                 <div id="day-hidden-inputs" hidden></div>
               </div>
               <div class="form-field">
-                <label class="form-label small-note text-uppercase" for="start_time">Start time</label>
+                <label class="form-label small-note text-uppercase" for="start_time">Startzeit</label>
                 <input type="time" class="form-control form-control-sm" id="start_time" name="start_time" required>
               </div>
               <div class="form-field">
-                <label class="form-label small-note text-uppercase" for="duration_hours">Duration (hours)</label>
-                <input type="number" step="0.25" min="0.25" max="24" class="form-control form-control-sm" id="duration_hours" name="duration_hours" placeholder="e.g. 8" required>
+                <label class="form-label small-note text-uppercase" for="duration_hours">Dauer (Stunden)</label>
+                <input type="number" step="0.25" min="0.25" max="24" class="form-control form-control-sm" id="duration_hours" name="duration_hours" placeholder="z. B. 8" required>
               </div>
               <div class="form-field form-field-span">
-                <label class="form-label small-note text-uppercase" for="instructions">Special instructions</label>
-                <textarea class="form-control form-control-sm" id="instructions" name="instructions" rows="3" placeholder="Optional notes for this shift"></textarea>
+                <label class="form-label small-note text-uppercase" for="instructions">Besondere Hinweise</label>
+                <textarea class="form-control form-control-sm" id="instructions" name="instructions" rows="3" placeholder="Optionale Hinweise für diesen Einsatz"></textarea>
               </div>
             </div>
             <div class="form-actions">
-              <button type="submit" class="btn btn-primary btn-sm">Save shift</button>
-              <span class="small-note">Calendar picks are duplicated for every day you select.</span>
+              <button type="submit" class="btn btn-primary btn-sm">Einsatz speichern</button>
+              <span class="small-note">Kalendereinträge werden für jeden ausgewählten Tag übernommen.</span>
             </div>
           </form>
           <div class="tip-callout mt-3">
-            Tip: An empty cell in the grid means the employee is free for that entire day.
+            Tipp: Eine leere Zelle im Raster bedeutet, dass der Mitarbeiter an diesem Tag vollständig frei ist.
           </div>
         </section>
       </main>
@@ -4853,24 +4853,32 @@ SCHEDULE_TEMPLATE = """
       <form id="edit-shift-form" method="post" action="" style="display:flex; flex-direction:column; gap:1rem;">
         <input type="hidden" id="edit-shift-id" name="shift_id" value="">
         <div>
-          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Day</label>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Mitarbeiter</label>
+          <select id="edit-shift-employee" name="employee_id" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;" required>
+            {% for emp in employees %}
+              <option value="{{ emp.id }}">{{ emp.name }}{% if emp.role %} — {{ emp.role }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Tag</label>
           <input type="date" id="edit-shift-day" name="day" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;" required>
         </div>
         <div>
-          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Start Time</label>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Startzeit</label>
           <input type="time" id="edit-shift-start" name="start_time" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;" required>
         </div>
         <div>
-          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">End Time</label>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Endzeit</label>
           <input type="time" id="edit-shift-end" name="end_time" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;" required>
         </div>
         <div>
-          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Instructions (optional)</label>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Hinweise (optional)</label>
           <textarea id="edit-shift-instructions" name="instructions" rows="3" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem; font-family:inherit; resize:vertical;"></textarea>
         </div>
         <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1rem;">
-          <button type="button" onclick="document.getElementById('edit-shift-modal').style.display='none'" style="padding:0.65rem 1.15rem; border:1px solid #cbd5f5; border-radius:0.75rem; background:#f8fafc; color:#0f172a; cursor:pointer; font-size:0.95rem;">Cancel</button>
-          <button type="submit" style="padding:0.65rem 1.15rem; border:none; border-radius:0.75rem; background:#0f766e; color:white; cursor:pointer; font-size:0.95rem; font-weight:500;">Save Changes</button>
+          <button type="button" onclick="document.getElementById('edit-shift-modal').style.display='none'" style="padding:0.65rem 1.15rem; border:1px solid #cbd5f5; border-radius:0.75rem; background:#f8fafc; color:#0f172a; cursor:pointer; font-size:0.95rem;">Abbrechen</button>
+          <button type="submit" style="padding:0.65rem 1.15rem; border:none; border-radius:0.75rem; background:#0f766e; color:white; cursor:pointer; font-size:0.95rem; font-weight:500;">Änderungen speichern</button>
         </div>
       </form>
     </div>
@@ -4905,7 +4913,7 @@ SCHEDULE_TEMPLATE = """
           <textarea id="batch-edit-instructions" name="instructions" rows="3" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem; font-family:inherit; resize:vertical;" placeholder="Leer lassen, um bestehende Hinweise beizubehalten"></textarea>
         </div>
         <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:0.5rem;">
-          <button type="button" id="batch-edit-cancel" style="padding:0.65rem 1.15rem; border:1px solid #cbd5f5; border-radius:0.75rem; background:#f8fafc; color:#0f172a; cursor:pointer; font-size:0.95rem;">Cancel</button>
+          <button type="button" id="batch-edit-cancel" style="padding:0.65rem 1.15rem; border:1px solid #cbd5f5; border-radius:0.75rem; background:#f8fafc; color:#0f172a; cursor:pointer; font-size:0.95rem;">Abbrechen</button>
           <button type="submit" style="padding:0.65rem 1.15rem; border:none; border-radius:0.75rem; background:#0f766e; color:white; cursor:pointer; font-size:0.95rem; font-weight:500;">Änderungen anwenden</button>
         </div>
       </form>
@@ -4966,7 +4974,7 @@ SCHEDULE_TEMPLATE = """
         });
         dayPicker.required = dates.length === 0;
         if (dates.length === 0) {
-          dayPicker.setCustomValidity('Select at least one day.');
+          dayPicker.setCustomValidity('Bitte mindestens einen Tag auswählen.');
         } else {
           dayPicker.setCustomValidity('');
         }
@@ -5096,7 +5104,7 @@ SCHEDULE_TEMPLATE = """
         }
         if (start && end && end <= start) {
           e.preventDefault();
-          alert('End time must be after start time.');
+          alert('Die Endzeit muss nach der Startzeit liegen.');
           return false;
         }
       });
@@ -5119,12 +5127,14 @@ SCHEDULE_TEMPLATE = """
       btn.addEventListener('click', function(e) {
         e.preventDefault();
         const shiftId = this.getAttribute('data-shift-id');
+        const employeeId = this.getAttribute('data-employee-id');
         const day = this.getAttribute('data-day');
         const start = this.getAttribute('data-start');
         const end = this.getAttribute('data-end');
         const instructions = this.getAttribute('data-instructions');
 
         document.getElementById('edit-shift-id').value = shiftId;
+        document.getElementById('edit-shift-employee').value = employeeId;
         document.getElementById('edit-shift-day').value = day;
         document.getElementById('edit-shift-start').value = start;
         document.getElementById('edit-shift-end').value = end;
@@ -5532,6 +5542,7 @@ try:
   from reportlab.pdfgen import canvas
   from reportlab.platypus import (
     Image,
+    PageBreak,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -5548,6 +5559,7 @@ except Exception:  # pragma: no cover - degrade gracefully when missing
   inch = None
   canvas = None
   Image = None
+  PageBreak = None
   Paragraph = None
   SimpleDocTemplate = None
   Spacer = None
@@ -5795,7 +5807,7 @@ ADMIN_PROFILES_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing — Profiles</title>
+  <title>Putzelf Marketing — Profile</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
@@ -5898,12 +5910,12 @@ ADMIN_PROFILES_TEMPLATE = """
 <body>
   <div class="app-shell">
     <aside class="sidebar">
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ Overview</a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 Manage employees</a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 Manage sites</a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill active">🪪 Profiles</a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill">📄 Invoices</a>
-      <a href="{{ url_for('logout') }}" class="nav-pill">⇦ Log out</a>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ Übersicht</a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 Mitarbeiter verwalten</a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 Standorte verwalten</a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill active">🪪 Profile</a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill">📄 Rechnungen</a>
+      <a href="{{ url_for('logout') }}" class="nav-pill">⇦ Abmelden</a>
     </aside>
     <main class="main-shell">
       {% with messages = get_flashed_messages(with_categories=true) %}
@@ -5916,42 +5928,42 @@ ADMIN_PROFILES_TEMPLATE = """
         {% endif %}
       {% endwith %}
       <header class="mb-4">
-        <div class="badge-soft mb-2">Profiles</div>
-        <h1 class="h4 text-dark mb-1">Profile Center</h1>
+        <div class="badge-soft mb-2">Profile</div>
+        <h1 class="h4 text-dark mb-1">Profilzentrum</h1>
       </header>
 
       <div class="d-flex gap-2 mb-3">
-        <a class="tab-btn {% if active_tab == 'employees' %}active{% endif %}" href="{{ url_for('admin_profiles', tab='employees') }}"><i class="bi bi-person-vcard"></i> Employee profiles</a>
-        <a class="tab-btn {% if active_tab == 'clients' %}active{% endif %}" href="{{ url_for('admin_profiles', tab='clients') }}"><i class="bi bi-building"></i> Client profiles</a>
+        <a class="tab-btn {% if active_tab == 'employees' %}active{% endif %}" href="{{ url_for('admin_profiles', tab='employees') }}"><i class="bi bi-person-vcard"></i> Mitarbeiterprofile</a>
+        <a class="tab-btn {% if active_tab == 'clients' %}active{% endif %}" href="{{ url_for('admin_profiles', tab='clients') }}"><i class="bi bi-building"></i> Kundenprofile</a>
       </div>
 
       {% if active_tab == 'employees' %}
         <div class="card-surface">
-          <h2 class="h6 text-uppercase text-secondary mb-3">Employee registration</h2>
+          <h2 class="h6 text-uppercase text-secondary mb-3">Mitarbeiterprofil</h2>
           <form method="get" class="mb-3">
             <input type="hidden" name="tab" value="employees">
             <div class="row g-2">
               <div class="col-md-4">
-                <input type="text" class="form-control form-control-sm" name="emp_search" value="{{ emp_search or '' }}" placeholder="Search name, phone, address, city...">
+                <input type="text" class="form-control form-control-sm" name="emp_search" value="{{ emp_search or '' }}" placeholder="Name, Telefon, Adresse, Stadt suchen...">
               </div>
               <div class="col-md-3">
                 <select class="form-select form-select-sm" name="emp_work_type">
-                  <option value="">All Work Types</option>
+                  <option value="">Alle Beschäftigungsarten</option>
                   <option value="Teilzeit" {% if emp_work_type_filter == 'Teilzeit' %}selected{% endif %}>Teilzeit</option>
                   <option value="Vollzeit" {% if emp_work_type_filter == 'Vollzeit' %}selected{% endif %}>Vollzeit</option>
                   <option value="Geringfügige" {% if emp_work_type_filter == 'Geringfügige' %}selected{% endif %}>Geringfügige / Minijobs</option>
                 </select>
               </div>
               <div class="col-md-3">
-                <input type="text" class="form-control form-control-sm" name="emp_role" value="{{ emp_role_filter or '' }}" placeholder="Filter by role...">
+                <input type="text" class="form-control form-control-sm" name="emp_role" value="{{ emp_role_filter or '' }}" placeholder="Nach Rolle filtern...">
               </div>
               <div class="col-md-2">
-                <button type="submit" class="btn btn-sm btn-primary w-100">Filter</button>
+                <button type="submit" class="btn btn-sm btn-primary w-100">Filtern</button>
               </div>
             </div>
             {% if emp_search or emp_work_type_filter or emp_role_filter %}
               <div class="mt-2">
-                <a href="{{ url_for('admin_profiles', tab='employees') }}" class="btn btn-sm btn-outline-secondary">Clear Filters</a>
+                <a href="{{ url_for('admin_profiles', tab='employees') }}" class="btn btn-sm btn-outline-secondary">Filter zurücksetzen</a>
               </div>
             {% endif %}
           </form>
@@ -5964,54 +5976,54 @@ ADMIN_PROFILES_TEMPLATE = """
                   <input type="hidden" name="tab" value="employees">
                   <div class="registration-grid">
                     <div class="avatar-wrap">
-                      <label class="avatar-uploader" title="Upload photo">
-                        <img class="avatar-preview" alt="Profile image preview" {% if emp.profile_image_path %}src="/static/{{ emp.profile_image_path }}" style="display:block;"{% endif %}>
+                      <label class="avatar-uploader" title="Foto hochladen">
+                        <img class="avatar-preview" alt="Vorschau Profilbild" {% if emp.profile_image_path %}src="/static/{{ emp.profile_image_path }}" style="display:block;"{% endif %}>
                         <span class="avatar-initials" {% if emp.profile_image_path %}style="display:none;"{% endif %}>{{ (emp.name or 'U')[:1]|upper }}</span>
                         <span class="avatar-badge"><i class="bi bi-camera-fill"></i></span>
                         <input type="file" name="employee_profile_image" class="d-none avatar-input" accept="image/*">
                       </label>
                     </div>
                     <div>
-                      <div class="mb-2"><strong>{{ emp.name }}</strong> <span class="muted">· {{ emp.role or 'No role' }}</span></div>
+                      <div class="mb-2"><strong>{{ emp.name }}</strong> <span class="muted">· {{ emp.role or 'Keine Rolle' }}</span></div>
                       <div class="row g-2">
                         <div class="col-md-4 col-12">
-                          <label class="form-label">Phone</label>
+                          <label class="form-label">Telefon</label>
                           <input type="text" class="form-control form-control-sm" name="profile_phone" value="{{ emp.profile_phone or '' }}">
                         </div>
                         <div class="col-md-6 col-12">
-                          <label class="form-label">Street / Address</label>
+                          <label class="form-label">Straße / Adresse</label>
                           <input type="text" class="form-control form-control-sm" name="profile_address" value="{{ emp.profile_address or '' }}">
                         </div>
                         <div class="col-md-3 col-12">
-                          <label class="form-label">ZIP Code</label>
+                          <label class="form-label">PLZ</label>
                           <input type="text" class="form-control form-control-sm" name="profile_zip_code" value="{{ emp.profile_zip_code or '' }}">
                         </div>
                         <div class="col-md-3 col-12">
-                          <label class="form-label">City</label>
+                          <label class="form-label">Stadt</label>
                           <input type="text" class="form-control form-control-sm" name="profile_city" value="{{ emp.profile_city or '' }}">
                         </div>
                         <div class="col-md-3 col-12">
-                          <label class="form-label">Beginning Date</label>
+                          <label class="form-label">Beginn-Datum</label>
                           <input type="text" class="form-control form-control-sm js-contract-date" name="profile_contract_start_date" value="{{ emp.profile_contract_start_date or '' }}" placeholder="YYYY-MM-DD">
                         </div>
                         <div class="col-md-3 col-12">
-                          <label class="form-label">End Date</label>
+                          <label class="form-label">End-Datum</label>
                           <input type="text" class="form-control form-control-sm js-contract-date" name="profile_contract_end_date" value="{{ emp.profile_contract_end_date or '' }}" placeholder="YYYY-MM-DD">
                         </div>
                         <div class="col-md-4 col-12">
-                          <label class="form-label">Type of Employment</label>
+                          <label class="form-label">Beschäftigungsart</label>
                           <input type="text" class="form-control form-control-sm" name="profile_employment_type" value="{{ emp.profile_employment_type or 'Reinigungskraft' }}">
                         </div>
                         <div class="col-md-3 col-12">
-                          <label class="form-label">Euros/hr</label>
+                          <label class="form-label">Euro/Std.</label>
                           <input type="text" class="form-control form-control-sm" name="profile_euros_per_hour" value="{{ emp.profile_euros_per_hour or '12,37' }}" placeholder="12,37">
                         </div>
                         <div class="col-md-3 col-12">
-                          <label class="form-label">Working Hours</label>
+                          <label class="form-label">Arbeitsstunden</label>
                           <input type="text" class="form-control form-control-sm" name="profile_working_hours" value="{{ emp.profile_working_hours or '3' }}" placeholder="3">
                         </div>
                         <div class="col-md-3 col-12">
-                          <label class="form-label">Work Type</label>
+                          <label class="form-label">Arbeitsmodell</label>
                           <select class="form-select form-select-sm" name="profile_work_type">
                             <option value="Teilzeit" {% if (emp.profile_work_type or 'Teilzeit') == 'Teilzeit' %}selected{% endif %}>Teilzeit</option>
                             <option value="Vollzeit" {% if (emp.profile_work_type or '') == 'Vollzeit' %}selected{% endif %}>Vollzeit</option>
@@ -6019,7 +6031,7 @@ ADMIN_PROFILES_TEMPLATE = """
                           </select>
                         </div>
                         <div class="col-md-4 col-12">
-                          <label class="form-label">Groups</label>
+                          <label class="form-label">Gruppen</label>
                           <div class="input-group input-group-sm">
                             <select class="form-select" name="profile_group_type">
                               <option value="Lohngruppe" {% if (emp.profile_group_type or 'Lohngruppe') == 'Lohngruppe' %}selected{% endif %}>Lohngruppe</option>
@@ -6029,58 +6041,58 @@ ADMIN_PROFILES_TEMPLATE = """
                           </div>
                         </div>
                         <div class="col-md-6 col-12">
-                          <label class="form-label">Notes</label>
+                          <label class="form-label">Notizen</label>
                           <input type="text" class="form-control form-control-sm" name="profile_notes" value="{{ emp.profile_notes or '' }}">
                         </div>
                       </div>
                     </div>
                   </div>
                   <div class="mt-2 d-flex justify-content-end">
-                    <a href="{{ url_for('admin_employee_docx', employee_id=emp.id) }}" class="btn btn-sm btn-outline-primary icon-btn me-2" title="Download employee document"><i class="bi bi-file-earmark-word"></i></a>
-                    <button class="btn btn-sm btn-primary icon-btn" type="submit" title="Save profile"><i class="bi bi-check2-circle"></i></button>
+                    <a href="{{ url_for('admin_employee_docx', employee_id=emp.id) }}" class="btn btn-sm btn-outline-primary icon-btn me-2" title="Mitarbeiterdokument herunterladen"><i class="bi bi-file-earmark-word"></i></a>
+                    <button class="btn btn-sm btn-primary icon-btn" type="submit" title="Profil speichern"><i class="bi bi-check2-circle"></i></button>
                   </div>
                 </form>
               {% endfor %}
             </div>
           {% else %}
-            <p class="muted mb-0">No employees found.</p>
+            <p class="muted mb-0">Keine Mitarbeiter gefunden.</p>
           {% endif %}
         </div>
       {% else %}
         <div class="card-surface">
-          <h2 class="h6 text-uppercase text-secondary mb-3">Client registration</h2>
+          <h2 class="h6 text-uppercase text-secondary mb-3">Kundenprofil</h2>
           <form method="get" class="mb-3">
             <input type="hidden" name="tab" value="clients">
             <input type="hidden" name="clients_page" value="{{ clients_page }}">
             <div class="row g-2">
               <div class="col-md-5">
-                <input type="text" class="form-control form-control-sm" name="client_search" value="{{ client_search or '' }}" placeholder="Search name, address, company, contact...">
+                <input type="text" class="form-control form-control-sm" name="client_search" value="{{ client_search or '' }}" placeholder="Name, Adresse, Firma, Kontakt suchen...">
               </div>
               <div class="col-md-3">
-                <input type="text" class="form-control form-control-sm" name="client_vat" value="{{ client_vat_filter or '' }}" placeholder="Filter by VAT ID...">
+                <input type="text" class="form-control form-control-sm" name="client_vat" value="{{ client_vat_filter or '' }}" placeholder="Nach USt-ID filtern...">
               </div>
               <div class="col-md-2">
-                <button type="submit" class="btn btn-sm btn-primary w-100">Filter</button>
+                <button type="submit" class="btn btn-sm btn-primary w-100">Filtern</button>
               </div>
               <div class="col-md-2">
                 {% if client_search or client_vat_filter %}
-                  <a href="{{ url_for('admin_profiles', tab='clients') }}" class="btn btn-sm btn-outline-secondary w-100">Clear</a>
+                  <a href="{{ url_for('admin_profiles', tab='clients') }}" class="btn btn-sm btn-outline-secondary w-100">Zurücksetzen</a>
                 {% endif %}
               </div>
             </div>
           </form>
           {% if sites %}
             <div class="d-flex justify-content-between align-items-center mb-3">
-              <span class="small text-secondary">Page {{ clients_page }} of {{ clients_total_pages }} · {{ clients_total_count }} clients</span>
+              <span class="small text-secondary">Seite {{ clients_page }} von {{ clients_total_pages }} · {{ clients_total_count }} Kunden</span>
               <div class="d-flex gap-2">
                 <a
                   class="btn btn-sm btn-outline-secondary {% if not clients_has_prev %}disabled{% endif %}"
                   href="{{ url_for('admin_profiles', tab='clients', clients_page=clients_prev_page) if clients_has_prev else '#' }}"
-                >Prev</a>
+                >Zurück</a>
                 <a
                   class="btn btn-sm btn-outline-secondary {% if not clients_has_next %}disabled{% endif %}"
                   href="{{ url_for('admin_profiles', tab='clients', clients_page=clients_next_page) if clients_has_next else '#' }}"
-                >Next</a>
+                >Weiter</a>
               </div>
             </div>
             <div class="vstack gap-3">
@@ -6092,42 +6104,42 @@ ADMIN_PROFILES_TEMPLATE = """
                   <input type="hidden" name="clients_page" value="{{ clients_page }}">
                   <div class="registration-grid">
                     <div class="avatar-wrap">
-                      <label class="avatar-uploader" title="Upload logo">
-                        <img class="avatar-preview" alt="Logo preview" {% if site.profile_image_path %}src="/static/{{ site.profile_image_path }}" style="display:block;"{% endif %}>
+                      <label class="avatar-uploader" title="Logo hochladen">
+                        <img class="avatar-preview" alt="Logo-Vorschau" {% if site.profile_image_path %}src="/static/{{ site.profile_image_path }}" style="display:block;"{% endif %}>
                         <span class="avatar-initials" {% if site.profile_image_path %}style="display:none;"{% endif %}>{{ (site.name or 'C')[:1]|upper }}</span>
                         <span class="avatar-badge"><i class="bi bi-camera-fill"></i></span>
                         <input type="file" name="site_profile_image" class="d-none avatar-input" accept="image/*">
                       </label>
                     </div>
                     <div>
-                      <div class="mb-2"><strong>{{ site.name }}</strong> <span class="muted">· {{ site.address or 'No address' }}</span></div>
+                      <div class="mb-2"><strong>{{ site.name }}</strong> <span class="muted">· {{ site.address or 'Keine Adresse' }}</span></div>
                       <div class="row g-2">
                         <div class="col-md-4 col-12">
                           <label class="form-label">Firma</label>
                           <input type="text" class="form-control form-control-sm" name="profile_company_name" value="{{ site.profile_company_name or '' }}">
                         </div>
                         <div class="col-md-4 col-12">
-                          <label class="form-label">Billing contact name</label>
+                          <label class="form-label">Name Rechnungs-Kontakt</label>
                           <input type="text" class="form-control form-control-sm" name="profile_contact_name" value="{{ site.profile_contact_name or '' }}">
                         </div>
                         <div class="col-md-4 col-12">
-                          <label class="form-label">Billing contact email</label>
+                          <label class="form-label">E-Mail Rechnungs-Kontakt</label>
                           <input type="email" class="form-control form-control-sm" name="profile_contact_email" value="{{ site.profile_contact_email or '' }}">
                         </div>
                         <div class="col-md-4 col-12">
-                          <label class="form-label">Billing phone</label>
+                          <label class="form-label">Rechnungstelefon</label>
                           <input type="text" class="form-control form-control-sm" name="profile_phone" value="{{ site.profile_phone or '' }}">
                         </div>
                         <div class="col-md-4 col-12">
-                          <label class="form-label">Customer ID</label>
+                          <label class="form-label">Kundennummer</label>
                           <input type="text" class="form-control form-control-sm" name="profile_tax_id" value="{{ site.profile_tax_id or '' }}" readonly>
                         </div>
                         <div class="col-md-4 col-12">
-                          <label class="form-label">VAT ID</label>
+                          <label class="form-label">USt-ID</label>
                           <input type="text" class="form-control form-control-sm" name="profile_vat_id" value="{{ site.profile_vat_id or '' }}" placeholder="ATU...">
                         </div>
                         <div class="col-md-6 col-12">
-                          <label class="form-label">Notes</label>
+                          <label class="form-label">Notizen</label>
                           <input type="text" class="form-control form-control-sm" name="profile_notes" value="{{ site.profile_notes or '' }}">
                         </div>
                         <div class="col-md-4 col-12">
@@ -6142,14 +6154,14 @@ ADMIN_PROFILES_TEMPLATE = """
                     </div>
                   </div>
                   <div class="mt-2 d-flex justify-content-end gap-2">
-                    <button class="btn btn-sm btn-outline-primary icon-btn" type="submit" name="profile_action" value="generate_contract" title="Generate contract PDF"><i class="bi bi-file-earmark-pdf"></i></button>
-                    <button class="btn btn-sm btn-primary icon-btn" type="submit" name="profile_action" value="save" title="Save profile"><i class="bi bi-check2-circle"></i></button>
+                    <button class="btn btn-sm btn-outline-primary icon-btn" type="submit" name="profile_action" value="generate_contract" title="Vertrags-PDF erstellen"><i class="bi bi-file-earmark-pdf"></i></button>
+                    <button class="btn btn-sm btn-primary icon-btn" type="submit" name="profile_action" value="save" title="Profil speichern"><i class="bi bi-check2-circle"></i></button>
                   </div>
                 </form>
               {% endfor %}
             </div>
           {% else %}
-            <p class="muted mb-0">No sites found.</p>
+            <p class="muted mb-0">Keine Standorte gefunden.</p>
           {% endif %}
         </div>
       {% endif %}
@@ -7428,6 +7440,7 @@ def _generate_hours_pdf(
     return buf
 
   for entry in report_rows:
+    elements.append(PageBreak())
     employee = entry["employee"]
     header_text = employee.name
     if employee.role:
@@ -8241,10 +8254,26 @@ def edit_shift(shift_id: int):
             return redirect(request.referrer or url_for("schedule_dashboard"))
         
         # Get form data
+        employee_id_raw = (request.form.get("employee_id") or "").strip()
         day_str = (request.form.get("day") or "").strip()
         start_str = (request.form.get("start_time") or "").strip()
         end_str = (request.form.get("end_time") or "").strip()
         instructions = (request.form.get("instructions") or "").strip() or None
+
+        if employee_id_raw:
+            try:
+                new_employee_id = int(employee_id_raw)
+            except (TypeError, ValueError):
+                flash("Invalid employee selected.", "warning")
+                return redirect(request.referrer or url_for("schedule_dashboard"))
+
+            employee_exists = db.query(Employee.id).filter(Employee.id == new_employee_id).first()
+            if not employee_exists:
+                flash("Selected employee was not found.", "warning")
+                return redirect(request.referrer or url_for("schedule_dashboard"))
+        else:
+            flash("Please select an employee.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
         
         # Parse and validate inputs
         try:
@@ -8271,6 +8300,7 @@ def edit_shift(shift_id: int):
             return redirect(request.referrer or url_for("schedule_dashboard"))
         
         # Update shift
+        shift.employee_id = new_employee_id
         shift.day = day
         shift.start_time = start_time
         shift.end_time = end_time
