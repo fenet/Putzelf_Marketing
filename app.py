@@ -3,12 +3,13 @@ import re
 import io
 import csv
 import json
+import html
 import logging
 import os
 import sys
 import secrets
 from collections import deque
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, time, timedelta
 from functools import wraps
 from typing import Any, Tuple
 from urllib.parse import urljoin, urldefrag, urlparse, quote_plus, urlencode
@@ -372,6 +373,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
   <link rel="manifest" href="/static/admin-manifest.json">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
   <style>
     :root {
       --accent: #0f766e;
@@ -5221,12 +5223,17 @@ SCHEDULE_TEMPLATE = """
             body: new URLSearchParams({ day: targetDay }).toString(),
           });
           if (!resp.ok) {
-            throw new Error(`Server returned ${resp.status}`);
+            let backendMessage = '';
+            try {
+              const payload = await resp.json();
+              backendMessage = payload && payload.error ? String(payload.error) : '';
+            } catch (_err) {}
+            throw new Error(backendMessage || `Server returned ${resp.status}`);
           }
           window.location.reload();
         } catch (err) {
           console.error(err);
-          alert('Einsatz konnte nicht verschoben werden. Bitte erneut versuchen.');
+          alert((err && err.message) ? err.message : 'Einsatz konnte nicht verschoben werden. Bitte erneut versuchen.');
         }
       });
     });
@@ -7123,6 +7130,62 @@ def _shift_actual_duration(shift: Shift) -> timedelta | None:
   return delta
 
 
+def _shift_interval(day: date, start_time: time, end_time: time) -> tuple[datetime, datetime]:
+  start_dt = datetime.combine(day, start_time)
+  end_dt = datetime.combine(day, end_time)
+  if end_dt <= start_dt:
+    end_dt += timedelta(days=1)
+  return start_dt, end_dt
+
+
+def _find_employee_schedule_conflict(
+  db,
+  employee_id: int,
+  day: date,
+  start_time: time,
+  end_time: time,
+  site_id: int,
+  exclude_shift_id: int | None = None,
+) -> str | None:
+  candidate_start, candidate_end = _shift_interval(day, start_time, end_time)
+
+  query = db.query(Shift).filter(Shift.employee_id == employee_id)
+  if exclude_shift_id is not None:
+    query = query.filter(Shift.id != exclude_shift_id)
+
+  candidate_site_name = "Standort"
+  candidate_site = db.get(Site, site_id)
+  if candidate_site and candidate_site.name:
+    candidate_site_name = candidate_site.name
+
+  for existing in query.all():
+    existing_start, existing_end = _shift_interval(existing.day, existing.start_time, existing.end_time)
+
+    if candidate_start < existing_end and existing_start < candidate_end:
+      existing_site = db.get(Site, existing.site_id)
+      existing_site_name = (existing_site.name if existing_site and existing_site.name else "Standort")
+      return (
+        "Planungs-Konflikt: Dieser Mitarbeiter ist bereits eingeteilt "
+        f"({existing.day.strftime('%d.%m.%Y')} {existing.start_time.strftime('%H:%M')}–{existing.end_time.strftime('%H:%M')} · {existing_site_name})."
+      )
+
+    gap = None
+    if candidate_end <= existing_start:
+      gap = existing_start - candidate_end
+    elif existing_end <= candidate_start:
+      gap = candidate_start - existing_end
+
+    if gap is not None and gap < timedelta(minutes=30) and existing.site_id != site_id:
+      existing_site = db.get(Site, existing.site_id)
+      existing_site_name = (existing_site.name if existing_site and existing_site.name else "Standort")
+      return (
+        "Warnung: Zwischen Einsätzen an unterschiedlichen Standorten müssen mindestens 30 Minuten liegen "
+        f"({existing_site_name} ↔ {candidate_site_name})."
+      )
+
+  return None
+
+
 def _format_hours(delta: timedelta | None, *, signed: bool = False) -> str:
   if delta is None:
     return "—"
@@ -7591,20 +7654,32 @@ def _generate_schedule_pdf(week_days, employees, matrix):
         )
     data = [header]
     for emp in employees:
-        header_line = emp.name
+        header_line = html.escape(emp.name or "")
         if emp.role:
-            header_line += f"<br/><font color='#94a3b8' size='9'>{emp.role}</font>"
+            header_line += f"<br/><font color='#94a3b8' size='9'>{html.escape(emp.role)}</font>"
         row = [Paragraph(header_line, cell_style)]
         for day in week_days:
             cell_items = matrix.get((emp.id, day), [])
             if not cell_items:
                 row.append(Paragraph("<font color='#9ca3af'>Free</font>", cell_style))
             else:
-                bullet = "<br/>".join(
-                    f"<font color='#0f172a'><b>{item.split(' — ')[0]}</b></font>"
-                    f"<br/><font color='#475569'>{' — '.join(item.split(' — ')[1:])}</font>"
-                    for item in cell_items
-                )
+                lines = []
+                for item in cell_items:
+                    if isinstance(item, dict):
+                        label_raw = str(item.get("label") or "")
+                    else:
+                        label_raw = str(item or "")
+                    head, sep, tail = label_raw.partition(" — ")
+                    head_safe = html.escape(head)
+                    tail_safe = html.escape(tail) if sep else ""
+                    if tail_safe:
+                        lines.append(
+                            f"<font color='#0f172a'><b>{head_safe}</b></font>"
+                            f"<br/><font color='#475569'>{tail_safe}</font>"
+                        )
+                    else:
+                        lines.append(f"<font color='#0f172a'><b>{head_safe}</b></font>")
+                bullet = "<br/><br/>".join(lines)
                 row.append(Paragraph(bullet, cell_style))
         data.append(row)
 
@@ -8298,6 +8373,19 @@ def edit_shift(shift_id: int):
         if end_time <= start_time:
             flash("End time must be after start time.", "warning")
             return redirect(request.referrer or url_for("schedule_dashboard"))
+
+        conflict_message = _find_employee_schedule_conflict(
+          db,
+          employee_id=new_employee_id,
+          day=day,
+          start_time=start_time,
+          end_time=end_time,
+          site_id=shift.site_id,
+          exclude_shift_id=shift.id,
+        )
+        if conflict_message:
+          flash(conflict_message, "warning")
+          return redirect(request.referrer or url_for("schedule_dashboard"))
         
         # Update shift
         shift.employee_id = new_employee_id
@@ -8335,6 +8423,18 @@ def move_shift_day(shift_id: int):
             new_day = datetime.strptime(day_str, "%Y-%m-%d").date()
         except (TypeError, ValueError):
             return jsonify({"ok": False, "error": "Invalid day format"}), 400
+
+        conflict_message = _find_employee_schedule_conflict(
+          db,
+          employee_id=shift.employee_id,
+          day=new_day,
+          start_time=shift.start_time,
+          end_time=shift.end_time,
+          site_id=shift.site_id,
+          exclude_shift_id=shift.id,
+        )
+        if conflict_message:
+          return jsonify({"ok": False, "error": conflict_message}), 400
 
         shift.day = new_day
         db.commit()
@@ -8407,6 +8507,23 @@ def batch_edit_shifts():
 
     updated_count = 0
     for shift in shifts:
+      target_day = new_day if new_day is not None else shift.day
+      target_start = new_start if new_start is not None else shift.start_time
+      target_end = new_end if new_end is not None else shift.end_time
+
+      conflict_message = _find_employee_schedule_conflict(
+        db,
+        employee_id=shift.employee_id,
+        day=target_day,
+        start_time=target_start,
+        end_time=target_end,
+        site_id=shift.site_id,
+        exclude_shift_id=shift.id,
+      )
+      if conflict_message:
+        flash(f"Einsatz #{shift.id}: {conflict_message}", "warning")
+        continue
+
       if new_day is not None:
         shift.day = new_day
       if new_start is not None and new_end is not None:
@@ -8518,9 +8635,23 @@ def schedule_dashboard():
               if start_val and 0 < duration_hours <= 24:
                 duration_delta = timedelta(hours=duration_hours)
                 created = 0
+                blocked_messages: list[str] = []
                 for day_val in day_values:
                   end_dt = datetime.combine(day_val, start_val) + duration_delta
                   end_val = end_dt.time()
+
+                  conflict_message = _find_employee_schedule_conflict(
+                    db,
+                    employee_id=int(emp_id),
+                    day=day_val,
+                    start_time=start_val,
+                    end_time=end_val,
+                    site_id=int(site_id),
+                  )
+                  if conflict_message:
+                    blocked_messages.append(f"{day_val.strftime('%d.%m.%Y')}: {conflict_message}")
+                    continue
+
                   shift = Shift(
                     employee_id=int(emp_id),
                     site_id=int(site_id),
@@ -8533,6 +8664,11 @@ def schedule_dashboard():
                   created += 1
                 if created:
                   db.commit()
+                  flash(f"{created} Einsatz/Einsätze wurden eingeplant.")
+                if blocked_messages:
+                  flash(blocked_messages[0], "warning")
+                if not created and not blocked_messages:
+                  flash("Es konnte kein Einsatz eingeplant werden.", "warning")
             return redirect(url_for("schedule_dashboard"))
 
         selected_employee_id = request.args.get("employee_id", type=int)
