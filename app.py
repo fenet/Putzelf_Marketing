@@ -9049,7 +9049,11 @@ def admin_employee_docx(employee_id: int):
       flash("DOCX generation is unavailable. Install python-docx.", "warning")
       return redirect(url_for("admin_employees"))
 
-    docx_buffer = _build_employee_docx(employee, template_path)
+    try:
+      docx_buffer = _build_employee_docx(employee, template_path)
+    except ValueError as exc:
+      flash(str(exc), "warning")
+      return redirect(url_for("admin_employees"))
     safe_name = re.sub(r"[^a-zA-Z0-9_-]+", "_", (employee.name or f"employee_{employee.id}").strip())
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     return send_file(
@@ -10489,7 +10493,29 @@ def _build_employee_docx(employee: Employee, template_path: str) -> io.BytesIO:
   group_number = (employee.profile_group_number or "").strip() or "6"
   group_label = f"{group_type} {group_number}".strip()
 
+  # Prefer explicit placeholders (so templates can be swapped safely)
+  placeholders = {
+    "{{EMPLOYEE_FULL_LINE}}": full_line,
+    "{{FULL_LINE}}": full_line,
+    "{{EMPLOYEE_NAME}}": employee_name,
+    "{{NAME}}": employee_name,
+    "{{STREET}}": street_line,
+    "{{ADDRESS}}": street_line,
+    "{{ZIP_CITY}}": city_line,
+    "{{CITY_LINE}}": city_line,
+    "{{CONTRACT_START_DATE}}": start_date_value,
+    "{{START_DATE}}": start_date_value,
+    "{{CONTRACT_END_DATE}}": end_date_value,
+    "{{END_DATE}}": end_date_value,
+    "{{EMPLOYMENT_TYPE}}": employment_type,
+    "{{EUROS_PER_HOUR}}": euros_per_hour,
+    "{{WORKING_HOURS}}": working_hours,
+    "{{WORK_TYPE}}": work_type,
+    "{{GROUP_LABEL}}": group_label,
+  }
+
   replacements = {
+    **placeholders,
     "Max Mustermann, Maxmustermanngasse 4/5/10, 1210 Wien": full_line,
     "Max Mustermann": employee_name,
     "Maxmustermanngasse 4/5/10": street_line,
@@ -10507,90 +10533,110 @@ def _build_employee_docx(employee: Employee, template_path: str) -> io.BytesIO:
     "Verwendungsgruupe 6": group_label,
   }
 
-  def _apply_to_paragraph(paragraph) -> None:
+  changed_any = False
+
+  def _apply_to_paragraph(paragraph) -> bool:
     if not paragraph.text:
-      return
+      return False
     original_text = paragraph.text
-    
-    # Track all replacements with their positions
-    replacements_made = []
-    
-    # Apply direct string replacements
     working_text = original_text
+
+    # 1) Placeholder + legacy sample string replacements
     for source, target in replacements.items():
-      if source in working_text:
-        start_idx = working_text.find(source)
-        while start_idx != -1:
-          replacements_made.append((start_idx, start_idx + len(source), target))
-          working_text = working_text[:start_idx] + target + working_text[start_idx + len(source):]
-          start_idx = working_text.find(source, start_idx + len(target))
-    
-    # Apply regex replacements
-    # Stundenlohn pattern
-    pattern = re.compile(r"Stundenlohn\s+von\s+brutto\s+€\s*\d+[\.,]\d+")
-    for match in pattern.finditer(working_text):
-      replacement = f"Stundenlohn von brutto € {euros_per_hour}"
-      replacements_made.append((match.start(), match.end(), replacement))
-    working_text = pattern.sub(f"Stundenlohn von brutto € {euros_per_hour}", working_text)
-    
-    # Hours pattern
-    pattern = re.compile(r"\b\d+\s*Stunden\b")
-    for match in pattern.finditer(working_text):
-      replacement = f"{working_hours} Stunden"
-      replacements_made.append((match.start(), match.end(), replacement))
-    working_text = pattern.sub(f"{working_hours} Stunden", working_text)
-    
-    # Geringfügige pattern
-    pattern = re.compile(r"geringf[uü]gige", re.IGNORECASE)
-    for match in pattern.finditer(working_text):
-      replacements_made.append((match.start(), match.end(), work_type))
-    working_text = pattern.sub(work_type, working_text)
-    
-    # Group pattern
-    pattern = re.compile(r"(Lohngruppe|Verwendungsgruppe|Verwendungsgruupe)\s*\d+")
-    for match in pattern.finditer(working_text):
-      replacements_made.append((match.start(), match.end(), group_label))
-    working_text = pattern.sub(group_label, working_text)
-    
+      if source and source in working_text:
+        working_text = working_text.replace(source, target)
+
+    # 2) Heuristics for typical contract templates (works even if demo names/dates differ)
+    employee_block = "\n".join([part for part in [employee_name, street_line, city_line] if part]).strip()
+    if employee_block:
+      # Replace employee details after 'ArbeitnehmerIn:' (keep the rest of the paragraph)
+      def _employee_repl(m: re.Match) -> str:
+        return f"{m.group(1)}{employee_block}{m.group(3)}"
+
+      working_text = re.sub(
+        r"((?:und\s+)?(?:ArbeitnehmerIn|Arbeitnehmerin|Arbeitnehmer/in)\s*:\s*)(.*?)(\s*Folgende\s+Vereinbarung)",
+        _employee_repl,
+        working_text,
+        flags=re.IGNORECASE | re.DOTALL,
+      )
+      working_text = re.sub(
+        r"((?:und\s+)?(?:ArbeitnehmerIn|Arbeitnehmerin|Arbeitnehmer/in)\s*:\s*)(.*)$",
+        lambda m: f"{m.group(1)}{employee_block}",
+        working_text,
+        flags=re.IGNORECASE | re.DOTALL,
+      )
+
+    if start_date_value:
+      working_text = re.sub(
+        r"(?i)(beginnt\s+am\s+)\d{2}\.\d{2}\.\d{4}",
+        lambda m: f"{m.group(1)}{start_date_value}",
+        working_text,
+      )
+    if end_date_value:
+      working_text = re.sub(
+        r"(?i)(befristet\s+bis\s+zum\s+)\d{2}\.\d{2}\.\d{4}",
+        lambda m: f"{m.group(1)}{end_date_value}",
+        working_text,
+      )
+
+    # 3) Broader (but still contract-related) normalization
+    working_text = re.sub(
+      r"Stundenlohn\s+von\s+brutto\s+€\s*\d+[\.,]\d+",
+      f"Stundenlohn von brutto € {euros_per_hour}",
+      working_text,
+    )
+    working_text = re.sub(r"\b\d+\s*Stunden\b", f"{working_hours} Stunden", working_text)
+    working_text = re.sub(r"geringf[uü]gige", work_type, working_text, flags=re.IGNORECASE)
+    working_text = re.sub(
+      r"(Lohngruppe|Verwendungsgruppe|Verwendungsgruupe)\s*\d+",
+      group_label,
+      working_text,
+    )
+
     if working_text != original_text:
-      # Sort replacements by position to build text with selective bold
-      replacements_made.sort(key=lambda x: x[0])
-      
-      # Merge overlapping replacements and build final text with bold markers
-      merged_ranges = []
-      for start, end, text in replacements_made:
-        if not merged_ranges or start >= merged_ranges[-1][1]:
-          merged_ranges.append([start, end])
-        else:
-          merged_ranges[-1][1] = max(merged_ranges[-1][1], end)
-      
-      # Clear paragraph and rebuild with selective bold
       paragraph.clear()
-      last_pos = 0
-      
-      for bold_start, bold_end in merged_ranges:
-        # Add normal text before bold section
-        if last_pos < bold_start:
-          paragraph.add_run(working_text[last_pos:bold_start])
-        
-        # Add bold text
-        bold_run = paragraph.add_run(working_text[bold_start:bold_end])
-        bold_run.bold = True
-        
-        last_pos = bold_end
-      
-      # Add any remaining normal text
-      if last_pos < len(working_text):
-        paragraph.add_run(working_text[last_pos:])
+      paragraph.add_run(working_text)
+      return True
+
+    return False
 
   for paragraph in doc.paragraphs:
-    _apply_to_paragraph(paragraph)
+    if _apply_to_paragraph(paragraph):
+      changed_any = True
 
   for table in doc.tables:
     for row in table.rows:
       for cell in row.cells:
         for paragraph in cell.paragraphs:
-          _apply_to_paragraph(paragraph)
+          if _apply_to_paragraph(paragraph):
+            changed_any = True
+
+  for section in doc.sections:
+    for paragraph in section.header.paragraphs:
+      if _apply_to_paragraph(paragraph):
+        changed_any = True
+    for table in section.header.tables:
+      for row in table.rows:
+        for cell in row.cells:
+          for paragraph in cell.paragraphs:
+            if _apply_to_paragraph(paragraph):
+              changed_any = True
+
+    for paragraph in section.footer.paragraphs:
+      if _apply_to_paragraph(paragraph):
+        changed_any = True
+    for table in section.footer.tables:
+      for row in table.rows:
+        for cell in row.cells:
+          for paragraph in cell.paragraphs:
+            if _apply_to_paragraph(paragraph):
+              changed_any = True
+
+  if not changed_any:
+    raise ValueError(
+      "Employee DOCX template seems incompatible: no placeholders or known contract labels were found to replace. "
+      "Use placeholders like {{EMPLOYEE_NAME}}, {{STREET}}, {{ZIP_CITY}}, {{START_DATE}}, {{END_DATE}}, {{EUROS_PER_HOUR}}, {{WORKING_HOURS}}, {{GROUP_LABEL}}."
+    )
 
   output = io.BytesIO()
   doc.save(output)
