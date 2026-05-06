@@ -9040,6 +9040,7 @@ def admin_employee_docx(employee_id: int):
       flash("Employee not found.", "warning")
       return redirect(url_for("admin_employees"))
 
+    debug_mode = (request.args.get("debug") or "").strip() in {"1", "true", "yes"}
     template_path = _resolve_employee_template_path()
     if not template_path:
       flash("Employee template not found. Place employee_template.docx in uploads/ or static/uploads/.", "warning")
@@ -9049,11 +9050,75 @@ def admin_employee_docx(employee_id: int):
       flash("DOCX generation is unavailable. Install python-docx.", "warning")
       return redirect(url_for("admin_employees"))
 
+    if debug_mode:
+      import json
+      from importlib import metadata as importlib_metadata
+
+      env_template = (os.getenv("EMPLOYEE_TEMPLATE_PATH") or "").strip()
+      stat_info: dict[str, str | int | None] = {
+        "resolved_template_path": template_path,
+        "env_EMPLOYEE_TEMPLATE_PATH": env_template or None,
+      }
+      try:
+        st = os.stat(template_path)
+        stat_info.update(
+          {
+            "template_size_bytes": int(st.st_size),
+            "template_mtime_utc": datetime.utcfromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M:%S UTC"),
+          }
+        )
+      except OSError as exc:
+        stat_info["template_stat_error"] = str(exc)
+
+      try:
+        docx_version = importlib_metadata.version("python-docx")
+      except Exception:
+        docx_version = None
+
+      # Inspect the template content as python-docx sees it (helps diagnose textboxes vs paragraphs)
+      template_probe: dict[str, str | int | None] = {
+        "python_docx_version": docx_version,
+        "employee_id": employee.id,
+        "employee_name": employee.name,
+        "employee_profile_address": employee.profile_address,
+        "employee_profile_zip_code": employee.profile_zip_code,
+        "employee_profile_city": employee.profile_city,
+      }
+
+      try:
+        probe_doc = Document(template_path)
+        hit = None
+        for p in probe_doc.paragraphs:
+          if "arbeitnehmer" in (p.text or "").lower():
+            hit = p.text
+            break
+        template_probe["template_first_arbeitnehmer_paragraph"] = hit
+        template_probe["template_paragraph_count"] = len(probe_doc.paragraphs)
+        template_probe["template_table_count"] = len(probe_doc.tables)
+      except Exception as exc:
+        template_probe["template_probe_error"] = str(exc)
+
+      payload = {"template": stat_info, "probe": template_probe}
+      return app.response_class(
+        response=json.dumps(payload, ensure_ascii=False, indent=2),
+        status=200,
+        mimetype="application/json",
+      )
+
     try:
       docx_buffer = _build_employee_docx(employee, template_path)
     except ValueError as exc:
       flash(str(exc), "warning")
       return redirect(url_for("admin_employees"))
+
+    try:
+      app.logger.info(
+        "Generated employee DOCX (employee_id=%s template=%s)",
+        employee.id,
+        template_path,
+      )
+    except Exception:
+      pass
     safe_name = re.sub(r"[^a-zA-Z0-9_-]+", "_", (employee.name or f"employee_{employee.id}").strip())
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     return send_file(
@@ -10535,6 +10600,82 @@ def _build_employee_docx(employee: Employee, template_path: str) -> io.BytesIO:
 
   changed_any = False
 
+  employee_block = "\n".join([part for part in [employee_name, street_line, city_line] if part]).strip()
+  bold_tokens = [
+    employee_name,
+    street_line,
+    city_line,
+    employee_block,
+    full_line,
+    start_date_value,
+    end_date_value,
+    employment_type,
+    euros_per_hour,
+    f"€ {euros_per_hour}".strip(),
+    working_hours,
+    f"{working_hours} Stunden".strip(),
+    work_type,
+    group_label,
+  ]
+
+  def _rewrite_with_bold_tokens(paragraph, updated_text: str) -> None:
+    paragraph.clear()
+
+    tokens = [t for t in (bold_tokens or []) if isinstance(t, str) and t.strip()]
+    if not tokens:
+      paragraph.add_run(updated_text)
+      return
+
+    ranges: list[tuple[int, int]] = []
+    seen = set()
+    for token in sorted(tokens, key=lambda v: len(v), reverse=True):
+      token = token.strip()
+      if len(token) < 2 or token in seen:
+        continue
+      seen.add(token)
+      start = 0
+      while True:
+        idx = updated_text.find(token, start)
+        if idx == -1:
+          break
+        ranges.append((idx, idx + len(token)))
+        start = idx + len(token)
+
+    if not ranges:
+      paragraph.add_run(updated_text)
+      return
+
+    # Prefer earlier ranges; if same start, prefer longer token
+    ranges.sort(key=lambda r: (r[0], -(r[1] - r[0])))
+    selected: list[tuple[int, int]] = []
+    last_end = -1
+    for start, end in ranges:
+      if start >= last_end:
+        selected.append((start, end))
+        last_end = end
+
+    # Merge overlaps/adjacent
+    merged: list[tuple[int, int]] = []
+    for start, end in selected:
+      if not merged:
+        merged.append((start, end))
+        continue
+      ps, pe = merged[-1]
+      if start <= pe:
+        merged[-1] = (ps, max(pe, end))
+      else:
+        merged.append((start, end))
+
+    pos = 0
+    for start, end in merged:
+      if pos < start:
+        paragraph.add_run(updated_text[pos:start])
+      run = paragraph.add_run(updated_text[start:end])
+      run.bold = True
+      pos = end
+    if pos < len(updated_text):
+      paragraph.add_run(updated_text[pos:])
+
   def _apply_to_paragraph(paragraph) -> bool:
     if not paragraph.text:
       return False
@@ -10547,7 +10688,6 @@ def _build_employee_docx(employee: Employee, template_path: str) -> io.BytesIO:
         working_text = working_text.replace(source, target)
 
     # 2) Heuristics for typical contract templates (works even if demo names/dates differ)
-    employee_block = "\n".join([part for part in [employee_name, street_line, city_line] if part]).strip()
     if employee_block:
       # Replace employee details after 'ArbeitnehmerIn:' (keep the rest of the paragraph)
       def _employee_repl(m: re.Match) -> str:
@@ -10594,8 +10734,7 @@ def _build_employee_docx(employee: Employee, template_path: str) -> io.BytesIO:
     )
 
     if working_text != original_text:
-      paragraph.clear()
-      paragraph.add_run(working_text)
+      _rewrite_with_bold_tokens(paragraph, working_text)
       return True
 
     return False
