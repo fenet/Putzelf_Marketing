@@ -9848,8 +9848,12 @@ def _format_invoice_number(invoice_number: str | None) -> str:
   return value
 
 
-def _generate_invoice_number(session_obj) -> str:
-  """Generate continuous invoice numbers: RE-1000, RE-1001, ..."""
+def _generate_invoice_number(session_obj, reserved: set[str] | None = None) -> str:
+  """Generate continuous invoice numbers: RE-1000, RE-1001, ...
+
+  NOTE: When creating multiple invoices in one DB transaction, pass a mutable
+  `reserved` set so invoice numbers remain unique even before commit.
+  """
   start_number = 1000
   highest = start_number - 1
 
@@ -9867,9 +9871,15 @@ def _generate_invoice_number(session_obj) -> str:
   candidate = f"RE-{next_number}"
 
   # Safety check in case of rare race conditions.
-  while session_obj.query(Invoice.id).filter(Invoice.invoice_number == candidate).first():
+  while (
+    (reserved is not None and candidate in reserved)
+    or session_obj.query(Invoice.id).filter(Invoice.invoice_number == candidate).first()
+  ):
     next_number += 1
     candidate = f"RE-{next_number}"
+
+  if reserved is not None:
+    reserved.add(candidate)
 
   return candidate
 
@@ -9887,8 +9897,12 @@ def _format_customer_id(sequence: int) -> str:
   return f"UT- {sequence:04d}"
 
 
-def _generate_customer_id(session_obj) -> str:
-  """Generate continuous customer IDs: UT- 0001, UT- 0002, ..."""
+def _generate_customer_id(session_obj, reserved: set[str] | None = None) -> str:
+  """Generate continuous customer IDs: UT- 0001, UT- 0002, ...
+
+  NOTE: When creating multiple IDs in one DB transaction, pass a mutable
+  `reserved` set to avoid duplicates before commit.
+  """
   start_sequence = 1
   highest = start_sequence - 1
 
@@ -9906,23 +9920,28 @@ def _generate_customer_id(session_obj) -> str:
   candidate = _format_customer_id(next_sequence)
 
   while (
+    (reserved is not None and candidate in reserved)
+    or
     session_obj.query(Site.id).filter(Site.profile_tax_id == candidate).first()
     or session_obj.query(Invoice.id).filter(Invoice.site_tax_id == candidate).first()
   ):
     next_sequence += 1
     candidate = _format_customer_id(next_sequence)
 
+  if reserved is not None:
+    reserved.add(candidate)
+
   return candidate
 
 
-def _ensure_site_customer_id(session_obj, site: Site | None) -> str:
+def _ensure_site_customer_id(session_obj, site: Site | None, reserved: set[str] | None = None) -> str:
   """Return a site's customer ID, creating one when missing."""
   if not site:
     return ""
   current_value = (site.profile_tax_id or "").strip()
   if current_value:
     return current_value
-  generated = _generate_customer_id(session_obj)
+  generated = _generate_customer_id(session_obj, reserved=reserved)
   site.profile_tax_id = generated
   return generated
 
@@ -9956,6 +9975,9 @@ def _auto_generate_monthly_invoices(
   skipped_existing = 0
   skipped_zero_hours = 0
 
+  reserved_invoice_numbers: set[str] = set()
+  reserved_customer_ids: set[str] = set()
+
   sites = session_obj.query(Site).order_by(Site.name.asc()).all()
   for site in sites:
     existing = (
@@ -9979,14 +10001,14 @@ def _auto_generate_monthly_invoices(
     total_amount = subtotal + tax_amount
 
     invoice = Invoice(
-      invoice_number=_generate_invoice_number(session_obj),
+      invoice_number=_generate_invoice_number(session_obj, reserved=reserved_invoice_numbers),
       site_id=site.id,
       site_company_name=((site.profile_company_name or "").strip() or (site.name or "").strip()),
       site_contact_name=((site.profile_contact_name or "").strip() or (site.contact_name or "").strip()),
       site_contact_email=((site.profile_contact_email or "").strip() or (site.contact_email or "").strip()),
       site_phone=(site.profile_phone or "").strip(),
       site_billing_address=((site.profile_billing_address or "").strip() or (site.address or "").strip()),
-      site_tax_id=_ensure_site_customer_id(session_obj, site),
+      site_tax_id=_ensure_site_customer_id(session_obj, site, reserved=reserved_customer_ids),
       hourly_rate=hourly_rate,
       tax_rate=tax_decimal,
       total_hours=total_hours,
@@ -11007,17 +11029,22 @@ def admin_generate_monthly_invoices():
       tax_rate_percent=tax_rate or 20.0,
       days_until_due=due_days or 30,
     )
-    flash(
-      (
-        f"Monthly invoices generated for {result['month']}: "
-        f"created {result['created']}, "
-        f"skipped existing {result['skipped_existing']}, "
-        f"skipped zero-hours {result['skipped_zero_hours']}."
-      ),
-      "success",
+    created = int(result.get("created") or 0)
+    skipped_existing = int(result.get("skipped_existing") or 0)
+    skipped_zero_hours = int(result.get("skipped_zero_hours") or 0)
+    msg = (
+      f"Monthly invoices generated for {result['month']}: "
+      f"created {created}, "
+      f"skipped existing {skipped_existing}, "
+      f"skipped zero-hours {skipped_zero_hours}."
     )
+    flash(msg, "success" if created > 0 else "warning")
   except ValueError as exc:
     flash(str(exc), "warning")
+  except Exception as exc:  # pragma: no cover - defensive
+    session_obj.rollback()
+    app.logger.exception("Auto-generate invoices failed")
+    flash(f"Auto-generate invoices failed: {exc}", "warning")
   finally:
     session_obj.close()
 
