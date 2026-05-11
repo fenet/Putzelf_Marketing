@@ -3635,6 +3635,10 @@ LEADS_TEMPLATE = """
           <span class="nav-pill-icon">🪪</span>
           <span class="nav-text">Profiles</span>
         </a>
+        <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">
+          <span class="nav-pill-icon">📄</span>
+          <span class="nav-text">Invoices</span>
+        </a>
         <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">
           <span class="nav-pill-icon">🗓</span>
           <span class="nav-text">Assign coverage</span>
@@ -3885,7 +3889,13 @@ LEADS_TEMPLATE = """
         try { localStorage.setItem(KEY, val ? '1' : '0'); } catch (e) {}
       };
       const initial = (() => {
-        try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+        try {
+          const raw = localStorage.getItem(KEY);
+          if (raw === null) return true; // default: collapsed (icons only)
+          return raw === '1';
+        } catch (e) {
+          return true;
+        }
       })();
       setState(initial);
       if (btn) btn.addEventListener('click', () => setState(!body.classList.contains('sidebar-collapsed')));
@@ -4211,6 +4221,10 @@ HTML_TEMPLATE = """
           <span class="nav-pill-icon">🪪</span>
           <span class="nav-text">Profiles</span>
         </a>
+        <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">
+          <span class="nav-pill-icon">📄</span>
+          <span class="nav-text">Invoices</span>
+        </a>
         <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">
           <span class="nav-pill-icon">🗓</span>
           <span class="nav-text">Assign coverage</span>
@@ -4344,7 +4358,13 @@ HTML_TEMPLATE = """
         try { localStorage.setItem(KEY, val ? '1' : '0'); } catch (e) {}
       };
       const initial = (() => {
-        try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+        try {
+          const raw = localStorage.getItem(KEY);
+          if (raw === null) return true; // default: collapsed (icons only)
+          return raw === '1';
+        } catch (e) {
+          return true;
+        }
       })();
       setState(initial);
       if (btn) {
@@ -4534,12 +4554,17 @@ SCHEDULE_TEMPLATE = """
     .schedule-table { margin-bottom:0; color:#0f172a; }
     .schedule-table th,
     .schedule-table td { font-size:0.82rem; vertical-align:top; border-color:#e2e8f0; }
-    .schedule-table th { background:#f1f5f9; color:#475569; position:sticky; top:0; z-index:5; }
-    .schedule-table th:first-child { position:sticky; left:0; z-index:10; background:#f1f5f9; }
-    .schedule-table td:first-child { position:sticky; left:0; z-index:3; background:inherit; }
+    .schedule-table thead th { background:#f1f5f9; color:#475569; position:sticky; top:0; z-index:5; }
+    .schedule-table thead th:first-child { position:sticky; left:0; z-index:10; background:#f1f5f9; }
+    .schedule-table tbody th { position:sticky; left:0; z-index:4; background:inherit; color:#0f172a; }
     .schedule-table tbody tr:nth-child(odd) { background:#ffffff; }
     .schedule-table tbody tr:nth-child(even) { background:#f8fafc; }
-    .shift-pill { display:inline-flex; align-items:center; gap:0.3rem; padding:0.18rem 0.6rem; border-radius:999px; background:#ecfdf5; border:1px solid #16a34a26; color:#0f766e; font-size:0.74rem; margin-bottom:0.25rem; white-space:nowrap; }
+    .shift-pill { display:flex; align-items:flex-start; gap:0.35rem; padding:0.3rem 0.6rem; border-radius:0.9rem; background:#ecfdf5; border:1px solid #16a34a26; color:#0f766e; font-size:0.74rem; margin-bottom:0.35rem; white-space:normal; }
+    .shift-pill-text { display:flex; flex-direction:column; gap:0.1rem; line-height:1.2; min-width:0; }
+    .shift-pill-title { font-weight:600; color:#0f766e; }
+    .shift-pill-sub { color:#0f766e; opacity:0.9; }
+    .shift-pill-time { color:#0f766e; opacity:0.9; }
+    .shift-pill-actions { display:inline-flex; align-items:center; gap:0.25rem; margin-left:auto; }
     .shift-pill[draggable="true"] { cursor:grab; }
     .shift-pill.dragging { opacity:0.55; }
     .schedule-drop-target { outline:2px dashed #0ea5e9; outline-offset:-2px; background:#e0f2fe !important; }
@@ -4625,6 +4650,10 @@ SCHEDULE_TEMPLATE = """
         <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">
           <span class="nav-pill-icon">🪪</span>
           <span class="nav-text">Profiles</span>
+        </a>
+        <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">
+          <span class="nav-pill-icon">📄</span>
+          <span class="nav-text">Invoices</span>
         </a>
         <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">
           <span class="nav-pill-icon">🗓</span>
@@ -4736,41 +4765,50 @@ SCHEDULE_TEMPLATE = """
                 <i class="bi bi-trash"></i> Ausgewählte löschen (<span id="selected-count">0</span>)
               </button>
             </div>
+            {% if not has_any_shifts %}
+              <div class="alert alert-warning mb-3" role="alert" style="border-radius:0.85rem;">
+                Keine Einsätze im ausgewählten Zeitraum ({{ week_days[0].strftime('%d.%m.%Y') }} – {{ week_days[-1].strftime('%d.%m.%Y') }}){% if selected_site %} für {{ selected_site.name }}{% endif %}{% if selected_employee %} ({{ selected_employee.name }}){% endif %}. Bitte Startwoche/Filter anpassen oder unten einen neuen Einsatz anlegen.
+              </div>
+            {% endif %}
             <div class="table-wrapper">
               <div class="table-scroll">
                 <table class="table table-bordered table-sm align-middle schedule-table">
                   <thead>
                     <tr>
-                      <th scope="col">Mitarbeiter</th>
-                      {% for d in week_days %}
+                      <th scope="col">Datum</th>
+                      {% for emp in visible_employees %}
                         <th scope="col">
-                          {{ ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][d.weekday()] }}<br>
-                          <span class="small-note">{{ d.strftime('%d.%m') }}</span>
+                          {{ emp.name }}<br>
+                          <span class="small-note">{{ emp.role or '' }}</span>
                         </th>
                       {% endfor %}
                     </tr>
                   </thead>
                   <tbody>
-                    {% for emp in visible_employees %}
-                      <tr data-employee-id="{{ emp.id }}">
+                    {% for d in visible_days %}
+                      <tr data-day="{{ d.isoformat() }}">
                         <th scope="row">
-                          {{ emp.name }}<br>
-                          <span class="small-note">{{ emp.role or '' }}</span>
+                          {{ ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][d.weekday()] }}<br>
+                          <span class="small-note">{{ d.strftime('%d.%m') }}</span>
                         </th>
-                        {% for d in week_days %}
+                        {% for emp in visible_employees %}
                           {% set cell = cells.get((emp.id, d)) %}
-                          <td data-day="{{ d.isoformat() }}">
+                          <td data-day="{{ d.isoformat() }}" data-employee-id="{{ emp.id }}">
                             {% if cell %}
                               {% for shift in cell %}
-                                <div class="shift-pill" draggable="true" data-shift-id="{{ shift.id }}">
+                                <div class="shift-pill" draggable="true" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}">
                                   <input type="checkbox" class="shift-checkbox" name="shift_ids[]" value="{{ shift.id }}" title="Zum Löschen auswählen">
-                                  {{ shift.label }}
-                                  <button type="button" class="shift-edit btn-icon-tiny" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}" data-day="{{ shift.day }}" data-start="{{ shift.start_time }}" data-end="{{ shift.end_time }}" data-instructions="{{ shift.instructions or '' }}" title="Einsatz bearbeiten" style="background:none; border:none; padding:0; cursor:pointer; color:#0f766e; font-size:0.9rem; margin:0 2px;">✎</button>
-                                  <a href="{{ url_for('delete_shift', shift_id=shift.id) }}" class="shift-delete" onclick="return confirm('Diesen Einsatz löschen?')" title="Einsatz löschen">×</a>
+                                  <div class="shift-pill-text">
+                                    <div class="shift-pill-title">{{ shift.site_name }}</div>
+                                    <div class="shift-pill-sub">{{ shift.site_address }}</div>
+                                    <div class="shift-pill-time">{{ shift.time_window }}</div>
+                                  </div>
+                                  <div class="shift-pill-actions">
+                                    <button type="button" class="shift-edit btn-icon-tiny" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}" data-day="{{ shift.day }}" data-start="{{ shift.start_time }}" data-end="{{ shift.end_time }}" data-instructions="{{ shift.instructions or '' }}" title="Einsatz bearbeiten" style="background:none; border:none; padding:0; cursor:pointer; color:#0f766e; font-size:0.9rem; margin:0 2px;">✎</button>
+                                    <a href="{{ url_for('delete_shift', shift_id=shift.id) }}" class="shift-delete" onclick="return confirm('Diesen Einsatz löschen?')" title="Einsatz löschen">×</a>
+                                  </div>
                                 </div>
                               {% endfor %}
-                            {% else %}
-                              <span class="free-pill">Frei</span>
                             {% endif %}
                           </td>
                         {% endfor %}
@@ -4933,7 +4971,13 @@ SCHEDULE_TEMPLATE = """
         try { localStorage.setItem(KEY, val ? '1' : '0'); } catch (e) {}
       };
       const initial = (() => {
-        try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+        try {
+          const raw = localStorage.getItem(KEY);
+          if (raw === null) return true; // default: collapsed (icons only)
+          return raw === '1';
+        } catch (e) {
+          return true;
+        }
       })();
       setState(initial);
       if (btn) {
@@ -5161,7 +5205,7 @@ SCHEDULE_TEMPLATE = """
     document.querySelectorAll('.shift-pill[draggable="true"]').forEach((pill) => {
       pill.addEventListener('dragstart', (e) => {
         draggedShiftId = pill.getAttribute('data-shift-id');
-        draggedFromEmployeeId = pill.closest('tr')?.getAttribute('data-employee-id') || null;
+        draggedFromEmployeeId = pill.getAttribute('data-employee-id') || null;
         pill.classList.add('dragging');
         if (e.dataTransfer) {
           e.dataTransfer.effectAllowed = 'move';
@@ -5184,7 +5228,7 @@ SCHEDULE_TEMPLATE = """
         if (!draggedShiftId) {
           return;
         }
-        const targetEmployeeId = cell.closest('tr')?.getAttribute('data-employee-id') || null;
+        const targetEmployeeId = cell.getAttribute('data-employee-id') || null;
         if (!targetEmployeeId || targetEmployeeId !== draggedFromEmployeeId) {
           return;
         }
@@ -5206,7 +5250,7 @@ SCHEDULE_TEMPLATE = """
           return;
         }
 
-        const targetEmployeeId = cell.closest('tr')?.getAttribute('data-employee-id') || null;
+        const targetEmployeeId = cell.getAttribute('data-employee-id') || null;
         if (!targetEmployeeId || targetEmployeeId !== draggedFromEmployeeId) {
           return;
         }
@@ -5949,6 +5993,7 @@ ADMIN_PROFILES_TEMPLATE = """
           <h2 class="h6 text-uppercase text-secondary mb-3">Mitarbeiterprofil</h2>
           <form method="get" class="mb-3">
             <input type="hidden" name="tab" value="employees">
+            <input type="hidden" name="employees_page" value="1">
             <div class="row g-2">
               <div class="col-md-4">
                 <input type="text" class="form-control form-control-sm" name="emp_search" value="{{ emp_search or '' }}" placeholder="Name, Telefon, Adresse, Stadt suchen...">
@@ -5975,12 +6020,26 @@ ADMIN_PROFILES_TEMPLATE = """
             {% endif %}
           </form>
           {% if employees %}
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span class="small text-secondary">Seite {{ employees_page }} von {{ employees_total_pages }} · {{ employees_total_count }} Mitarbeiter</span>
+              <div class="d-flex gap-2">
+                <a
+                  class="btn btn-sm btn-outline-secondary {% if not employees_has_prev %}disabled{% endif %}"
+                  href="{{ url_for('admin_profiles', tab='employees', employees_page=employees_prev_page, emp_search=emp_search, emp_work_type=emp_work_type_filter, emp_role=emp_role_filter) if employees_has_prev else '#' }}"
+                >Zurück</a>
+                <a
+                  class="btn btn-sm btn-outline-secondary {% if not employees_has_next %}disabled{% endif %}"
+                  href="{{ url_for('admin_profiles', tab='employees', employees_page=employees_next_page, emp_search=emp_search, emp_work_type=emp_work_type_filter, emp_role=emp_role_filter) if employees_has_next else '#' }}"
+                >Weiter</a>
+              </div>
+            </div>
             <div class="vstack gap-3">
               {% for emp in employees %}
                 <form method="post" enctype="multipart/form-data" class="registration-card">
                   <input type="hidden" name="entity" value="employee_profile">
                   <input type="hidden" name="id" value="{{ emp.id }}">
                   <input type="hidden" name="tab" value="employees">
+                  <input type="hidden" name="employees_page" value="{{ employees_page }}">
                   <div class="registration-grid">
                     <div class="avatar-wrap">
                       <label class="avatar-uploader" title="Foto hochladen">
@@ -6070,7 +6129,7 @@ ADMIN_PROFILES_TEMPLATE = """
           <h2 class="h6 text-uppercase text-secondary mb-3">Kundenprofil</h2>
           <form method="get" class="mb-3">
             <input type="hidden" name="tab" value="clients">
-            <input type="hidden" name="clients_page" value="{{ clients_page }}">
+            <input type="hidden" name="clients_page" value="1">
             <div class="row g-2">
               <div class="col-md-5">
                 <input type="text" class="form-control form-control-sm" name="client_search" value="{{ client_search or '' }}" placeholder="Name, Adresse, Firma, Kontakt suchen...">
@@ -6094,11 +6153,11 @@ ADMIN_PROFILES_TEMPLATE = """
               <div class="d-flex gap-2">
                 <a
                   class="btn btn-sm btn-outline-secondary {% if not clients_has_prev %}disabled{% endif %}"
-                  href="{{ url_for('admin_profiles', tab='clients', clients_page=clients_prev_page) if clients_has_prev else '#' }}"
+                  href="{{ url_for('admin_profiles', tab='clients', clients_page=clients_prev_page, client_search=client_search, client_vat=client_vat_filter) if clients_has_prev else '#' }}"
                 >Zurück</a>
                 <a
                   class="btn btn-sm btn-outline-secondary {% if not clients_has_next %}disabled{% endif %}"
-                  href="{{ url_for('admin_profiles', tab='clients', clients_page=clients_next_page) if clients_has_next else '#' }}"
+                  href="{{ url_for('admin_profiles', tab='clients', clients_page=clients_next_page, client_search=client_search, client_vat=client_vat_filter) if clients_has_next else '#' }}"
                 >Weiter</a>
               </div>
             </div>
@@ -6157,6 +6216,14 @@ ADMIN_PROFILES_TEMPLATE = """
                           <label class="form-label">Tel./ Fax / E-Mail</label>
                           <input type="text" class="form-control form-control-sm" name="contract_contact_details" value="{{ site.contract_contact_details or '' }}">
                         </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Vertragsbeginn</label>
+                          <input type="text" class="form-control form-control-sm js-contract-date-dmy" name="contract_start_date" value="{{ site.contract_start_date or '' }}" placeholder="TT-MM-JJJJ">
+                        </div>
+                        <div class="col-md-4 col-12">
+                          <label class="form-label">Vertragsende</label>
+                          <input type="text" class="form-control form-control-sm js-contract-date-dmy" name="contract_end_date" value="{{ site.contract_end_date or '' }}" placeholder="TT-MM-JJJJ">
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -6198,6 +6265,15 @@ ADMIN_PROFILES_TEMPLATE = """
     if (window.flatpickr) {
       flatpickr('.js-contract-date', {
         dateFormat: 'Y-m-d',
+        locale: {
+          firstDayOfWeek: 1,
+        },
+        static: false,
+        disableMobile: false,
+      });
+
+      flatpickr('.js-contract-date-dmy', {
+        dateFormat: 'd-m-Y',
         locale: {
           firstDayOfWeek: 1,
         },
@@ -6265,6 +6341,8 @@ class Site(Base):
   profile_image_path = Column(String(255))
   contract_partner_name = Column(String(255))
   contract_contact_details = Column(String(255))
+  contract_start_date = Column(String(10))
+  contract_end_date = Column(String(10))
 
   shifts = relationship("Shift", back_populates="site", cascade="all, delete-orphan")
 
@@ -6394,6 +6472,8 @@ _ensure_sqlite_column(engine, "sites", "profile_notes", "TEXT")
 _ensure_sqlite_column(engine, "sites", "profile_image_path", "TEXT")
 _ensure_sqlite_column(engine, "sites", "contract_partner_name", "TEXT")
 _ensure_sqlite_column(engine, "sites", "contract_contact_details", "TEXT")
+_ensure_sqlite_column(engine, "sites", "contract_start_date", "TEXT")
+_ensure_sqlite_column(engine, "sites", "contract_end_date", "TEXT")
 _ensure_sqlite_column(engine, "invoices", "site_company_name", "TEXT")
 _ensure_sqlite_column(engine, "invoices", "site_phone", "TEXT")
 _ensure_sqlite_column(engine, "invoices", "site_billing_address", "TEXT")
@@ -6418,6 +6498,19 @@ def _coerce_float(value: str | None) -> float | None:
     return None
 
 
+def _coerce_optional_dmy_date(value: str | None) -> tuple[str | None, bool]:
+  raw = (value or "").strip()
+  if not raw:
+    return None, True
+  for fmt in ("%d-%m-%Y", "%d.%m.%Y", "%d/%m/%Y"):
+    try:
+      parsed = datetime.strptime(raw, fmt)
+      return parsed.strftime("%d-%m-%Y"), True
+    except ValueError:
+      continue
+  return None, False
+
+
 def _remove_photo(path: str | None) -> None:
   if not path:
     return
@@ -6426,7 +6519,7 @@ def _remove_photo(path: str | None) -> None:
     if os.path.isfile(absolute):
       os.remove(absolute)
   except OSError:
-    logging.debug("Failed to remove photo %s", path)
+    logging.debug("Failed to remove phot/o %s", path)
 
 
 def _save_profile_image(file_obj, prefix: str, replace_path: str | None = None) -> str | None:
@@ -7102,10 +7195,16 @@ def _load_schedule_context(db, week_days):
     matrix = {}
     for s in shifts:
         key = (s.employee_id, s.day)
+        site_name = s.site.name if s.site and s.site.name else "Standort"
+        site_address = s.site.address if s.site and s.site.address else "Adresse unbekannt"
+        time_window = f"{s.start_time.strftime('%H:%M')}–{s.end_time.strftime('%H:%M')}"
         shift_info = {
             'id': s.id,
-        'site_id': s.site_id,
-            'label': f"{s.site.name} — {s.site.address or 'No address'} ({s.start_time.strftime('%H:%M')}–{s.end_time.strftime('%H:%M')})"
+            'site_id': s.site_id,
+            'label': f"{site_name} — {site_address} ({time_window})",
+            'site_name': site_name,
+            'site_address': site_address,
+            'time_window': time_window,
         }
         matrix.setdefault(key, []).append(shift_info)
     for key in matrix:
@@ -8673,7 +8772,7 @@ def schedule_dashboard():
 
         selected_employee_id = request.args.get("employee_id", type=int)
         selected_site_id = request.args.get("site_id", type=int)
-        weeks = request.args.get("weeks", default=1, type=int) or 1
+        weeks = request.args.get("weeks", default=8, type=int) or 8
         weeks = max(1, min(weeks, 12))
         start_date_str = request.args.get("start_date")
         start_date_val = None
@@ -8682,17 +8781,38 @@ def schedule_dashboard():
                 start_date_val = datetime.strptime(start_date_str, "%Y-%m-%d").date()
             except ValueError:
                 start_date_val = None
+        else:
+            # If the user didn't choose a start date, anchor the default view to
+            # the next upcoming shift (or the most recent shift) so the grid isn't empty.
+            today = date.today()
+            next_row = (
+              db.query(Shift.day)
+              .filter(Shift.day >= today)
+              .order_by(Shift.day.asc())
+              .first()
+            )
+            if next_row and next_row[0]:
+              start_date_val = next_row[0]
+            else:
+              last_row = (
+                db.query(Shift.day)
+                .order_by(Shift.day.desc())
+                .first()
+              )
+              if last_row and last_row[0]:
+                start_date_val = last_row[0]
 
         week_days = _get_day_range(start=start_date_val, weeks=weeks)
         employees, sites, matrix = _load_schedule_context(db, week_days)
 
         selected_employee = None
         selected_site = None
+        # Employee focus only affects the grid columns (filter dropdown still uses `employees`).
         visible_employees = employees
         if selected_employee_id:
-            selected_employee = next((e for e in employees if e.id == selected_employee_id), None)
-            if selected_employee:
-                visible_employees = [selected_employee]
+          selected_employee = next((e for e in employees if e.id == selected_employee_id), None)
+          if selected_employee:
+            visible_employees = [selected_employee]
 
         filtered_matrix = matrix
         if selected_site_id:
@@ -8702,6 +8822,16 @@ def schedule_dashboard():
             matched = [shift for shift in shifts if shift.get("site_id") == selected_site_id]
             if matched:
               filtered_matrix[key] = matched
+
+        # Hide completely empty rows/columns (after applying employee/site filters).
+        grid_employee_ids = {e.id for e in visible_employees}
+        shift_days_for_grid = {day for (emp_id, day) in filtered_matrix.keys() if emp_id in grid_employee_ids}
+        visible_days = [day for day in week_days if day in shift_days_for_grid]
+        has_any_shifts = bool(visible_days)
+
+        if not selected_employee:
+          shift_employee_ids_for_grid = {emp_id for (emp_id, _day) in filtered_matrix.keys()}
+          visible_employees = [e for e in employees if e.id in shift_employee_ids_for_grid]
 
         pdf_params = {"week": week_days[0].isoformat()}
         pdf_params["weeks"] = weeks
@@ -8725,6 +8855,8 @@ def schedule_dashboard():
             visible_employees=visible_employees,
             sites=sites,
             week_days=week_days,
+            visible_days=visible_days,
+            has_any_shifts=has_any_shifts,
             weeks=weeks,
             start_date=start_date_val.isoformat() if start_date_val else "",
             cells=filtered_matrix,
@@ -9347,6 +9479,12 @@ def admin_profiles():
     if clients_page is None:
       clients_page = request.form.get("clients_page", type=int)
     clients_page = max(clients_page or 1, 1)
+
+    employees_page = request.args.get("employees_page", type=int)
+    if employees_page is None:
+      employees_page = request.form.get("employees_page", type=int)
+    employees_page = max(employees_page or 1, 1)
+
     if active_tab not in {"employees", "clients"}:
       active_tab = "employees"
 
@@ -9415,6 +9553,18 @@ def admin_profiles():
           site.profile_notes = (request.form.get("profile_notes") or "").strip() or None
           site.contract_partner_name = (request.form.get("contract_partner_name") or "").strip() or None
           site.contract_contact_details = (request.form.get("contract_contact_details") or "").strip() or None
+
+          contract_start_val, contract_start_ok = _coerce_optional_dmy_date(request.form.get("contract_start_date"))
+          if contract_start_ok:
+            site.contract_start_date = contract_start_val
+          else:
+            flash("Ungültiges Datum für Vertragsbeginn. Bitte TT-MM-JJJJ verwenden.", "warning")
+
+          contract_end_val, contract_end_ok = _coerce_optional_dmy_date(request.form.get("contract_end_date"))
+          if contract_end_ok:
+            site.contract_end_date = contract_end_val
+          else:
+            flash("Ungültiges Datum für Vertragsende. Bitte TT-MM-JJJJ verwenden.", "warning")
           if "profile_default_hourly_rate" in request.form:
             default_rate_raw = request.form.get("profile_default_hourly_rate")
             parsed_rate = _coerce_float(default_rate_raw)
@@ -9450,6 +9600,8 @@ def admin_profiles():
       redirect_args = {"tab": active_tab}
       if active_tab == "clients":
         redirect_args["clients_page"] = clients_page
+      if active_tab == "employees":
+        redirect_args["employees_page"] = employees_page
       # Preserve search/filter parameters
       if emp_search:
         redirect_args["emp_search"] = emp_search
@@ -9479,7 +9631,25 @@ def admin_profiles():
       emp_query = emp_query.filter(Employee.profile_work_type == emp_work_type_filter)
     if emp_role_filter:
       emp_query = emp_query.filter(Employee.role.ilike(f"%{emp_role_filter}%"))
-    employees = emp_query.order_by(Employee.name.asc()).all()
+
+    employees_per_page = 5
+    employees_total_count = emp_query.count()
+    employees_total_pages = max(1, math.ceil(employees_total_count / employees_per_page))
+    if employees_page > employees_total_pages:
+      employees_page = employees_total_pages
+    employees_offset = (employees_page - 1) * employees_per_page
+    employees = (
+      emp_query
+      .order_by(Employee.name.asc())
+      .offset(employees_offset)
+      .limit(employees_per_page)
+      .all()
+    )
+
+    employees_has_prev = employees_page > 1
+    employees_has_next = employees_page < employees_total_pages
+    employees_prev_page = employees_page - 1 if employees_has_prev else 1
+    employees_next_page = employees_page + 1 if employees_has_next else employees_total_pages
 
     # Build sites query with filters
     sites_query = db.query(Site)
@@ -9525,6 +9695,13 @@ def admin_profiles():
       active_tab=active_tab,
       employees=employees,
       sites=sites,
+      employees_page=employees_page,
+      employees_total_pages=employees_total_pages,
+      employees_total_count=employees_total_count,
+      employees_has_prev=employees_has_prev,
+      employees_has_next=employees_has_next,
+      employees_prev_page=employees_prev_page,
+      employees_next_page=employees_next_page,
       clients_page=clients_page,
       clients_total_pages=clients_total_pages,
       clients_total_count=clients_total_count,
@@ -10143,17 +10320,30 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
       or (str(invoice.site_id) if invoice.site_id else "")
     )
 
-    # Client profile for recipient block
-    recipient_name = (
-      (invoice.site_contact_name or "").strip()
+    # Recipient block (company above contact name, plus address with country)
+    recipient_company_line = (
+      ((invoice.site.profile_company_name or "").strip() if invoice.site else "")
       or (invoice.site_company_name or "").strip()
-      or (invoice.site.name if invoice.site else "")
+      or (invoice.site.name.strip() if invoice.site and invoice.site.name else "")
       or ""
     )
-    recipient_contact_line = (invoice.site_contact_name or "").strip()
+    recipient_contact_line = (
+      ((invoice.site.profile_contact_name or "").strip() if invoice.site else "")
+      or (invoice.site_contact_name or "").strip()
+      or ""
+    )
+
+    recipient_name_lines: list[str] = []
+    if recipient_company_line:
+      recipient_name_lines.append(recipient_company_line)
+    if recipient_contact_line and recipient_contact_line != recipient_company_line:
+      recipient_name_lines.append(recipient_contact_line)
+    if not recipient_name_lines:
+      recipient_name_lines = ["-"]
+
     recipient_address_raw = (
       (invoice.site_billing_address or "").strip()
-      or (invoice.site.address if invoice.site and invoice.site.address else "").strip()
+      or (invoice.site.address.strip() if invoice.site and invoice.site.address else "")
     )
     recipient_address_lines: list[str] = []
     if recipient_address_raw:
@@ -10162,9 +10352,15 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
       else:
         recipient_address_lines = [part.strip() for part in recipient_address_raw.split(",") if part.strip()]
 
+    # Ensure "Österreich" is shown as the last line (exactly once) under the address.
+    if recipient_address_lines:
+      recipient_address_lines = [
+        line for line in recipient_address_lines
+        if line.strip().lower().strip(".") != "österreich"
+      ]
+      recipient_address_lines.append("Österreich")
+
     recipient_extra_lines: list[str] = []
-    if recipient_contact_line and recipient_contact_line != recipient_name:
-      recipient_extra_lines.append(recipient_contact_line)
     
     # Logo path (drawn on canvas to avoid layout shifts)
     logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'stafflogo.png')
@@ -10173,14 +10369,28 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
       logo_flowable = Image(logo_path, width=1.6 * inch, height=0.4 * inch)
       logo_flowable.hAlign = "LEFT"
     
+    vat_id = ((invoice.site.profile_vat_id or "").strip() if invoice.site else "")
+    contract_start = ((invoice.site.contract_start_date or "").strip() if invoice.site else "")
+    contract_end = ((invoice.site.contract_end_date or "").strip() if invoice.site else "")
+
+    leistungszeitraum_value = delivery_date
+    if contract_start and contract_end:
+      leistungszeitraum_value = f"{contract_start} – {contract_end}"
+    elif contract_start:
+      leistungszeitraum_value = contract_start
+    elif contract_end:
+      leistungszeitraum_value = contract_end
+
     # Create header table with sender and invoice info
     right_details_data = [
       [Paragraph('Rechnungs-Nr.', invoice_header_label_style), Paragraph(_format_invoice_number(invoice.invoice_number), invoice_header_value_style)],
       [Paragraph('Rechnungsdatum', invoice_header_label_style), Paragraph(invoice_date, invoice_header_value_style)],
-      [Paragraph('Lieferdatum', invoice_header_label_style), Paragraph(delivery_date, invoice_header_value_style)],
+      [Paragraph('Leistungszeitraum', invoice_header_label_style), Paragraph(leistungszeitraum_value, invoice_header_value_style)],
       [Paragraph('Ihre Kundennummer', invoice_header_label_style), Paragraph(customer_number, invoice_header_value_style)],
-      [Paragraph('Ihr Ansprechpartner', invoice_header_label_style), Paragraph('Sebastijan Kerculj', invoice_header_value_style)],
     ]
+    if vat_id:
+      right_details_data.append([Paragraph('Ihre USt-ID', invoice_header_label_style), Paragraph(vat_id, invoice_header_value_style)])
+    right_details_data.append([Paragraph('Ihr Ansprechpartner', invoice_header_label_style), Paragraph('Sebastijan Kerculj', invoice_header_value_style)])
     right_details_table = Table(right_details_data, colWidths=[1.6*inch, 1.2*inch])
     right_details_table.setStyle(TableStyle([
       ('ALIGN', (0, 0), (0, -1), 'LEFT'),
@@ -10201,7 +10411,7 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
         right_details_table
       ],
       [
-        Paragraph(f'<font size=10>{recipient_name}</font>', address_style),
+        Paragraph(f'<font size=10>{"<br/>".join(recipient_name_lines)}</font>', address_style),
         ''
       ],
       [
