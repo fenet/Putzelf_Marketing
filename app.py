@@ -1610,7 +1610,7 @@ INVOICE_LIST_TEMPLATE = """
                 <td>{{ inv.site.name }}</td>
                 <td>{{ inv.site_contact_name or 'N/A' }}</td>
                 <td class="text-end">{{ inv.total_hours }}</td>
-                <td class="text-end"><strong>${{ "%.2f"|format(inv.total_amount) }}</strong></td>
+                <td class="text-end"><strong>{{ "%.2f"|format(inv.total_amount) }} €</strong></td>
                 <td>
                   {% if inv.status == 'draft' %}
                     <span class="badge bg-warning text-dark">DRAFT</span>
@@ -1860,7 +1860,7 @@ INCOME_REPORT_TEMPLATE = """
             <div class="income-summary">
               <div class="summary-stat">
                 <div class="summary-label">Total Income</div>
-                <div class="summary-value">${{ "%.2f"|format(summary.total_income) }}</div>
+                <div class="summary-value">{{ "%.2f"|format(summary.total_income) }} €</div>
                 <div class="summary-sub">Gross earnings</div>
               </div>
               <div class="summary-stat">
@@ -1891,8 +1891,8 @@ INCOME_REPORT_TEMPLATE = """
                       <tr>
                         <td><strong>{{ site_data.site_name }}</strong></td>
                         <td class="text-end">{{ site_data.hours }}</td>
-                        <td class="text-end">${{ "%.2f"|format(site_data.hourly_rate) }}/hr</td>
-                        <td class="text-end"><strong>${{ "%.2f"|format(site_data.income) }}</strong></td>
+                        <td class="text-end">{{ "%.2f"|format(site_data.hourly_rate) }} €/hr</td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(site_data.income) }} €</strong></td>
                       </tr>
                     {% endfor %}
                   </tbody>
@@ -2094,7 +2094,7 @@ INCOME_REPORT_TEMPLATE = """
             <div class="income-summary">
               <div class="summary-stat">
                 <div class="summary-label">Total Income</div>
-                <div class="summary-value">${{ "%.2f"|format(summary.total_income) }}</div>
+                <div class="summary-value">{{ "%.2f"|format(summary.total_income) }} €</div>
                 <div class="summary-sub">Gross earnings</div>
               </div>
               <div class="summary-stat">
@@ -2125,8 +2125,8 @@ INCOME_REPORT_TEMPLATE = """
                       <tr>
                         <td><strong>{{ site_data.site_name }}</strong></td>
                         <td class="text-end">{{ site_data.hours }}</td>
-                        <td class="text-end">${{ "%.2f"|format(site_data.hourly_rate) }}/hr</td>
-                        <td class="text-end"><strong>${{ "%.2f"|format(site_data.income) }}</strong></td>
+                        <td class="text-end">{{ "%.2f"|format(site_data.hourly_rate) }} €/hr</td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(site_data.income) }} €</strong></td>
                       </tr>
                     {% endfor %}
                   </tbody>
@@ -2870,7 +2870,7 @@ INVOICE_VIEW_TEMPLATE = """
               <div class="col-md-6">
                 <h6 class="text-muted text-uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.08em;">Invoice Details:</h6>
                 <p class="mb-1"><strong>Site:</strong> {{ invoice.site.name }}</p>
-                <p class="mb-1"><strong>Hourly Rate:</strong> ${{ "%.2f"|format(invoice.hourly_rate) }}</p>
+                <p class="mb-1"><strong>Hourly Rate:</strong> {{ "%.2f"|format(invoice.hourly_rate) }} €</p>
                 <p class="mb-1"><strong>Total Hours:</strong> {{ invoice.total_hours }}</p>
               </div>
             </div>
@@ -2889,8 +2889,8 @@ INVOICE_VIEW_TEMPLATE = """
                   <tr>
                     <td>Work at {{ invoice.site.name }}</td>
                     <td class="text-end">{{ invoice.total_hours }} hours</td>
-                    <td class="text-end">${{ "%.2f"|format(invoice.hourly_rate) }}/hr</td>
-                    <td class="text-end"><strong>${{ "%.2f"|format(invoice.subtotal) }}</strong></td>
+                    <td class="text-end">{{ "%.2f"|format(invoice.hourly_rate) }} €/hr</td>
+                    <td class="text-end"><strong>{{ "%.2f"|format(invoice.subtotal) }} €</strong></td>
                   </tr>
                 </tbody>
               </table>
@@ -2901,15 +2901,15 @@ INVOICE_VIEW_TEMPLATE = """
                 <table class="table table-sm mb-0">
                   <tr>
                     <td class="text-end">Subtotal:</td>
-                    <td class="text-end"><strong>${{ "%.2f"|format(invoice.subtotal) }}</strong></td>
+                    <td class="text-end"><strong>{{ "%.2f"|format(invoice.subtotal) }} €</strong></td>
                   </tr>
                   <tr>
                     <td class="text-end">Tax ({{ (invoice.tax_rate * 100)|round(1) }}%):</td>
-                    <td class="text-end"><strong>${{ "%.2f"|format(invoice.tax_amount) }}</strong></td>
+                    <td class="text-end"><strong>{{ "%.2f"|format(invoice.tax_amount) }} €</strong></td>
                   </tr>
                   <tr class="table-dark">
                     <td class="text-end"><strong>TOTAL:</strong></td>
-                    <td class="text-end"><strong>${{ "%.2f"|format(invoice.total_amount) }}</strong></td>
+                    <td class="text-end"><strong>{{ "%.2f"|format(invoice.total_amount) }} €</strong></td>
                   </tr>
                 </table>
               </div>
@@ -10470,8 +10470,8 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
             '1.',
             'Reinigungsservice',
             f'{quantity:.2f}',
-            f'{unit_price:.2f} EUR',
-            f'{original_total:.2f} EUR'
+            f'{unit_price:.2f} €',
+            f'{original_total:.2f} €'
         ]
     ]
     
@@ -10509,9 +10509,9 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     gross_total = invoice.total_amount if invoice.total_amount else (net_total + tax_amount)
     
     totals_data = [
-        ['', '', '', 'Gesamtbetrag netto', f'{net_total:.2f} EUR'],
-        ['', '', '', f'zzgl. Umsatzsteuer {tax_rate_percent:.0f}%', f'{tax_amount:.2f} EUR'],
-        ['', '', '', 'Gesamtbetrag brutto', f'{gross_total:.2f} EUR']
+      ['', '', '', 'Gesamtbetrag netto', f'{net_total:.2f} €'],
+      ['', '', '', f'zzgl. Umsatzsteuer {tax_rate_percent:.0f}%', f'{tax_amount:.2f} €'],
+      ['', '', '', 'Gesamtbetrag brutto', f'{gross_total:.2f} €']
     ]
     
     totals_table = Table(totals_data, colWidths=[0.5*inch, 2.5*inch, 0.8*inch, 1.2*inch, 1.5*inch])
@@ -10678,8 +10678,8 @@ Invoice Details:
 - Site: {invoice.site.name}
 - Company: {invoice.site_company_name or invoice.site.name}
 - Hours Worked: {invoice.total_hours}
-- Hourly Rate: ${invoice.hourly_rate:.2f}
-- Total Amount: ${invoice.total_amount:.2f}
+- Hourly Rate: €{invoice.hourly_rate:.2f}
+- Total Amount: €{invoice.total_amount:.2f}
 - Due Date: {invoice.due_date.strftime("%d/%m/%Y") if invoice.due_date else "Upon receipt"}
 {f"- Customer ID: {invoice.site_tax_id}" if invoice.site_tax_id else ""}
 
