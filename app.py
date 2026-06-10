@@ -15,7 +15,8 @@ from typing import Any, Tuple
 from urllib.parse import urljoin, urldefrag, urlparse, quote_plus, urlencode
 from dotenv import load_dotenv
 
-load_dotenv()
+_APP_DOTENV_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), ".env")
+load_dotenv(dotenv_path=_APP_DOTENV_PATH, override=False)
 
 import requests
 from bs4 import BeautifulSoup
@@ -5572,6 +5573,13 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
   DATABASE_URL = "sqlite:///" + os.path.join(APP_ROOT, "schedule.db")
 
+# If DATABASE_URL is a relative SQLite path (e.g. sqlite:///schedule.db), make it
+# relative to APP_ROOT rather than the current working directory.
+if DATABASE_URL.startswith("sqlite:///") and not DATABASE_URL.startswith("sqlite:////"):
+  sqlite_path = DATABASE_URL.removeprefix("sqlite:///")
+  if sqlite_path and not sqlite_path.startswith("/") and sqlite_path != ":memory:":
+    DATABASE_URL = "sqlite:///" + os.path.join(APP_ROOT, sqlite_path)
+
 _engine_kwargs: dict[str, object] = {}
 if DATABASE_URL.startswith("sqlite"):
   _engine_kwargs["connect_args"] = {"check_same_thread": False}
@@ -5581,6 +5589,330 @@ SessionLocal = scoped_session(
   sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 )
 Base = declarative_base()
+
+INTEGRATION_KEY = (os.getenv("INTEGRATION_KEY") or "").strip()
+
+
+def _require_integration_key():
+  if not INTEGRATION_KEY:
+    return False, ("Integration key not configured", 503)
+  provided = (request.headers.get("X-INTEGRATION-KEY") or "").strip()
+  if not provided or provided != INTEGRATION_KEY:
+    return False, ("Invalid integration key", 401)
+  return True, None
+
+
+@app.route("/api/integrations/employees")
+def api_integrations_employees():
+  ok, error = _require_integration_key()
+  if not ok:
+    message, status = error
+    return jsonify({"error": message}), status
+
+  db = SessionLocal()
+  try:
+    _generate_missing_employee_credentials(db)
+    employees = db.query(Employee).order_by(Employee.name.asc()).all()
+    payload = []
+    for emp in employees:
+      code = (emp.login_code or "").strip() or str(emp.id)
+      name = (emp.name or code).strip()
+      payload.append({
+        "code": code,
+        "name": name,
+        "active": True,
+      })
+    return jsonify({"employees": payload})
+  finally:
+    db.close()
+
+
+def _parse_employee_code(raw: str | None) -> str:
+  return (raw or "").strip()
+
+
+def _parse_day_ymd(raw: str | None) -> date | None:
+  value = (raw or "").strip()
+  if not value:
+    return None
+  try:
+    return datetime.strptime(value, "%Y-%m-%d").date()
+  except ValueError:
+    return None
+
+
+def _parse_month_ym(raw: str | None) -> tuple[int, int] | None:
+  value = (raw or "").strip()
+  if not value:
+    return None
+  try:
+    parsed = datetime.strptime(value, "%Y-%m")
+    return parsed.year, parsed.month
+  except ValueError:
+    return None
+
+
+def _parse_duration_hours(raw: str | None) -> int | None:
+  value = (raw or "").strip()
+  if not value:
+    return None
+  try:
+    hours = float(value)
+  except ValueError:
+    return None
+  if hours <= 0:
+    return None
+  # Round up to the next 30 minute block.
+  minutes = int(math.ceil(hours * 60 / 30) * 30)
+  return minutes
+
+
+def _time_to_minutes(t: time) -> int:
+  return int(t.hour) * 60 + int(t.minute)
+
+
+def _minutes_to_hhmm(minutes: int) -> str:
+  h = minutes // 60
+  m = minutes % 60
+  return f"{h:02d}:{m:02d}"
+
+
+def _intervals_overlap(a_start: int, a_end: int, b_start: int, b_end: int) -> bool:
+  return a_start < b_end and a_end > b_start
+
+
+def _generate_slots_for_day(blocked: list[tuple[int, int]], duration_minutes: int) -> list[str]:
+  # Simple, opinionated working window.
+  work_start = 8 * 60
+  work_end = 18 * 60
+  step = 30
+  latest_start = work_end - duration_minutes
+  if latest_start < work_start:
+    return []
+
+  slots: list[str] = []
+  t = work_start
+  while t <= latest_start:
+    end = t + duration_minutes
+    ok = True
+    for b_start, b_end in blocked:
+      if _intervals_overlap(t, end, b_start, b_end):
+        ok = False
+        break
+    if ok:
+      slots.append(_minutes_to_hhmm(t))
+    t += step
+  return slots
+
+
+def _parse_time_hhmm(raw: str | None) -> time | None:
+  value = (raw or "").strip()
+  if not value:
+    return None
+  try:
+    return datetime.strptime(value, "%H:%M").time()
+  except ValueError:
+    try:
+      return datetime.strptime(value, "%H:%M:%S").time()
+    except ValueError:
+      return None
+
+
+def _ensure_default_website_site(db, address: str | None = None):
+  name = "Website bookings"
+  site = db.query(Site).filter(func.lower(Site.name) == name.lower()).first()
+  if site:
+    return site
+  site = Site(name=name, address=(address or "").strip() or None, hourly_rate=0.0, is_active=True)
+  db.add(site)
+  db.commit()
+  return site
+
+
+@app.route("/api/integrations/shifts/from-booking", methods=["POST"])
+def api_integrations_shift_from_booking():
+  ok, error = _require_integration_key()
+  if not ok:
+    message, status = error
+    return jsonify({"error": message}), status
+
+  payload = request.get_json(silent=True) or {}
+  booking_id = payload.get("booking_id")
+  employee_code = _parse_employee_code(payload.get("employee_code"))
+  day = _parse_day_ymd(payload.get("day"))
+  start = _parse_time_hhmm(payload.get("start_time"))
+  duration_raw = payload.get("duration_hours")
+  duration_minutes = _parse_duration_hours(str(duration_raw) if duration_raw is not None else None)
+  address = (payload.get("address") or "").strip()
+  instructions = (payload.get("instructions") or "").strip()
+
+  if not employee_code or day is None or start is None or duration_minutes is None:
+    return jsonify({"error": "employee_code, day, start_time and duration_hours are required"}), 400
+
+  start_min = _time_to_minutes(start)
+  end_min = start_min + duration_minutes
+  if end_min > 24 * 60:
+    return jsonify({"error": "Invalid start_time/duration_hours"}), 400
+
+  end_time_obj = (datetime.combine(date.today(), start) + timedelta(minutes=duration_minutes)).time()
+
+  db = SessionLocal()
+  try:
+    # Ensure employee login codes exist (so the website's employee_code always resolves).
+    _generate_missing_employee_credentials(db)
+
+    emp = (
+      db.query(Employee)
+      .filter(func.lower(Employee.login_code) == employee_code.strip().lower())
+      .first()
+    )
+    if not emp:
+      return jsonify({"error": "Employee not found"}), 404
+
+    # Idempotency: if a shift for this booking already exists, return it.
+    if booking_id is not None:
+      needle = f"Website booking #{booking_id}"
+      existing = (
+        db.query(Shift)
+        .filter(Shift.employee_id == emp.id, Shift.day == day)
+        .filter(Shift.instructions.ilike(f"%{needle}%"))
+        .first()
+      )
+      if existing:
+        return jsonify({"shiftId": existing.id})
+
+    # Conflict check: any overlap means slot is no longer available.
+    shifts = db.query(Shift).filter(Shift.employee_id == emp.id, Shift.day == day).all()
+    for s in shifts:
+      try:
+        b_start = _time_to_minutes(s.start_time)
+        b_end = _time_to_minutes(s.end_time)
+      except Exception:
+        continue
+      if _intervals_overlap(start_min, end_min, b_start, b_end):
+        return jsonify({"error": "Slot no longer available"}), 409
+
+    site = _ensure_default_website_site(db, address=address)
+    full_instructions = instructions
+    if address and address.lower() not in full_instructions.lower():
+      full_instructions = (full_instructions + f"\nAddress: {address}").strip()
+
+    shift = Shift(
+      employee_id=emp.id,
+      site_id=site.id,
+      day=day,
+      start_time=start,
+      end_time=end_time_obj,
+      instructions=full_instructions or None,
+    )
+    db.add(shift)
+    db.commit()
+    return jsonify({"shiftId": shift.id}), 201
+  finally:
+    db.close()
+
+
+@app.route("/api/integrations/availability/slots")
+def api_integrations_availability_slots():
+  ok, error = _require_integration_key()
+  if not ok:
+    message, status = error
+    return jsonify({"error": message}), status
+
+  employee_code = _parse_employee_code(request.args.get("employee_code") or request.args.get("worker"))
+  day = _parse_day_ymd(request.args.get("day") or request.args.get("date"))
+  duration_minutes = _parse_duration_hours(request.args.get("duration_hours") or request.args.get("duration"))
+
+  if not employee_code or day is None or duration_minutes is None:
+    return jsonify({"error": "employee_code, day and duration_hours are required"}), 400
+
+  db = SessionLocal()
+  try:
+    _generate_missing_employee_credentials(db)
+    emp = (
+      db.query(Employee)
+      .filter(func.lower(Employee.login_code) == employee_code.strip().lower())
+      .first()
+    )
+    if not emp:
+      return jsonify({"error": "Employee not found"}), 404
+
+    shifts = db.query(Shift).filter(Shift.employee_id == emp.id, Shift.day == day).all()
+    blocked: list[tuple[int, int]] = []
+    for s in shifts:
+      try:
+        blocked.append((_time_to_minutes(s.start_time), _time_to_minutes(s.end_time)))
+      except Exception:
+        continue
+
+    slots = _generate_slots_for_day(blocked, duration_minutes)
+    return jsonify({"slots": slots})
+  finally:
+    db.close()
+
+
+@app.route("/api/integrations/availability/month")
+def api_integrations_availability_month():
+  ok, error = _require_integration_key()
+  if not ok:
+    message, status = error
+    return jsonify({"error": message}), status
+
+  employee_code = _parse_employee_code(request.args.get("employee_code") or request.args.get("worker"))
+  month_parts = _parse_month_ym(request.args.get("month"))
+  duration_minutes = _parse_duration_hours(request.args.get("duration_hours") or request.args.get("duration"))
+
+  if not employee_code or month_parts is None or duration_minutes is None:
+    return jsonify({"error": "employee_code, month and duration_hours are required"}), 400
+
+  year, month = month_parts
+  month_start = date(year, month, 1)
+  if month == 12:
+    month_end = date(year + 1, 1, 1) - timedelta(days=1)
+  else:
+    month_end = date(year, month + 1, 1) - timedelta(days=1)
+
+  db = SessionLocal()
+  try:
+    _generate_missing_employee_credentials(db)
+    emp = (
+      db.query(Employee)
+      .filter(func.lower(Employee.login_code) == employee_code.strip().lower())
+      .first()
+    )
+    if not emp:
+      return jsonify({"error": "Employee not found"}), 404
+
+    shifts = (
+      db.query(Shift)
+      .filter(
+        Shift.employee_id == emp.id,
+        Shift.day >= month_start,
+        Shift.day <= month_end,
+      )
+      .all()
+    )
+
+    blocked_by_day: dict[date, list[tuple[int, int]]] = {}
+    for s in shifts:
+      try:
+        blocked_by_day.setdefault(s.day, []).append(
+          (_time_to_minutes(s.start_time), _time_to_minutes(s.end_time))
+        )
+      except Exception:
+        continue
+
+    available_days: list[str] = []
+    cursor = month_start
+    while cursor <= month_end:
+      blocked = blocked_by_day.get(cursor, [])
+      if _generate_slots_for_day(blocked, duration_minutes):
+        available_days.append(cursor.strftime("%Y-%m-%d"))
+      cursor += timedelta(days=1)
+
+    return jsonify({"availableDays": available_days})
+  finally:
+    db.close()
 
 
 # --- Optional integrations -----------------------------------------------------
