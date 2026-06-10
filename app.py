@@ -4714,8 +4714,12 @@ SCHEDULE_TEMPLATE = """
             </div>
           </div>
           <div class="insight-badges">
-            <span class="insight-badge">Woche {{ week_days[0].strftime('%d.%m') }} – {{ week_days[-1].strftime('%d.%m') }}</span>
-            <span class="insight-badge">Zeitraum {{ weeks }} Woche{% if weeks > 1 %}n{% endif %}</span>
+            <span class="insight-badge">Woche {{ week_days[0].strftime('%d.%m') }}{% if week_days|length > 1 %} – {{ week_days[-1].strftime('%d.%m') }}{% endif %}</span>
+            {% if range_mode == 'day' %}
+              <span class="insight-badge">Zeitraum 1 Tag</span>
+            {% else %}
+              <span class="insight-badge">Zeitraum {{ weeks }} Woche{% if weeks > 1 %}n{% endif %}</span>
+            {% endif %}
             {% if selected_employee %}
               <span class="insight-badge">Fokus: {{ selected_employee.name }}</span>
             {% else %}
@@ -4744,17 +4748,22 @@ SCHEDULE_TEMPLATE = """
                 {% endfor %}
               </select>
             </div>
-            <div>
+            <div id="start_date_wrap">
               <label class="form-label" for="start_date">Startwoche (Montag)</label>
               <input type="date" class="form-control form-control-sm" id="start_date" name="start_date" value="{{ start_date or week_days[0].isoformat() }}" onchange="this.form.submit()">
             </div>
             <div>
               <label class="form-label" for="weeks">Zeitraum (Wochen)</label>
-              <select class="form-select form-select-sm" id="weeks" name="weeks" onchange="this.form.submit()">
+              <select class="form-select form-select-sm" id="weeks" name="weeks">
+                <option value="day" {% if range_mode == 'day' %}selected{% endif %}>Tag (Datum auswählen)</option>
                 {% for n in [1,2,4,8,12] %}
-                  <option value="{{ n }}" {% if weeks == n %}selected{% endif %}>{{ n }} Woche{% if n>1 %}n{% endif %}</option>
+                  <option value="{{ n }}" {% if range_mode != 'day' and weeks == n %}selected{% endif %}>{{ n }} Woche{% if n>1 %}n{% endif %}</option>
                 {% endfor %}
               </select>
+            </div>
+            <div id="day_date_wrap" style="display:none;">
+              <label class="form-label" for="day_date">Tag</label>
+              <input type="date" class="form-control form-control-sm" id="day_date" name="day_date" value="{{ day_date or week_days[0].isoformat() }}" onchange="this.form.submit()">
             </div>
           </form>
           <form id="batch-delete-form" method="post" action="{{ url_for('batch_delete_shifts') }}">
@@ -5282,6 +5291,35 @@ SCHEDULE_TEMPLATE = """
         }
       });
     });
+
+    // Range picker: show a day picker when user chooses 'Tag' option.
+    (function setupRangePicker() {
+      const weeksSel = document.getElementById('weeks');
+      const startWrap = document.getElementById('start_date_wrap');
+      const dayWrap = document.getElementById('day_date_wrap');
+      const dayInput = document.getElementById('day_date');
+      if (!weeksSel || !startWrap || !dayWrap || !dayInput) return;
+
+      const apply = (focusPicker) => {
+        const isDay = (weeksSel.value === 'day');
+        dayWrap.style.display = isDay ? '' : 'none';
+        startWrap.style.display = isDay ? 'none' : '';
+        if (isDay && focusPicker) {
+          try { dayInput.focus(); if (typeof dayInput.showPicker === 'function') dayInput.showPicker(); } catch (e) {}
+        }
+      };
+
+      weeksSel.addEventListener('change', (e) => {
+        const isDay = weeksSel.value === 'day';
+        apply(isDay);
+        if (!isDay) {
+          weeksSel.form && weeksSel.form.submit();
+        }
+      });
+
+      // Initialize depending on server state
+      apply(false);
+    })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -9104,18 +9142,54 @@ def schedule_dashboard():
 
         selected_employee_id = request.args.get("employee_id", type=int)
         selected_site_id = request.args.get("site_id", type=int)
+
+        weeks_raw = (request.args.get("weeks") or "").strip()
+        range_mode = "day" if weeks_raw == "day" else "weeks"
+
         weeks = request.args.get("weeks", default=8, type=int) or 8
         weeks = max(1, min(weeks, 12))
+
         start_date_str = request.args.get("start_date")
-        start_date_val = None
-        if start_date_str:
-            try:
-                start_date_val = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-            except ValueError:
-                start_date_val = None
+        day_date_str = request.args.get("day_date")
+
+        def _parse_date(value: str | None) -> date | None:
+          if not value:
+            return None
+          try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+          except ValueError:
+            return None
+
+        start_date_val = _parse_date(start_date_str)
+        day_date_val = _parse_date(day_date_str)
+
+        if range_mode == "day":
+          target_day = day_date_val or start_date_val
+          if target_day is None:
+            today = date.today()
+            next_row = (
+              db.query(Shift.day)
+              .filter(Shift.day >= today)
+              .order_by(Shift.day.asc())
+              .first()
+            )
+            if next_row and next_row[0]:
+              target_day = next_row[0]
+            else:
+              last_row = (
+                db.query(Shift.day)
+                .order_by(Shift.day.desc())
+                .first()
+              )
+              if last_row and last_row[0]:
+                target_day = last_row[0]
+          if target_day is None:
+            target_day = date.today()
+          week_days = [target_day]
+          start_date_val = target_day
+          day_date_val = target_day
         else:
-            # If the user didn't choose a start date, anchor the default view to
-            # the next upcoming shift (or the most recent shift) so the grid isn't empty.
+          if start_date_val is None:
             today = date.today()
             next_row = (
               db.query(Shift.day)
@@ -9133,8 +9207,7 @@ def schedule_dashboard():
               )
               if last_row and last_row[0]:
                 start_date_val = last_row[0]
-
-        week_days = _get_day_range(start=start_date_val, weeks=weeks)
+          week_days = _get_day_range(start=start_date_val, weeks=weeks)
         employees, sites, matrix = _load_schedule_context(db, week_days)
 
         selected_employee = None
@@ -9165,12 +9238,12 @@ def schedule_dashboard():
           shift_employee_ids_for_grid = {emp_id for (emp_id, _day) in filtered_matrix.keys()}
           visible_employees = [e for e in employees if e.id in shift_employee_ids_for_grid]
 
-        pdf_params = {"week": week_days[0].isoformat()}
-        pdf_params["weeks"] = weeks
+        if range_mode == "day":
+          pdf_params = {"mode": "day", "day": week_days[0].isoformat()}
+        else:
+          pdf_params = {"week": week_days[0].isoformat(), "weeks": weeks}
         if selected_employee_id:
-            pdf_params["employee_id"] = selected_employee_id
-        if start_date_val:
-            pdf_params["week"] = week_days[0].isoformat()
+          pdf_params["employee_id"] = selected_employee_id
         pdf_url = url_for("schedule_pdf", **pdf_params)
 
         hours_params = {
@@ -9191,6 +9264,8 @@ def schedule_dashboard():
             has_any_shifts=has_any_shifts,
             weeks=weeks,
             start_date=start_date_val.isoformat() if start_date_val else "",
+            day_date=day_date_val.isoformat() if day_date_val else "",
+            range_mode=range_mode,
             cells=filtered_matrix,
             reportlab_available=REPORTLAB_AVAILABLE,
             selected_employee_id=selected_employee_id,
@@ -10168,17 +10243,31 @@ def schedule_pdf():
     if not REPORTLAB_AVAILABLE:
         return jsonify({"error": "reportlab not installed"}), 503
 
+    mode = (request.args.get("mode") or "").strip().lower()
     week_param = request.args.get("week")
+    day_param = request.args.get("day")
     employee_id = request.args.get("employee_id", type=int)
     weeks = request.args.get("weeks", default=1, type=int) or 1
     weeks = max(1, min(weeks, 12))
     ref_date = None
-    if week_param:
-        try:
-            ref_date = datetime.strptime(week_param, "%Y-%m-%d").date()
-        except ValueError:
-            ref_date = None
-    week_days = _get_day_range(ref_date, weeks=weeks)
+
+    if mode == "day":
+        day_value = day_param or week_param
+        if day_value:
+            try:
+                ref_date = datetime.strptime(day_value, "%Y-%m-%d").date()
+            except ValueError:
+                return jsonify({"error": "Invalid day"}), 400
+        else:
+            return jsonify({"error": "Missing day"}), 400
+        week_days = [ref_date]
+    else:
+        if week_param:
+            try:
+                ref_date = datetime.strptime(week_param, "%Y-%m-%d").date()
+            except ValueError:
+                ref_date = None
+        week_days = _get_day_range(ref_date, weeks=weeks)
 
     db = SessionLocal()
     try:
