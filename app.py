@@ -586,6 +586,10 @@ ADMIN_EMPLOYEES_TEMPLATE = """
             </div>
           </div>
           <div class="col-sm-4">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="employee_free" name="free" value="1" {% if free_filter %}checked{% endif %} onchange="this.form.submit()">
+              <label class="form-check-label" for="employee_free">Nur freie Mitarbeiter diese Woche</label>
+            </div>
             <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-secondary w-100" title="Filter zurücksetzen"><i class="bi bi-x-circle"></i></a>
           </div>
         </form>
@@ -4738,6 +4742,7 @@ SCHEDULE_TEMPLATE = """
               {% else %}
                 <span class="tag-muted">Installieren Sie reportlab für den PDF-Export</span>
               {% endif %}
+              <button type="button" class="btn btn-sm btn-outline-primary" id="import-previous-month-btn">Vorherigen Monat importieren</button>
             </div>
           </div>
           <div class="insight-badges">
@@ -4776,12 +4781,15 @@ SCHEDULE_TEMPLATE = """
               <input type="date" class="form-control form-control-sm" id="start_date" name="start_date" value="{{ start_date or week_days[0].isoformat() }}" onchange="this.form.submit()">
             </div>
             <div>
-              <label class="form-label" for="weeks">Zeitraum (Wochen)</label>
-              <select class="form-select form-select-sm" id="weeks" name="weeks" onchange="this.form.submit()">
+              <label class="form-label" for="filter-zeitraum">Zeitraum</label>
+              <select class="form-select form-select-sm" id="filter-zeitraum" onchange="handleZeitraumChange(event, '{{ url_for('schedule_dashboard') }}')">
+                <option value="">— Wählen —</option>
                 {% for n in [1,2,4,8,12] %}
-                  <option value="{{ n }}" {% if weeks == n %}selected{% endif %}>{{ n }} Woche{% if n>1 %}n{% endif %}</option>
+                  <option value="weeks={{ n }}" {% if weeks == n and not request.args.get('days') %}selected{% endif %}>{{ n }} Woche{% if n>1 %}n{% endif %}</option>
                 {% endfor %}
+                <option value="day-picker" {% if request.args.get('days') %}selected{% endif %}>Tag auswählen</option>
               </select>
+              <input type="hidden" id="filter-day-picker" class="form-control form-control-sm" placeholder="Tag wählen">
             </div>
           </form>
           <form id="batch-delete-form" method="post" action="{{ url_for('batch_delete_shifts') }}">
@@ -4911,6 +4919,26 @@ SCHEDULE_TEMPLATE = """
     </div>
   </div>
 
+  <!-- Previous month import modal -->
+  <div id="previous-month-import-modal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:10010; align-items:center; justify-content:center; padding:1.5rem;">
+    <div style="background:#ffffff; border-radius:1rem; padding:1.5rem; width:100%; max-width:900px; max-height:90vh; overflow-y:auto; box-shadow:0 24px 60px rgba(15,23,42,0.25);">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1rem;">
+        <div>
+          <h3 style="margin:0; font-size:1.3rem; color:#0f172a;">Einsätze aus dem vorherigen Monat importieren</h3>
+          <p style="margin:0.5rem 0 0; color:#475569;">Wählen Sie einzelne Einsätze aus der letzten Monatsschichtplanung aus und importieren Sie sie in den aktuellen Monat.</p>
+        </div>
+        <button type="button" id="previous-month-import-close" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#64748b;">×</button>
+      </div>
+      <div id="previous-month-import-content">
+        <div class="alert alert-info" role="alert">Lade Einsätze des vorherigen Monats...</div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1rem;">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="previous-month-import-cancel">Abbrechen</button>
+        <button type="button" class="btn btn-sm btn-primary" id="previous-month-import-submit" disabled>Importieren</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Edit Shift Modal -->
   <div id="edit-shift-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
     <div style="background:white; border-radius:1rem; padding:1.5rem; max-width:500px; width:90%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
@@ -4988,8 +5016,227 @@ SCHEDULE_TEMPLATE = """
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Zeitraum (time period) filter with day picker - MUST be at global scope for inline onchange handler
+    window.handleZeitraumChange = function(event, dashboardUrl) {
+      const selected = event.target.value;
+      if (!selected) {
+        return;
+      }
+      if (selected === 'day-picker') {
+        const dayPickerInput = document.getElementById('filter-day-picker');
+        if (typeof flatpickr === 'undefined') {
+          alert('Kalender konnte nicht geladen werden. Bitte Seite neu laden.');
+          return;
+        }
+        if (!dayPickerInput._flatpickr) {
+          flatpickr(dayPickerInput, {
+            mode: 'single',
+            dateFormat: 'Y-m-d',
+            disableMobile: true,
+            defaultDate: new Date(),
+            onChange: function(selectedDates, dateStr, instance) {
+              if (selectedDates.length > 0) {
+                const url = new URL(dashboardUrl, window.location.origin);
+                const params = new URLSearchParams(window.location.search);
+                params.delete('weeks');
+                params.set('days', '1');
+                params.set('start_date', dateStr);
+                window.location.href = url.toString() + '?' + params.toString();
+              }
+            }
+          });
+        }
+        dayPickerInput._flatpickr.open();
+      } else {
+        const url = new URL(dashboardUrl, window.location.origin);
+        const params = new URLSearchParams(window.location.search);
+        params.delete('days');
+        params.delete('start_date');
+        params.append(selected.split('=')[0], selected.split('=')[1]);
+        window.location.href = url.toString() + '?' + params.toString();
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      console.log('DOMContentLoaded fired for import modal');
+      const importPrevMonthBtn = document.getElementById('import-previous-month-btn');
+      const importModal = document.getElementById('previous-month-import-modal');
+      const importContent = document.getElementById('previous-month-import-content');
+      const importSubmitBtn = document.getElementById('previous-month-import-submit');
+      const importCancelBtn = document.getElementById('previous-month-import-cancel');
+      const importCloseBtn = document.getElementById('previous-month-import-close');
+      console.log('importPrevMonthBtn:', importPrevMonthBtn);
+      console.log('importModal:', importModal);
+
+      const openImportModal = async () => {
+        console.log('openImportModal called');
+        if (!importModal || !importContent || !importSubmitBtn) {
+          console.log('Missing elements:', { importModal, importContent, importSubmitBtn });
+          return;
+        }
+        console.log('Setting modal display to flex');
+        importModal.style.display = 'flex';
+        importContent.innerHTML = '<div class="alert alert-info" role="alert">Lade Einsätze des vorherigen Monats...</div>';
+        importSubmitBtn.disabled = true;
+        try {
+          const resp = await fetch('/schedule/preview-import-previous-month');
+          if (!resp.ok) {
+            throw new Error(`Server returned ${resp.status}`);
+          }
+          const data = await resp.json();
+          const items = Array.isArray(data.items) ? data.items : [];
+          if (!items.length) {
+            importContent.innerHTML = '<div class="alert alert-warning" role="alert">Keine aktiven Einsätze im vorherigen Monat gefunden.</div>';
+            return;
+          }
+
+          const table = document.createElement('table');
+          table.className = 'table table-bordered table-sm';
+          table.innerHTML = `
+            <thead>
+              <tr>
+                <th style="width:1%;"><input type="checkbox" id="previous-month-import-select-all" aria-label="Alle auswählen"></th>
+                <th>Mitarbeiter</th>
+                <th>Aktiv</th>
+                <th>Standort</th>
+                <th>Quelle</th>
+                <th>Ziel</th>
+                <th>Zeit</th>
+                <th>Konflikt</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          `;
+          const tbody = table.querySelector('tbody');
+          items.forEach(item => {
+            const row = document.createElement('tr');
+            row.dataset.active = item.active ? 'true' : 'false';
+            row.innerHTML = `
+              <td><input type="checkbox" class="previous-month-import-checkbox" value="${item.id}"></td>
+              <td>${item.employee}</td>
+              <td>${item.active ? '<span class="badge bg-success" title="Der Mitarbeiter ist aktiv und kann importiert werden">Aktiv</span>' : '<span class="badge bg-secondary" title="Der Mitarbeiter ist inaktiv und wird standardmäßig ausgeblendet">Inaktiv</span>'}</td>
+              <td>${item.site}</td>
+              <td>${item.from_day}</td>
+              <td>${item.to_day}</td>
+              <td>${item.time}</td>
+              <td>${item.conflict ? '<span class="text-warning" title="Diese Schicht verursacht einen Konflikt mit vorhandenen Planungen">Warnung</span>' : '—'}</td>
+            `;
+            tbody.appendChild(row);
+          });
+
+          importContent.innerHTML = '';
+          // add active-only filter control
+          const filterWrap = document.createElement('div');
+          filterWrap.style.marginBottom = '0.5rem';
+          filterWrap.innerHTML = `<label style="font-size:0.9rem;"><input type="checkbox" id="previous-month-only-active" style="margin-right:0.4rem;">Nur aktive anzeigen</label>`;
+          importContent.appendChild(filterWrap);
+          importContent.appendChild(table);
+
+          const onlyActiveCheckbox = document.getElementById('previous-month-only-active');
+          const applyActiveFilter = () => {
+            const onlyActive = onlyActiveCheckbox && onlyActiveCheckbox.checked;
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.forEach(r => {
+              if (onlyActive && r.dataset.active !== 'true') {
+                // hide and uncheck
+                r.style.display = 'none';
+                const cb = r.querySelector('.previous-month-import-checkbox');
+                if (cb) cb.checked = false;
+              } else {
+                r.style.display = '';
+              }
+            });
+            // refresh itemCheckboxes and submit button state
+            const visibleChecked = Array.from(importContent.querySelectorAll('.previous-month-import-checkbox:checked')).filter(cb => cb.closest('tr').style.display !== 'none');
+            importSubmitBtn.disabled = visibleChecked.length === 0;
+          };
+          if (onlyActiveCheckbox) {
+            onlyActiveCheckbox.addEventListener('change', applyActiveFilter);
+          }
+
+          const selectAllCheckbox = document.getElementById('previous-month-import-select-all');
+          const itemCheckboxes = Array.from(importContent.querySelectorAll('.previous-month-import-checkbox'));
+
+          const updateImportSelection = () => {
+            const selected = itemCheckboxes.filter(cb => cb.checked);
+            importSubmitBtn.disabled = selected.length === 0;
+          };
+
+          itemCheckboxes.forEach(cb => cb.addEventListener('change', updateImportSelection));
+          if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function () {
+              itemCheckboxes.forEach(cb => { cb.checked = this.checked; });
+              updateImportSelection();
+            });
+          }
+        } catch (err) {
+          importContent.innerHTML = `<div class="alert alert-danger" role="alert">Fehler beim Laden der Einsätze. Bitte Seite neu laden.</div>`;
+          console.error(err);
+        }
+      };
+
+      const closeImportModal = () => {
+        if (importModal) {
+          importModal.style.display = 'none';
+        }
+      };
+
+      if (importPrevMonthBtn) {
+        importPrevMonthBtn.addEventListener('click', openImportModal);
+      }
+      if (importCancelBtn) {
+        importCancelBtn.addEventListener('click', closeImportModal);
+      }
+      if (importCloseBtn) {
+        importCloseBtn.addEventListener('click', closeImportModal);
+      }
+      if (importModal) {
+        importModal.addEventListener('click', function (e) {
+          if (e.target === importModal) {
+            closeImportModal();
+          }
+        });
+      }
+      if (importSubmitBtn) {
+        importSubmitBtn.addEventListener('click', async () => {
+          const checkedBoxes = Array.from(document.querySelectorAll('.previous-month-import-checkbox:checked'));
+          const selectedIds = checkedBoxes.map(cb => cb.value).filter(Boolean);
+          if (!selectedIds.length) {
+            return;
+          }
+          importSubmitBtn.disabled = true;
+          importSubmitBtn.textContent = 'Importiere...';
+          try {
+            const resp = await fetch('/schedule/import-previous-month', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ selected_ids: selectedIds }),
+            });
+            if (!resp.ok) {
+              throw new Error(`Server returned ${resp.status}`);
+            }
+            const result = await resp.json();
+            const summary = [];
+            if (result.created) summary.push(`${result.created} Einsätze importiert`);
+            if (result.skipped_existing) summary.push(`${result.skipped_existing} doppelt übersprungen`);
+            if (result.skipped_conflict) summary.push(`${result.skipped_conflict} wegen Konflikten übersprungen`);
+            if (result.skipped_inactive) summary.push(`${result.skipped_inactive} inaktive Mitarbeiter übersprungen`);
+            alert(summary.join(String.fromCharCode(10)) || 'Import abgeschlossen.');
+            window.location.reload();
+          } catch (err) {
+            importSubmitBtn.disabled = false;
+            importSubmitBtn.textContent = 'Importieren';
+            console.error(err);
+            alert('Fehler beim Importieren. Bitte erneut versuchen.');
+          }
+        });
+      }
+    });
+
     (function () {
       const KEY = 'pm-sidebar-collapsed';
       const body = document.body;
@@ -5213,18 +5460,20 @@ SCHEDULE_TEMPLATE = """
         document.getElementById('edit-shift-start').value = start;
         document.getElementById('edit-shift-end').value = end;
         document.getElementById('edit-shift-instructions').value = instructions || '';
-        
+
         editForm.action = '/shift/' + shiftId + '/edit';
         editModal.style.display = 'flex';
       });
     });
 
     // Close modal when clicking outside
-    editModal.addEventListener('click', function(e) {
-      if (e.target === editModal) {
-        editModal.style.display = 'none';
-      }
-    });
+    if (editModal) {
+      editModal.addEventListener('click', function(e) {
+        if (e.target === editModal) {
+          editModal.style.display = 'none';
+        }
+      });
+    }
 
     // Drag and drop shifts between days
     let draggedShiftId = null;
@@ -5310,7 +5559,6 @@ SCHEDULE_TEMPLATE = """
       });
     });
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
@@ -7573,16 +7821,19 @@ def clean_contacts(rows: list[dict[str, str]]) -> list[dict[str, str]]:
   return clean_contacts_without_pandas(rows)
 
 
-def _get_day_range(start: date | None = None, weeks: int = 1):
+def _get_day_range(start: date | None = None, weeks: int = 1, days: int | None = None):
     """
-    Return list of dates covering the given number of weeks (starting Monday of the reference week).
-    Clamped to max 12 weeks to keep the grid manageable.
+    Return list of dates covering the given number of weeks or explicit days (starting Monday of the reference week).
+    If `days` is provided it overrides `weeks`. Clamped to max 12 weeks (84 days) to keep the grid manageable.
     """
-    weeks = max(1, min(int(weeks or 1), 12))
+    if days is not None:
+        total_days = max(1, min(int(days), 84))
+    else:
+        weeks = max(1, min(int(weeks or 1), 12))
+        total_days = weeks * 7
     if start is None:
         start = date.today()
     monday = start - timedelta(days=start.weekday())
-    total_days = weeks * 7
     return [monday + timedelta(days=i) for i in range(total_days)]
 
 
@@ -9171,8 +9422,13 @@ def schedule_dashboard():
 
         selected_employee_id = request.args.get("employee_id", type=int)
         selected_site_id = request.args.get("site_id", type=int)
+        # Support both weeks (legacy) and explicit days view: `?days=3` overrides weeks.
+        days = request.args.get("days", type=int)
         weeks = request.args.get("weeks", default=8, type=int) or 8
         weeks = max(1, min(weeks, 12))
+        if days:
+            # clamp days between 1 and 84 (12 weeks)
+            days = max(1, min(int(days), 84))
         start_date_str = request.args.get("start_date")
         start_date_val = None
         if start_date_str:
@@ -9269,6 +9525,117 @@ def schedule_dashboard():
             active_page="schedule",
         )
         return schedule_html
+    finally:
+        db.close()
+
+
+@app.route("/schedule/preview-import-previous-month")
+@login_required
+def schedule_preview_import_previous_month():
+    db = SessionLocal()
+    try:
+        first_day, last_day = _previous_month_range()
+        shifts = (
+            db.query(Shift)
+            .filter(Shift.day >= first_day, Shift.day <= last_day)
+            .order_by(Shift.day.asc())
+            .all()
+        )
+        items = []
+        for s in shifts:
+            emp = s.employee if s.employee else db.get(Employee, s.employee_id)
+            # skip employees explicitly marked inactive
+            if not getattr(emp, 'is_active', False):
+                continue
+            target_day = _add_months(s.day, 1)
+            conflict_msg = _find_employee_schedule_conflict(
+                db, s.employee_id, target_day, s.start_time, s.end_time, s.site_id
+            )
+            site = s.site if s.site else db.get(Site, s.site_id)
+            items.append({
+              "id": s.id,
+              "employee": emp.name if emp else "-",
+              "active": True,
+              "site": site.name if site else "-",
+                "from_day": s.day.strftime("%Y-%m-%d"),
+                "to_day": target_day.strftime("%Y-%m-%d"),
+                "time": f"{s.start_time.strftime('%H:%M')}–{s.end_time.strftime('%H:%M')}",
+                "conflict": conflict_msg is not None,
+                "conflict_message": conflict_msg,
+            })
+        # sort items by employee name ascending
+        items = sorted(items, key=lambda it: (it.get('employee') or '').lower())
+        return jsonify(items=items)
+    finally:
+        db.close()
+
+
+@app.route("/schedule/import-previous-month", methods=["POST"])
+@login_required
+def schedule_import_previous_month():
+    db = SessionLocal()
+    try:
+        payload = request.get_json(silent=True) or {}
+        selected_ids_raw = payload.get("selected_ids") if isinstance(payload, dict) else None
+        if selected_ids_raw is None:
+            selected_ids_raw = request.form.getlist("selected_ids[]")
+        selected_ids = []
+        if selected_ids_raw:
+            for sel in selected_ids_raw:
+                try:
+                    selected_ids.append(int(sel))
+                except (ValueError, TypeError):
+                    continue
+        first_day, last_day = _previous_month_range()
+        query = db.query(Shift).filter(Shift.day >= first_day, Shift.day <= last_day)
+        if selected_ids:
+            query = query.filter(Shift.id.in_(selected_ids))
+        shifts = query.order_by(Shift.day.asc()).all()
+        created = 0
+        skipped_conflict = 0
+        skipped_existing = 0
+        skipped_inactive = 0
+        for s in shifts:
+            emp = s.employee if s.employee else db.get(Employee, s.employee_id)
+            target_day = _add_months(s.day, 1)
+            existing = (
+                db.query(Shift)
+                .filter(
+                    Shift.employee_id == s.employee_id,
+                    Shift.site_id == s.site_id,
+                    Shift.day == target_day,
+                    Shift.start_time == s.start_time,
+                    Shift.end_time == s.end_time,
+                )
+                .first()
+            )
+            if existing:
+                skipped_existing += 1
+                continue
+            conflict_msg = _find_employee_schedule_conflict(
+                db, s.employee_id, target_day, s.start_time, s.end_time, s.site_id
+            )
+            if conflict_msg:
+                skipped_conflict += 1
+                continue
+            new_shift = Shift(
+                employee_id=s.employee_id,
+                site_id=s.site_id,
+                day=target_day,
+                start_time=s.start_time,
+                end_time=s.end_time,
+                instructions=s.instructions,
+            )
+            db.add(new_shift)
+            created += 1
+        if created > 0:
+            db.commit()
+        return jsonify({
+            "created": created,
+            "skipped_conflict": skipped_conflict,
+            "skipped_existing": skipped_existing,
+            "skipped_inactive": skipped_inactive,
+        })
     finally:
         db.close()
 
@@ -9466,6 +9833,22 @@ def admin_employees():
         )
       )
 
+    free_filter = request.args.get('free', default='0') == '1'
+    if free_filter:
+      week_start = date.today() - timedelta(days=date.today().weekday())
+      week_end = week_start + timedelta(days=7)
+      scheduled_employee_ids_subq = (
+        db.query(Shift.employee_id)
+        .filter(
+          Shift.employee_id.isnot(None),
+          Shift.day >= week_start,
+          Shift.day < week_end,
+        )
+        .distinct()
+        .subquery()
+      )
+      base_query = base_query.filter(~Employee.id.in_(scheduled_employee_ids_subq))
+
     total_employees = db.query(func.count(Employee.id)).scalar() or 0
     filtered_employees = base_query.count()
 
@@ -9580,6 +9963,7 @@ def admin_employees():
       unassigned_employees=unassigned_employees,
       credential_snippets=credential_snippets,
       employee_shift_groups=employee_shift_groups,
+      free_filter=free_filter,
       page=page,
       per_page=per_page,
       total_pages=total_pages,
@@ -10561,6 +10945,47 @@ def _previous_month_range(reference_day: date | None = None) -> tuple[date, date
   previous_month_last = first_of_current - timedelta(days=1)
   previous_month_first = date(previous_month_last.year, previous_month_last.month, 1)
   return previous_month_first, previous_month_last
+
+
+def _parse_optional_contract_date(value: str | None) -> date | None:
+  raw = (value or "").strip()
+  if not raw:
+    return None
+  for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d.%m.%Y", "%d/%m/%Y"):
+    try:
+      return datetime.strptime(raw, fmt).date()
+    except ValueError:
+      continue
+  return None
+
+
+def _is_employee_active(emp, reference_date: date | None = None) -> bool:
+  if emp is None:
+    return False
+  if reference_date is None:
+    reference_date = date.today()
+
+  start_date = _parse_optional_contract_date(emp.profile_contract_start_date)
+  end_date = _parse_optional_contract_date(emp.profile_contract_end_date)
+  if start_date and start_date > reference_date:
+    return False
+  if end_date and end_date < reference_date:
+    return False
+  return True
+
+
+def _add_months(original_date: date, months: int) -> date:
+  year = original_date.year + (original_date.month - 1 + months) // 12
+  month = ((original_date.month - 1 + months) % 12) + 1
+  day = original_date.day
+  try:
+    return date(year, month, day)
+  except ValueError:
+    if month == 12:
+      next_month = date(year + 1, 1, 1)
+    else:
+      next_month = date(year, month + 1, 1)
+    return next_month - timedelta(days=1)
 
 
 def _auto_generate_monthly_invoices(
