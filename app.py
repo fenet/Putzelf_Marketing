@@ -588,7 +588,17 @@ ADMIN_EMPLOYEES_TEMPLATE = """
           <div class="col-sm-4">
             <div class="form-check mb-2">
               <input class="form-check-input" type="checkbox" id="employee_free" name="free" value="1" {% if free_filter %}checked{% endif %} onchange="this.form.submit()">
-              <label class="form-check-label" for="employee_free">Nur freie Mitarbeiter diese Woche</label>
+              <label class="form-check-label" for="employee_free">Nur freie Mitarbeiter</label>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-12">
+                <label class="form-label small mb-1" for="free_day">Am Tag frei</label>
+                <input type="date" class="form-control form-control-sm" id="free_day" name="free_day" value="{{ free_day or '' }}" onchange="document.getElementById('employee_free').checked=true; this.form.submit()">
+              </div>
+              <div class="col-12">
+                <label class="form-label small mb-1" for="free_week_start">Woche ab</label>
+                <input type="date" class="form-control form-control-sm" id="free_week_start" name="free_week_start" value="{{ free_week_start or '' }}" onchange="document.getElementById('employee_free').checked=true; this.form.submit()">
+              </div>
             </div>
             <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-secondary w-100" title="Filter zurücksetzen"><i class="bi bi-x-circle"></i></a>
           </div>
@@ -840,11 +850,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                   <span class="text-secondary small">Seite {{ page }} von {{ total_pages }}</span>
                   <div class="btn-group" role="group" aria-label="Mitarbeiter-Seitennavigation">
                     {% if has_prev %}
-                      {% if search_q %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=prev_page, q=search_q) }}">Zurück</a>
-                      {% else %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=prev_page) }}">Zurück</a>
-                      {% endif %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=prev_page, q=search_q or None, free='1' if free_filter else None, free_day=free_day or None, free_week_start=free_week_start or None) }}">Zurück</a>
                     {% else %}
                       <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Zurück</span>
                     {% endif %}
@@ -852,19 +858,11 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                       {% if page_num == page %}
                         <span class="btn btn-sm btn-primary disabled" aria-current="page">{{ page_num }}</span>
                       {% else %}
-                        {% if search_q %}
-                          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=page_num, q=search_q) }}">{{ page_num }}</a>
-                        {% else %}
-                          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=page_num) }}">{{ page_num }}</a>
-                        {% endif %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=page_num, q=search_q or None, free='1' if free_filter else None, free_day=free_day or None, free_week_start=free_week_start or None) }}">{{ page_num }}</a>
                       {% endif %}
                     {% endfor %}
                     {% if has_next %}
-                      {% if search_q %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=next_page, q=search_q) }}">Weiter</a>
-                      {% else %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=next_page) }}">Weiter</a>
-                      {% endif %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=next_page, q=search_q or None, free='1' if free_filter else None, free_day=free_day or None, free_week_start=free_week_start or None) }}">Weiter</a>
                     {% else %}
                       <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Weiter</span>
                     {% endif %}
@@ -4742,7 +4740,7 @@ SCHEDULE_TEMPLATE = """
               {% else %}
                 <span class="tag-muted">Installieren Sie reportlab für den PDF-Export</span>
               {% endif %}
-              <button type="button" class="btn btn-sm btn-outline-primary" id="import-previous-month-btn">Vorherigen Monat importieren</button>
+              <button type="button" class="btn btn-sm btn-outline-primary" id="import-previous-month-btn">Einsätze importieren</button>
             </div>
           </div>
           <div class="insight-badges">
@@ -4755,6 +4753,14 @@ SCHEDULE_TEMPLATE = """
             {% endif %}
             {% if selected_site %}
               <span class="insight-badge">Standort: {{ selected_site.name }}</span>
+            {% endif %}
+            {% if free_filter %}
+              <span class="insight-badge">Nur freie Mitarbeitende</span>
+              {% if free_day %}
+                <span class="insight-badge">Frei am {{ free_day }}</span>
+              {% elif free_week_start %}
+                <span class="insight-badge">Frei ab Woche {{ free_week_start }}</span>
+              {% endif %}
             {% endif %}
           </div>
           <form method="get" action="{{ url_for('schedule_dashboard') }}" class="filter-toolbar">
@@ -4775,6 +4781,20 @@ SCHEDULE_TEMPLATE = """
                   <option value="{{ site.id }}" {% if selected_site_id == site.id %}selected{% endif %}>{{ site.name }}</option>
                 {% endfor %}
               </select>
+            </div>
+            <div>
+              <div class="form-check" style="padding-top:0.5rem;">
+                <input class="form-check-input" type="checkbox" id="schedule_free" name="free" value="1" {% if free_filter %}checked{% endif %} onchange="this.form.submit()">
+                <label class="form-check-label small mb-0" for="schedule_free">Nur freie Mitarbeitende</label>
+              </div>
+              <div class="mt-2">
+                <label class="form-label small mb-1" for="schedule_free_day">Am Tag frei</label>
+                <input type="date" class="form-control form-control-sm" id="schedule_free_day" name="free_day" value="{{ free_day or '' }}" onchange="document.getElementById('schedule_free').checked=true; this.form.submit()">
+              </div>
+              <div class="mt-2">
+                <label class="form-label small mb-1" for="schedule_free_week_start">Startwoche frei (Montag)</label>
+                <input type="date" class="form-control form-control-sm" id="schedule_free_week_start" name="free_week_start" value="{{ free_week_start or '' }}" onchange="document.getElementById('schedule_free').checked=true; this.form.submit()">
+              </div>
             </div>
             <div>
               <label class="form-label" for="start_date">Startwoche (Montag)</label>
@@ -4801,7 +4821,12 @@ SCHEDULE_TEMPLATE = """
                 <i class="bi bi-trash"></i> Ausgewählte löschen (<span id="selected-count">0</span>)
               </button>
             </div>
-            {% if not has_any_shifts %}
+            {% if free_filter and visible_employees|length == 0 %}
+              <div class="alert alert-warning mb-3" role="alert" style="border-radius:0.85rem;">
+                Keine freien Mitarbeitenden für den gewählten Zeitraum gefunden. Bitte Filter anpassen.
+              </div>
+            {% endif %}
+            {% if not has_any_shifts and not free_filter %}
               <div class="alert alert-warning mb-3" role="alert" style="border-radius:0.85rem;">
                 Keine Einsätze im ausgewählten Zeitraum ({{ week_days[0].strftime('%d.%m.%Y') }} – {{ week_days[-1].strftime('%d.%m.%Y') }}){% if selected_site %} für {{ selected_site.name }}{% endif %}{% if selected_employee %} ({{ selected_employee.name }}){% endif %}. Bitte Startwoche/Filter anpassen oder unten einen neuen Einsatz anlegen.
               </div>
@@ -4832,7 +4857,7 @@ SCHEDULE_TEMPLATE = """
                           <td data-day="{{ d.isoformat() }}" data-employee-id="{{ emp.id }}">
                             {% if cell %}
                               {% for shift in cell %}
-                                <div class="shift-pill" draggable="true" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}">
+                                <div class="shift-pill" draggable="true" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions | e }}">
                                   <input type="checkbox" class="shift-checkbox" name="shift_ids[]" value="{{ shift.id }}" title="Zum Löschen auswählen">
                                   <div class="shift-pill-text">
                                     <div class="shift-pill-title">{{ shift.site_name }}</div>
@@ -4840,7 +4865,7 @@ SCHEDULE_TEMPLATE = """
                                     <div class="shift-pill-time">{{ shift.time_window }}</div>
                                   </div>
                                   <div class="shift-pill-actions">
-                                    <button type="button" class="shift-edit btn-icon-tiny" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}" data-day="{{ shift.day }}" data-start="{{ shift.start_time }}" data-end="{{ shift.end_time }}" data-instructions="{{ shift.instructions or '' }}" title="Einsatz bearbeiten" style="background:none; border:none; padding:0; cursor:pointer; color:#0f766e; font-size:0.9rem; margin:0 2px;">✎</button>
+                                    <button type="button" class="shift-edit btn-icon-tiny" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions | e }}" title="Einsatz bearbeiten" style="background:none; border:none; padding:0; cursor:pointer; color:#0f766e; font-size:0.9rem; margin:0 2px;">✎</button>
                                     <a href="{{ url_for('delete_shift', shift_id=shift.id) }}" class="shift-delete" onclick="return confirm('Diesen Einsatz löschen?')" title="Einsatz löschen">×</a>
                                   </div>
                                 </div>
@@ -4924,13 +4949,32 @@ SCHEDULE_TEMPLATE = """
     <div style="background:#ffffff; border-radius:1rem; padding:1.5rem; width:100%; max-width:900px; max-height:90vh; overflow-y:auto; box-shadow:0 24px 60px rgba(15,23,42,0.25);">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1rem;">
         <div>
-          <h3 style="margin:0; font-size:1.3rem; color:#0f172a;">Einsätze aus dem vorherigen Monat importieren</h3>
-          <p style="margin:0.5rem 0 0; color:#475569;">Wählen Sie einzelne Einsätze aus der letzten Monatsschichtplanung aus und importieren Sie sie in den aktuellen Monat.</p>
+          <h3 style="margin:0; font-size:1.3rem; color:#0f172a;">Einsätze importieren</h3>
+          <p style="margin:0.5rem 0 0; color:#475569;">Wählen Sie den Quellmonat und die Anzahl der Monate aus, um die die Einsätze vorwärts kopiert werden sollen.</p>
         </div>
         <button type="button" id="previous-month-import-close" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#64748b;">×</button>
       </div>
+      <div style="display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+        <div style="flex:1; min-width:220px;">
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Quellmonat</label>
+          <select id="previous-month-import-source-offset" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
+            <option value="1" selected>Vorheriger Monat</option>
+            <option value="0">Aktueller Monat</option>
+            <option value="2">2 Monate zurück</option>
+            <option value="3">3 Monate zurück</option>
+          </select>
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Zielmonat</label>
+          <select id="previous-month-import-target-offset" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
+            <option value="1" selected>+1 Monat</option>
+            <option value="2">+2 Monate</option>
+            <option value="3">+3 Monate</option>
+          </select>
+        </div>
+      </div>
       <div id="previous-month-import-content">
-        <div class="alert alert-info" role="alert">Lade Einsätze des vorherigen Monats...</div>
+        <div class="alert alert-info" role="alert">Lade Einsätze aus dem ausgewählten Monat...</div>
       </div>
       <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1rem;">
         <button type="button" class="btn btn-sm btn-outline-secondary" id="previous-month-import-cancel">Abbrechen</button>
@@ -5078,12 +5122,18 @@ SCHEDULE_TEMPLATE = """
           console.log('Missing elements:', { importModal, importContent, importSubmitBtn });
           return;
         }
+        const sourceOffset = Number(document.getElementById('previous-month-import-source-offset')?.value || 1);
+        const targetOffset = Number(document.getElementById('previous-month-import-target-offset')?.value || 1);
         console.log('Setting modal display to flex');
         importModal.style.display = 'flex';
-        importContent.innerHTML = '<div class="alert alert-info" role="alert">Lade Einsätze des vorherigen Monats...</div>';
+        importContent.innerHTML = '<div class="alert alert-info" role="alert">Lade Einsätze aus dem ausgewählten Monat...</div>';
         importSubmitBtn.disabled = true;
         try {
-          const resp = await fetch('/schedule/preview-import-previous-month');
+          const params = new URLSearchParams({
+            source_offset: String(sourceOffset),
+            target_offset: String(targetOffset),
+          });
+          const resp = await fetch(`/schedule/preview-import-previous-month?${params.toString()}`);
           if (!resp.ok) {
             throw new Error(`Server returned ${resp.status}`);
           }
@@ -5208,13 +5258,15 @@ SCHEDULE_TEMPLATE = """
           if (!selectedIds.length) {
             return;
           }
+          const sourceOffset = Number(document.getElementById('previous-month-import-source-offset')?.value || 1);
+          const targetOffset = Number(document.getElementById('previous-month-import-target-offset')?.value || 1);
           importSubmitBtn.disabled = true;
           importSubmitBtn.textContent = 'Importiere...';
           try {
             const resp = await fetch('/schedule/import-previous-month', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ selected_ids: selectedIds }),
+              body: JSON.stringify({ selected_ids: selectedIds, source_offset: sourceOffset, target_offset: targetOffset }),
             });
             if (!resp.ok) {
               throw new Error(`Server returned ${resp.status}`);
@@ -5404,6 +5456,20 @@ SCHEDULE_TEMPLATE = """
         }
 
         batchEditForm.reset();
+
+        const firstSelectedId = selectedIds[0];
+        const firstShiftPill = document.querySelector(`.shift-pill[data-shift-id="${firstSelectedId}"]`);
+        if (firstShiftPill) {
+          const dayInput = document.getElementById('batch-edit-day');
+          const startInput = document.getElementById('batch-edit-start');
+          const endInput = document.getElementById('batch-edit-end');
+          const instructionsInput = document.getElementById('batch-edit-instructions');
+          if (dayInput) dayInput.value = firstShiftPill.dataset.day || '';
+          if (startInput) startInput.value = firstShiftPill.dataset.start || '';
+          if (endInput) endInput.value = firstShiftPill.dataset.end || '';
+          if (instructionsInput) instructionsInput.value = firstShiftPill.dataset.instructions || '';
+        }
+
         batchEditModal.style.display = 'flex';
       });
 
@@ -5447,12 +5513,13 @@ SCHEDULE_TEMPLATE = """
     editButtons.forEach(btn => {
       btn.addEventListener('click', function(e) {
         e.preventDefault();
-        const shiftId = this.getAttribute('data-shift-id');
-        const employeeId = this.getAttribute('data-employee-id');
-        const day = this.getAttribute('data-day');
-        const start = this.getAttribute('data-start');
-        const end = this.getAttribute('data-end');
-        const instructions = this.getAttribute('data-instructions');
+        const shiftPill = this.closest('.shift-pill') || this;
+        const shiftId = shiftPill.dataset.shiftId || this.getAttribute('data-shift-id');
+        const employeeId = shiftPill.dataset.employeeId || this.getAttribute('data-employee-id');
+        const day = shiftPill.dataset.day || this.getAttribute('data-day');
+        const start = shiftPill.dataset.start || this.getAttribute('data-start');
+        const end = shiftPill.dataset.end || this.getAttribute('data-end');
+        const instructions = shiftPill.dataset.instructions || this.getAttribute('data-instructions');
 
         document.getElementById('edit-shift-id').value = shiftId;
         document.getElementById('edit-shift-employee').value = employeeId;
@@ -5506,7 +5573,7 @@ SCHEDULE_TEMPLATE = """
           return;
         }
         const targetEmployeeId = cell.getAttribute('data-employee-id') || null;
-        if (!targetEmployeeId || targetEmployeeId !== draggedFromEmployeeId) {
+        if (!targetEmployeeId) {
           return;
         }
         e.preventDefault();
@@ -5527,13 +5594,9 @@ SCHEDULE_TEMPLATE = """
           return;
         }
 
-        const targetEmployeeId = cell.getAttribute('data-employee-id') || null;
-        if (!targetEmployeeId || targetEmployeeId !== draggedFromEmployeeId) {
-          return;
-        }
-
         const targetDay = cell.getAttribute('data-day');
-        if (!targetDay) {
+        const targetEmployeeId = cell.getAttribute('data-employee-id') || null;
+        if (!targetDay || !targetEmployeeId) {
           return;
         }
 
@@ -5541,7 +5604,7 @@ SCHEDULE_TEMPLATE = """
           const resp = await fetch(`/shift/${draggedShiftId}/move`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ day: targetDay }).toString(),
+            body: new URLSearchParams({ day: targetDay, employee_id: targetEmployeeId }).toString(),
           });
           if (!resp.ok) {
             let backendMessage = '';
@@ -7823,16 +7886,16 @@ def clean_contacts(rows: list[dict[str, str]]) -> list[dict[str, str]]:
 
 def _get_day_range(start: date | None = None, weeks: int = 1, days: int | None = None):
     """
-    Return list of dates covering the given number of weeks or explicit days (starting Monday of the reference week).
+    Return list of dates covering the given number of weeks or explicit days.
     If `days` is provided it overrides `weeks`. Clamped to max 12 weeks (84 days) to keep the grid manageable.
     """
-    if days is not None:
-        total_days = max(1, min(int(days), 84))
-    else:
-        weeks = max(1, min(int(weeks or 1), 12))
-        total_days = weeks * 7
     if start is None:
         start = date.today()
+    if days is not None:
+        total_days = max(1, min(int(days), 84))
+        return [start + timedelta(days=i) for i in range(total_days)]
+    weeks = max(1, min(int(weeks or 1), 12))
+    total_days = weeks * 7
     monday = start - timedelta(days=start.weekday())
     return [monday + timedelta(days=i) for i in range(total_days)]
 
@@ -7855,6 +7918,10 @@ def _load_schedule_context(db, week_days):
             'site_name': site_name,
             'site_address': site_address,
             'time_window': time_window,
+            'day_iso': s.day.isoformat(),
+            'start_time_str': s.start_time.strftime('%H:%M'),
+            'end_time_str': s.end_time.strftime('%H:%M'),
+            'instructions': s.instructions or '',
         }
         matrix.setdefault(key, []).append(shift_info)
     for key in matrix:
@@ -9173,9 +9240,21 @@ def move_shift_day(shift_id: int):
         except (TypeError, ValueError):
             return jsonify({"ok": False, "error": "Invalid day format"}), 400
 
+        employee_id_str = (request.form.get("employee_id") or "").strip()
+        new_employee_id = shift.employee_id
+        if employee_id_str:
+            try:
+                new_employee_id = int(employee_id_str)
+            except (TypeError, ValueError):
+                return jsonify({"ok": False, "error": "Invalid employee id"}), 400
+            if new_employee_id != shift.employee_id:
+                new_employee = db.get(Employee, new_employee_id)
+                if not new_employee:
+                    return jsonify({"ok": False, "error": "Target employee not found"}), 404
+
         conflict_message = _find_employee_schedule_conflict(
           db,
-          employee_id=shift.employee_id,
+          employee_id=new_employee_id,
           day=new_day,
           start_time=shift.start_time,
           end_time=shift.end_time,
@@ -9186,6 +9265,7 @@ def move_shift_day(shift_id: int):
           return jsonify({"ok": False, "error": conflict_message}), 400
 
         shift.day = new_day
+        shift.employee_id = new_employee_id
         db.commit()
         return jsonify({"ok": True})
     except Exception as exc:
@@ -9422,6 +9502,22 @@ def schedule_dashboard():
 
         selected_employee_id = request.args.get("employee_id", type=int)
         selected_site_id = request.args.get("site_id", type=int)
+        free_filter = request.args.get("free", default="0") == "1"
+        free_day_str = (request.args.get("free_day") or "").strip()
+        free_week_start_str = (request.args.get("free_week_start") or "").strip()
+        free_day = None
+        free_week_start = None
+        if free_day_str:
+            try:
+                free_day = datetime.strptime(free_day_str, "%Y-%m-%d").date()
+            except ValueError:
+                free_day = None
+        if not free_day and free_week_start_str:
+            try:
+                free_week_start = datetime.strptime(free_week_start_str, "%Y-%m-%d").date()
+            except ValueError:
+                free_week_start = None
+
         # Support both weeks (legacy) and explicit days view: `?days=3` overrides weeks.
         days = request.args.get("days", type=int)
         weeks = request.args.get("weeks", default=8, type=int) or 8
@@ -9457,7 +9553,7 @@ def schedule_dashboard():
               if last_row and last_row[0]:
                 start_date_val = last_row[0]
 
-        week_days = _get_day_range(start=start_date_val, weeks=weeks)
+        week_days = _get_day_range(start=start_date_val, weeks=weeks, days=days)
         employees, sites, matrix = _load_schedule_context(db, week_days)
 
         selected_employee = None
@@ -9478,15 +9574,49 @@ def schedule_dashboard():
             if matched:
               filtered_matrix[key] = matched
 
-        # Hide completely empty rows/columns (after applying employee/site filters).
-        grid_employee_ids = {e.id for e in visible_employees}
-        shift_days_for_grid = {day for (emp_id, day) in filtered_matrix.keys() if emp_id in grid_employee_ids}
-        visible_days = [day for day in week_days if day in shift_days_for_grid]
-        has_any_shifts = bool(visible_days)
+        free_employee_ids = None
+        if free_filter:
+          if free_day is not None:
+            scheduled_employee_ids = {
+              row[0]
+              for row in db.query(Shift.employee_id)
+              .filter(Shift.day == free_day)
+              .distinct()
+              .all()
+              if row[0] is not None
+            }
+          else:
+            week_start = free_week_start if free_week_start is not None else (start_date_val or date.today() - timedelta(days=date.today().weekday()))
+            week_end = week_start + timedelta(days=7)
+            scheduled_employee_ids = {
+              row[0]
+              for row in db.query(Shift.employee_id)
+              .filter(Shift.day >= week_start, Shift.day < week_end)
+              .distinct()
+              .all()
+              if row[0] is not None
+            }
+          free_employee_ids = {e.id for e in employees if e.id not in scheduled_employee_ids}
+          if selected_employee_id:
+            if selected_employee and selected_employee.id in free_employee_ids:
+              visible_employees = [selected_employee]
+            else:
+              visible_employees = []
+          else:
+            visible_employees = [e for e in employees if e.id in free_employee_ids]
 
-        if not selected_employee:
-          shift_employee_ids_for_grid = {emp_id for (emp_id, _day) in filtered_matrix.keys()}
-          visible_employees = [e for e in employees if e.id in shift_employee_ids_for_grid]
+        if free_filter:
+          visible_days = week_days
+          has_any_shifts = True
+        else:
+          grid_employee_ids = {e.id for e in visible_employees}
+          shift_days_for_grid = {day for (emp_id, day) in filtered_matrix.keys() if emp_id in grid_employee_ids}
+          visible_days = [day for day in week_days if day in shift_days_for_grid]
+          has_any_shifts = bool(visible_days)
+
+          if not selected_employee:
+            shift_employee_ids_for_grid = {emp_id for (emp_id, _day) in filtered_matrix.keys()}
+            visible_employees = [e for e in employees if e.id in shift_employee_ids_for_grid]
 
         pdf_params = {"week": week_days[0].isoformat()}
         pdf_params["weeks"] = weeks
@@ -9522,6 +9652,9 @@ def schedule_dashboard():
             selected_site=selected_site,
             pdf_url=pdf_url,
             hours_pdf_url=hours_pdf_url,
+            free_filter=free_filter,
+            free_day=free_day_str,
+            free_week_start=free_week_start_str,
             active_page="schedule",
         )
         return schedule_html
@@ -9534,7 +9667,17 @@ def schedule_dashboard():
 def schedule_preview_import_previous_month():
     db = SessionLocal()
     try:
-        first_day, last_day = _previous_month_range()
+        source_offset_raw = request.args.get("source_offset", "1")
+        target_offset_raw = request.args.get("target_offset", "1")
+        try:
+            source_offset = max(0, min(int(source_offset_raw), 12))
+        except (ValueError, TypeError):
+            source_offset = 1
+        try:
+            target_offset = max(1, min(int(target_offset_raw), 12))
+        except (ValueError, TypeError):
+            target_offset = 1
+        first_day, last_day = _month_range_by_offset(reference_day=date.today(), months_back=source_offset)
         shifts = (
             db.query(Shift)
             .filter(Shift.day >= first_day, Shift.day <= last_day)
@@ -9547,7 +9690,7 @@ def schedule_preview_import_previous_month():
             # skip employees explicitly marked inactive
             if not getattr(emp, 'is_active', False):
                 continue
-            target_day = _add_months(s.day, 1)
+            target_day = _add_months(s.day, target_offset)
             conflict_msg = _find_employee_schedule_conflict(
                 db, s.employee_id, target_day, s.start_time, s.end_time, s.site_id
             )
@@ -9579,6 +9722,12 @@ def schedule_import_previous_month():
         selected_ids_raw = payload.get("selected_ids") if isinstance(payload, dict) else None
         if selected_ids_raw is None:
             selected_ids_raw = request.form.getlist("selected_ids[]")
+        source_offset_raw = payload.get("source_offset") if isinstance(payload, dict) else None
+        target_offset_raw = payload.get("target_offset") if isinstance(payload, dict) else None
+        if source_offset_raw is None:
+            source_offset_raw = request.form.get("source_offset", "1")
+        if target_offset_raw is None:
+            target_offset_raw = request.form.get("target_offset", "1")
         selected_ids = []
         if selected_ids_raw:
             for sel in selected_ids_raw:
@@ -9586,7 +9735,15 @@ def schedule_import_previous_month():
                     selected_ids.append(int(sel))
                 except (ValueError, TypeError):
                     continue
-        first_day, last_day = _previous_month_range()
+        try:
+            source_offset = max(0, min(int(source_offset_raw), 12))
+        except (ValueError, TypeError):
+            source_offset = 1
+        try:
+            target_offset = max(1, min(int(target_offset_raw), 12))
+        except (ValueError, TypeError):
+            target_offset = 1
+        first_day, last_day = _month_range_by_offset(reference_day=date.today(), months_back=source_offset)
         query = db.query(Shift).filter(Shift.day >= first_day, Shift.day <= last_day)
         if selected_ids:
             query = query.filter(Shift.id.in_(selected_ids))
@@ -9597,7 +9754,7 @@ def schedule_import_previous_month():
         skipped_inactive = 0
         for s in shifts:
             emp = s.employee if s.employee else db.get(Employee, s.employee_id)
-            target_day = _add_months(s.day, 1)
+            target_day = _add_months(s.day, target_offset)
             existing = (
                 db.query(Shift)
                 .filter(
@@ -9612,6 +9769,7 @@ def schedule_import_previous_month():
             if existing:
                 skipped_existing += 1
                 continue
+            target_day = _add_months(s.day, target_offset)
             conflict_msg = _find_employee_schedule_conflict(
                 db, s.employee_id, target_day, s.start_time, s.end_time, s.site_id
             )
@@ -9834,19 +9992,38 @@ def admin_employees():
       )
 
     free_filter = request.args.get('free', default='0') == '1'
+    free_day_str = (request.args.get('free_day') or '').strip()
+    free_week_start_str = (request.args.get('free_week_start') or '').strip()
+    free_day = None
+    free_week_start = None
+    if free_day_str:
+      try:
+        free_day = datetime.strptime(free_day_str, "%Y-%m-%d").date()
+      except ValueError:
+        free_day = None
+    if not free_day and free_week_start_str:
+      try:
+        free_week_start = datetime.strptime(free_week_start_str, "%Y-%m-%d").date()
+      except ValueError:
+        free_week_start = None
+
     if free_filter:
-      week_start = date.today() - timedelta(days=date.today().weekday())
-      week_end = week_start + timedelta(days=7)
-      scheduled_employee_ids_subq = (
-        db.query(Shift.employee_id)
-        .filter(
-          Shift.employee_id.isnot(None),
-          Shift.day >= week_start,
-          Shift.day < week_end,
+      if free_day is not None:
+        scheduled_employee_ids_subq = (
+          db.query(Shift.employee_id)
+          .filter(Shift.day == free_day)
+          .distinct()
+          .subquery()
         )
-        .distinct()
-        .subquery()
-      )
+      else:
+        week_start = free_week_start if free_week_start is not None else date.today() - timedelta(days=date.today().weekday())
+        week_end = week_start + timedelta(days=7)
+        scheduled_employee_ids_subq = (
+          db.query(Shift.employee_id)
+          .filter(Shift.day >= week_start, Shift.day < week_end)
+          .distinct()
+          .subquery()
+        )
       base_query = base_query.filter(~Employee.id.in_(scheduled_employee_ids_subq))
 
     total_employees = db.query(func.count(Employee.id)).scalar() or 0
@@ -9964,6 +10141,8 @@ def admin_employees():
       credential_snippets=credential_snippets,
       employee_shift_groups=employee_shift_groups,
       free_filter=free_filter,
+      free_day=free_day_str,
+      free_week_start=free_week_start_str,
       page=page,
       per_page=per_page,
       total_pages=total_pages,
@@ -10938,13 +11117,20 @@ def _ensure_site_customer_id(session_obj, site: Site | None, reserved: set[str] 
   return generated
 
 
-def _previous_month_range(reference_day: date | None = None) -> tuple[date, date]:
-  """Return first/last day of previous month."""
+def _month_range_by_offset(reference_day: date | None = None, months_back: int = 1) -> tuple[date, date]:
+  """Return first/last day of the month that is months_back before the reference month."""
   ref = reference_day or date.today()
   first_of_current = date(ref.year, ref.month, 1)
-  previous_month_last = first_of_current - timedelta(days=1)
-  previous_month_first = date(previous_month_last.year, previous_month_last.month, 1)
-  return previous_month_first, previous_month_last
+  source_month_first = _add_months(first_of_current, -months_back)
+  if source_month_first.month == 12:
+    next_month = date(source_month_first.year + 1, 1, 1)
+  else:
+    next_month = date(source_month_first.year, source_month_first.month + 1, 1)
+  return source_month_first, next_month - timedelta(days=1)
+
+
+def _previous_month_range(reference_day: date | None = None) -> tuple[date, date]:
+  return _month_range_by_offset(reference_day, 1)
 
 
 def _parse_optional_contract_date(value: str | None) -> date | None:
