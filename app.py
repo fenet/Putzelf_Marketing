@@ -447,6 +447,39 @@ ADMIN_EMPLOYEES_TEMPLATE = """
     .stat-card { border-radius:0.85rem; border:1px solid #e2e8f0; background:#ffffff; padding:1rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
     .stat-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#475569; margin-bottom:0.35rem; }
     .stat-value { font-size:1.6rem; font-weight:600; color:#0f172a; }
+    .toast-container { position:fixed; bottom:2rem; right:2rem; z-index:2000; display:flex; flex-direction:column; gap:0.75rem; max-width:400px; pointer-events:none; }
+    .toast-container.mobile { bottom:1rem; right:1rem; max-width:calc(100vw - 2rem); }
+    .toast { display:flex; align-items:flex-start; gap:0.75rem; padding:1rem 1.25rem; border-radius:0.85rem; box-shadow:0 16px 32px rgba(15,23,42,0.15); background:#ffffff; border-left:4px solid #64748b; pointer-events:auto; animation:slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); position:relative; overflow:hidden; }
+    .toast.success { border-left-color:#22c55e; background:linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%); }
+    .toast.error { border-left-color:#ef4444; background:linear-gradient(135deg, #fef2f2 0%, #ffffff 100%); }
+    .toast.warning { border-left-color:#f59e0b; background:linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); }
+    .toast.info { border-left-color:#3b82f6; background:linear-gradient(135deg, #eff6ff 0%, #ffffff 100%); }
+    .toast-icon { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; flex-shrink:0; font-size:1rem; }
+    .toast.success .toast-icon { background:#ecfdf5; color:#22c55e; }
+    .toast.error .toast-icon { background:#fef2f2; color:#ef4444; }
+    .toast.warning .toast-icon { background:#fffbeb; color:#f59e0b; }
+    .toast.info .toast-icon { background:#eff6ff; color:#3b82f6; }
+    .toast-content { display:flex; flex-direction:column; gap:0.25rem; flex:1; }
+    .toast-title { font-weight:600; color:#0f172a; font-size:0.95rem; }
+    .toast.success .toast-title { color:#15803d; }
+    .toast.error .toast-title { color:#991b1b; }
+    .toast.warning .toast-title { color:#92400e; }
+    .toast.info .toast-title { color:#1e40af; }
+    .toast-message { font-size:0.85rem; color:#64748b; line-height:1.4; }
+    .toast.success .toast-message { color:#166534; }
+    .toast.error .toast-message { color:#7f1d1d; }
+    .toast.warning .toast-message { color:#78350f; }
+    .toast.info .toast-message { color:#1e3a8a; }
+    .toast-close { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border:none; background:none; cursor:pointer; color:#94a3b8; border-radius:4px; transition:background 0.2s ease; flex-shrink:0; }
+    .toast-close:hover { background:rgba(15,23,42,0.08); color:#64748b; }
+    .toast-progress { position:absolute; bottom:0; left:0; height:3px; background:currentColor; border-radius:0 0 0.85rem 0; animation:progress linear 5s forwards; }
+    .toast.success .toast-progress { color:#22c55e; }
+    .toast.error .toast-progress { color:#ef4444; }
+    .toast.warning .toast-progress { color:#f59e0b; }
+    .toast.info .toast-progress { color:#3b82f6; }
+    @keyframes slideIn { from { transform:translateX(400px); opacity:0; } to { transform:translateX(0); opacity:1; } }
+    @keyframes progress { from { width:100%; } to { width:0%; } }
+    @media(max-width:640px) { .toast-container { bottom:1rem; right:1rem; max-width:calc(100vw - 2rem); } .toast { gap:0.5rem; padding:0.9rem 1rem; font-size:0.9rem; } }
     .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
     .btn { border:1px solid rgba(15,23,42,0.18); }
     .btn i { font-size:1.05rem; }
@@ -531,13 +564,27 @@ ADMIN_EMPLOYEES_TEMPLATE = """
     </aside>
     <main class="main-shell">
       <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menü</button>
+      <div id="toast-container" class="toast-container"></div>
+      <script>
+        window._toastQueue = window._toastQueue || [];
+        window.showToast = window.showToast || function(message, type = 'info', title = '') {
+          window._toastQueue.push({ message, type, title });
+        };
+      </script>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-          <div class="mb-3">
-            {% for category, message in messages %}
-              <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }} border-0 text-dark">{{ message }}</div>
-            {% endfor %}
-          </div>
+          <script>
+            const fireToasts = function() {
+              {% for category, message in messages %}
+                window.showToast('{{ message | replace("'", "\\'") }}', '{{ 'success' if category=='success' else 'error' if category=='warning' else 'info' }}');
+              {% endfor %}
+            };
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', fireToasts);
+            } else {
+              fireToasts();
+            }
+          </script>
         {% endif %}
       {% endwith %}
 
@@ -880,6 +927,91 @@ ADMIN_EMPLOYEES_TEMPLATE = """
   </div>
     <script>
       document.getElementById('year').textContent = new Date().getFullYear();
+
+      // Modern Toast Notification System
+      window.showToast = function(message, type = 'info', title = '') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const icons = {
+          success: '✓',
+          error: '✕',
+          warning: '!',
+          info: 'ℹ'
+        };
+
+        const titles = {
+          success: 'Erfolg',
+          error: 'Fehler',
+          warning: 'Warnung',
+          info: 'Information'
+        };
+
+        const finalTitle = title || titles[type] || 'Nachricht';
+        const icon = icons[type] || 'ℹ';
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `
+          <div class="toast-icon">${icon}</div>
+          <div class="toast-content">
+            <div class="toast-title">${finalTitle}</div>
+            <div class="toast-message">${message}</div>
+          </div>
+          <button type="button" class="toast-close" aria-label="Schließen">×</button>
+          <div class="toast-progress"></div>
+        `;
+
+        container.appendChild(toast);
+
+        const closeBtn = toast.querySelector('.toast-close');
+        closeBtn.addEventListener('click', () => {
+          toast.style.animation = 'slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) reverse';
+          setTimeout(() => {
+            if (toast.parentElement) toast.remove();
+          }, 300);
+        });
+
+        setTimeout(() => {
+          if (toast.parentElement) {
+            toast.style.animation = 'slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) reverse';
+            setTimeout(() => {
+              if (toast.parentElement) toast.remove();
+            }, 300);
+          }
+        }, 5000);
+      };
+      if (window._toastQueue && Array.isArray(window._toastQueue) && window._toastQueue.length) {
+        window._toastQueue.forEach(({ message, type, title }) => window.showToast(message, type, title));
+        window._toastQueue = [];
+      }
+
+      // Form submission handlers for employee management
+      document.addEventListener('DOMContentLoaded', function() {
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+          if (form.method.toLowerCase() === 'post') {
+            form.addEventListener('submit', function(e) {
+              const actionBtn = document.activeElement;
+              const action = actionBtn.name === 'action' ? actionBtn.value : (form.querySelector('input[name="action"]')?.value || 'unknown');
+
+              // Map actions to user-friendly messages
+              const messages = {
+                create: { success: 'Mitarbeiter erfolgreich hinzugefügt', error: 'Fehler beim Hinzufügen des Mitarbeiters' },
+                update: { success: 'Mitarbeiter erfolgreich aktualisiert', error: 'Fehler beim Aktualisieren des Mitarbeiters' },
+                delete: { success: 'Mitarbeiter erfolgreich gelöscht', error: 'Fehler beim Löschen des Mitarbeiters' },
+                credentials_share: { success: 'Anmeldedaten aktualisiert', error: 'Fehler beim Aktualisieren der Anmeldedaten' },
+                credentials_update: { success: 'Anmeldedaten gespeichert', error: 'Fehler beim Speichern der Anmeldedaten' }
+              };
+
+              const msg = messages[action] || messages['update'];
+              // Note: The actual success/error will be shown via flashed messages
+              // This just logs the action; the server will handle the response
+            });
+          }
+        });
+      });
+
       (function() {
         const body = document.body;
         const toggle = document.getElementById('mobile-nav-toggle');
@@ -4724,6 +4856,18 @@ SCHEDULE_TEMPLATE = """
         </div>
       </header>
       <main class="content-shell">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <section class="section-card" style="padding:1rem 1.1rem;">
+              {% for category, message in messages %}
+                <div class="alert {% if category in ['warning', 'error', 'danger'] %}alert-warning{% elif category == 'success' %}alert-success{% else %}alert-info{% endif %} mb-2" role="alert" style="border-radius:0.8rem;">
+                  {{ message }}
+                </div>
+              {% endfor %}
+            </section>
+          {% endif %}
+        {% endwith %}
+
         <section class="section-card schedule-card">
           <div class="section-header">
             <div>
@@ -4764,6 +4908,7 @@ SCHEDULE_TEMPLATE = """
             {% endif %}
           </div>
           <form method="get" action="{{ url_for('schedule_dashboard') }}" class="filter-toolbar">
+            <input type="hidden" name="weeks" value="{{ weeks }}">
             <div>
               <label class="form-label" for="filter_employee_id">Mitarbeiterfokus</label>
               <select class="form-select form-select-sm" id="filter_employee_id" name="employee_id" onchange="this.form.submit()">
@@ -5100,7 +5245,7 @@ SCHEDULE_TEMPLATE = """
         const params = new URLSearchParams(window.location.search);
         params.delete('days');
         params.delete('start_date');
-        params.append(selected.split('=')[0], selected.split('=')[1]);
+        params.set(selected.split('=')[0], selected.split('=')[1]);
         window.location.href = url.toString() + '?' + params.toString();
       }
     };
@@ -8754,8 +8899,21 @@ def _safe_next_url() -> str | None:
 
 def _employee_redirect_target(next_url: str | None) -> str:
   # Employees may only land on employee-scoped routes to avoid redirect loops.
-  if next_url and next_url.startswith("/employee"):
-    return next_url
+  if not next_url:
+    return url_for("employee_dashboard")
+  try:
+    parsed = urlparse(next_url)
+    path = parsed.path or ""
+  except Exception:
+    return url_for("employee_dashboard")
+  # reject any attempt to land on the login page
+  login_path = url_for("login")
+  if path == login_path:
+    return url_for("employee_dashboard")
+  if path.startswith("/employee"):
+    # keep query component if present
+    query = f"?{parsed.query}" if parsed.query else ""
+    return f"{path}{query}"
   return url_for("employee_dashboard")
 
 
@@ -9611,8 +9769,9 @@ def schedule_dashboard():
         else:
           grid_employee_ids = {e.id for e in visible_employees}
           shift_days_for_grid = {day for (emp_id, day) in filtered_matrix.keys() if emp_id in grid_employee_ids}
-          visible_days = [day for day in week_days if day in shift_days_for_grid]
-          has_any_shifts = bool(visible_days)
+          # Keep the full selected period in the grid, even when some days are empty.
+          visible_days = week_days
+          has_any_shifts = bool(shift_days_for_grid)
 
           if not selected_employee:
             shift_employee_ids_for_grid = {emp_id for (emp_id, _day) in filtered_matrix.keys()}
@@ -9871,6 +10030,7 @@ def admin_employees():
           db.commit()
           if generated_pin:
             _remember_credentials_for_session(employee.id, employee.login_code, generated_pin)
+          flash(f"Mitarbeiter {name} erfolgreich hinzugefügt.", 'success')
       elif action == "update" and emp_id:
         emp = db.get(Employee, int(emp_id))
         if emp:
@@ -9917,9 +10077,11 @@ def admin_employees():
             except Exception:
               pass
             db.commit()
+            flash(f"Mitarbeiter {name or emp.name} erfolgreich aktualisiert.", 'success')
       elif action == "delete" and emp_id:
         emp = db.get(Employee, int(emp_id))
         if emp:
+          emp_name = emp.name
           # remove associated profile image from disk
           try:
             _remove_photo(emp.profile_image_path)
@@ -9927,6 +10089,7 @@ def admin_employees():
             logging.exception("Failed removing profile image for deleted employee %s", emp.id)
           db.delete(emp)
           db.commit()
+          flash(f"Mitarbeiter {emp_name} erfolgreich gelöscht.", 'success')
       elif action == "credentials_share" and emp_id:
         emp = db.get(Employee, int(emp_id))
         if emp:
@@ -9937,7 +10100,9 @@ def admin_employees():
           emp.login_pin_hash = generate_password_hash(new_pin)
           db.commit()
           _remember_credentials_for_session(emp.id, emp.login_code, new_pin)
-          flash(f"Credentials refreshed for {emp.name}.")
+          flash(f"Anmeldedaten aktualisiert für {emp.name}.", 'success')
+        else:
+          flash("Fehler beim Aktualisieren der Anmeldedaten.", 'warning')
         return redirect(redirect_url)
       elif action == "credentials_update" and emp_id:
         emp = db.get(Employee, int(emp_id))
@@ -9964,9 +10129,11 @@ def admin_employees():
           db.commit()
           if pin_snippet:
             _remember_credentials_for_session(emp.id, emp.login_code, pin_snippet)
-            flash(f"Credentials updated for {emp.name}.")
+            flash(f"Anmeldedaten aktualisiert für {emp.name}.", 'success')
           else:
-            flash(f"Login details saved for {emp.name}.")
+            flash(f"Anmeldedaten gespeichert für {emp.name}.", 'success')
+        else:
+          flash("Fehler beim Speichern der Anmeldedaten.", 'warning')
         return redirect(redirect_url)
 
       return redirect(redirect_url)
