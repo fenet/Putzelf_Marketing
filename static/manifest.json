@@ -1,7 +1,9 @@
 {
   "name": "Putzelf Crew Dashboard",
   "short_name": "Crew",
+  "id": "/employee/dashboard",
   "start_url": "/employee/dashboard",
+  "scope": "/employee/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#020617",

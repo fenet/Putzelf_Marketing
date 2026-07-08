@@ -773,7 +773,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
 
                     {% set snippet = (credential_snippets|default({})).get(emp.id|string) %}
                     {% set code_display = snippet.code if snippet and snippet.code else (emp.login_code or 'Ausstehend') %}
-                    {% set pin_display = snippet.pin if snippet and snippet.pin else None %}
+                    {% set pin_display = snippet.pin if snippet and snippet.pin else (emp.login_pin_plain or None) %}
 
                     <div class="credential-box mt-3">
                       <div class="credential-grid">
@@ -787,7 +787,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                             {% if pin_display %}
                               {{ pin_display }}
                             {% elif emp.login_pin_hash %}
-                              Verborgen — mit „Teilen“ aktualisieren
+                              PIN vorhanden — einmal „PIN teilen“ klicken, damit sie wieder angezeigt wird
                             {% else %}
                               Wird erstellt…
                             {% endif %}
@@ -798,7 +798,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                           <div class="credential-value">{{ emp.login_email or 'Nicht gesetzt' }}</div>
                         </div>
                       </div>
-                      {% if pin_display %}
+                      {% if pin_display and snippet and snippet.pin %}
                         <div class="credential-note mt-2">Neue PIN erstellt — bitte zeitnah mit {{ emp.name }} teilen.</div>
                       {% endif %}
                     </div>
@@ -811,7 +811,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
                           <input type="hidden" name="redirect_q" value="{{ search_q }}">
                         {% endif %}
                         <input type="hidden" name="redirect_page" value="{{ page }}">
-                        <button type="submit" class="btn btn-sm btn-outline-info">Neue PIN teilen</button>
+                        <button type="submit" class="btn btn-sm btn-outline-info">{% if emp.login_pin_plain %}PIN teilen{% else %}Neue PIN erzeugen und teilen{% endif %}</button>
                       </form>
                       {% if pin_display %}
                         {% set share_text = 'Anmeldecode: ' ~ code_display ~ ' · PIN: ' ~ pin_display %}
@@ -3125,7 +3125,7 @@ INVOICE_VIEW_TEMPLATE = """
 
 LOGIN_TEMPLATE = """
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -3184,32 +3184,44 @@ LOGIN_TEMPLATE = """
 </head>
 <body>
   <div class="login-card">
+    <form method="get" class="d-flex justify-content-end mb-2">
+      {% if next_value %}
+        <input type="hidden" name="next" value="{{ next_value }}">
+      {% endif %}
+      <label class="small-note me-2" for="lang">{{ ui.language }}</label>
+      <select id="lang" name="lang" class="form-select form-select-sm" style="max-width: 180px;" onchange="this.form.submit()">
+        {% for code, label in lang_labels.items() %}
+          <option value="{{ code }}" {% if code == lang %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </form>
     <div class="brand">
       <div class="brand-logo">
         <img src="/static/logo.png" alt="Putzelf Marketing">
       </div>
       <div>
         <div class="brand-title">Putzelf Marketing</div>
-        <div class="brand-sub">Secure access</div>
+        <div class="brand-sub">{{ ui.login_secure_access }}</div>
       </div>
     </div>
-    <h1 class="h5 text-dark mb-3">Sign in</h1>
+    <h1 class="h5 text-dark mb-3">{{ ui.login_title }}</h1>
     <form method="post" class="needs-validation" novalidate>
       <input type="hidden" name="next" value="{{ next_value or request.args.get('next','') }}">
+      <input type="hidden" name="lang" value="{{ lang }}">
       <div class="mb-3">
-        <label class="form-label small-note text-uppercase" for="username">Username or login code</label>
+        <label class="form-label small-note text-uppercase" for="username">{{ ui.login_username }}</label>
         <input class="form-control form-control-sm" id="username" name="username" required autofocus>
       </div>
       <div class="mb-3">
-        <label class="form-label small-note text-uppercase" for="password">Password</label>
+        <label class="form-label small-note text-uppercase" for="password">{{ ui.login_password }}</label>
         <input type="password" class="form-control form-control-sm" id="password" name="password" required>
       </div>
       {% if error %}
         <div class="alert alert-danger py-2" role="alert">{{ error }}</div>
       {% endif %}
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <button class="btn btn-sm btn-primary">Login</button>
-        <span class="small-note">Admins use their username and password. Employees use their work email or login code plus PIN.</span>
+        <button class="btn btn-sm btn-primary">{{ ui.login_button }}</button>
+        <span class="small-note">{{ ui.login_hint }}</span>
       </div>
     </form>
   </div>
@@ -3229,13 +3241,6 @@ LOGIN_TEMPLATE = """
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
-      });
-    }
-  </script>
 </body>
 </html>
 """
@@ -3243,11 +3248,11 @@ LOGIN_TEMPLATE = """
 
 EMPLOYEE_DASHBOARD_TEMPLATE = """
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Putzelf Marketing — My Jobs</title>
+  <title>Putzelf Marketing — {{ ui.your_missions }}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#0f172a" />
@@ -3288,9 +3293,9 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
     .job-head { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: space-between; align-items: baseline; }
     .job-title { font-size: 1.18rem; font-weight: 600; letter-spacing: 0.015em; color: #0f172a; }
     .status-pill { padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; border: 1px solid #cbd5f5; color: #0f172a; background: #f8fafc; }
-    .status-pill[data-state="Scheduled"] { border-color: #38bdf8; background: #e0f2fe; color: #0369a1; }
-    .status-pill[data-state="In progress"] { border-color: #fb923c; background: #ffedd5; color: #9a3412; }
-    .status-pill[data-state="Completed"] { border-color: #4ade80; background: #dcfce7; color: #166534; }
+    .status-pill[data-state="scheduled"] { border-color: #38bdf8; background: #e0f2fe; color: #0369a1; }
+    .status-pill[data-state="in_progress"] { border-color: #fb923c; background: #ffedd5; color: #9a3412; }
+    .status-pill[data-state="completed"] { border-color: #4ade80; background: #dcfce7; color: #166534; }
     .job-meta { display: grid; gap: 0.5rem; font-size: 0.95rem; color: #0f172a; }
     .meta-label { font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: #64748b; margin-bottom: 0.25rem; }
     .meta-chip-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
@@ -3336,22 +3341,32 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
         <div class="brand-group">
           <span class="brand-mark" aria-hidden="true">🧽</span>
           <div class="brand-text">
-            <span class="brand-label">Crew dashboard</span>
+            <span class="brand-label">{{ ui.dashboard_title }}</span>
             <span class="brand-sub">Putzelf Marketing</span>
           </div>
         </div>
-        <a class="logout-chip" href="{{ url_for('logout') }}">Sign out</a>
+        <a class="logout-chip" href="{{ url_for('logout') }}">{{ ui.sign_out }}</a>
+      </div>
+      <div class="d-flex justify-content-end mt-2">
+        <form method="get" class="d-flex align-items-center gap-2">
+          <label class="small-note" for="employee-lang">{{ ui.language }}</label>
+          <select id="employee-lang" name="lang" class="form-select form-select-sm" style="max-width: 180px;" onchange="this.form.submit()">
+            {% for code, label in lang_labels.items() %}
+              <option value="{{ code }}" {% if code == lang %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </form>
       </div>
       <div class="date-line">
-        <span class="welcome">Hi {{ employee_name }}!</span>
+        <span class="welcome">{{ welcome_message }}</span>
         <span class="date-chip">{{ today_label }}</span>
       </div>
     </header>
     <main class="app-content" id="content">
       <section id="today" class="section">
         <div class="section-head">
-          <span class="section-eyebrow">Today</span>
-          <h1 class="section-title">Your missions</h1>
+          <span class="section-eyebrow">{{ ui.today }}</span>
+          <h1 class="section-title">{{ ui.your_missions }}</h1>
           <p class="section-subtitle">{{ friendly_message }}</p>
         </div>
         {% with messages = get_flashed_messages() %}
@@ -3372,34 +3387,34 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
                     <div class="job-title">{{ shift.site_name }}</div>
                     <div class="timeline-meta">{{ shift.time_window }}</div>
                   </div>
-                  <span class="status-pill" data-state="{{ shift.status_label }}">{{ shift.status_label }}</span>
+                  <span class="status-pill" data-state="{{ shift.status_key }}">{{ shift.status_label }}</span>
                 </div>
                 <div class="job-meta">
                   <div>
-                    <div class="meta-label">Location</div>
+                    <div class="meta-label">{{ ui.location }}</div>
                     <div>{{ shift.address }}</div>
                     {% if shift.map_url %}
-                      <a class="map-link" href="{{ shift.map_url }}" target="_blank" rel="noopener">Open in Maps</a>
+                      <a class="map-link" href="{{ shift.map_url }}" target="_blank" rel="noopener">{{ ui.open_maps }}</a>
                     {% endif %}
                   </div>
                   <div>
-                    <div class="meta-label">Instructions</div>
+                    <div class="meta-label">{{ ui.instructions }}</div>
                     <div>{{ shift.instructions }}</div>
                   </div>
                   <div>
-                    <div class="meta-label">Duration</div>
+                    <div class="meta-label">{{ ui.duration }}</div>
                     <div class="meta-chip-row">
-                      <span class="meta-chip">Scheduled · {{ shift.scheduled_duration }}</span>
+                      <span class="meta-chip">{{ ui.scheduled }} · {{ shift.scheduled_duration }}</span>
                       {% if shift.has_actual_duration %}
-                        <span class="meta-chip meta-chip--accent">Actual · {{ shift.actual_duration }}</span>
+                        <span class="meta-chip meta-chip--accent">{{ ui.actual }} · {{ shift.actual_duration }}</span>
                       {% endif %}
                     </div>
                   </div>
                   <div>
-                    <div class="meta-label">Checkpoints</div>
+                    <div class="meta-label">{{ ui.checkpoints }}</div>
                     <div class="checkpoint-row">
-                      <span>Clock-in: {{ shift.clock_in_display }}</span>
-                      <span>Clock-out: {{ shift.clock_out_display }}</span>
+                      <span>{{ ui.clock_in }}: {{ shift.clock_in_display }}</span>
+                      <span>{{ ui.clock_out }}: {{ shift.clock_out_display }}</span>
                     </div>
                   </div>
                 </div>
@@ -3408,14 +3423,14 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
                     <input type="hidden" name="lat" value="">
                     <input type="hidden" name="lng" value="">
                     <button type="submit" class="action-button btn-clock" {% if shift.clocked_in %}disabled{% endif %}>
-                      {% if shift.clocked_in %}Clocked in ✔{% else %}Clock in{% endif %}
+                      {% if shift.clocked_in %}{{ ui.clocked_in }}{% else %}{{ ui.clock_in }}{% endif %}
                     </button>
                   </form>
                   <form method="post" action="{{ shift.upload_url }}" enctype="multipart/form-data">
                     <input type="hidden" name="photo_type" value="before">
                     <label class="upload-tile" data-type="before">
                       <span class="icon" aria-hidden="true">📸</span>
-                      <span>{% if shift.before_photo_url %}Replace before photo{% else %}Upload before photo{% endif %}</span>
+                      <span>{% if shift.before_photo_url %}{{ ui.replace_before }}{% else %}{{ ui.upload_before }}{% endif %}</span>
                       <input type="file" name="photo" accept="image/*" onchange="this.form.submit()">
                     </label>
                   </form>
@@ -3423,7 +3438,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
                     <input type="hidden" name="photo_type" value="after">
                     <label class="upload-tile" data-type="after">
                       <span class="icon" aria-hidden="true">✨</span>
-                      <span>{% if shift.after_photo_url %}Replace after photo{% else %}Upload after photo{% endif %}</span>
+                      <span>{% if shift.after_photo_url %}{{ ui.replace_after }}{% else %}{{ ui.upload_after }}{% endif %}</span>
                       <input type="file" name="photo" accept="image/*" onchange="this.form.submit()">
                     </label>
                   </form>
@@ -3431,7 +3446,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
                     <input type="hidden" name="lat" value="">
                     <input type="hidden" name="lng" value="">
                     <button type="submit" class="action-button btn-complete" {% if shift.clocked_out %}disabled{% endif %}>
-                      {% if shift.clocked_out %}Completed 🎉{% else %}Mark complete{% endif %}
+                      {% if shift.clocked_out %}{{ ui.completed }}{% else %}{{ ui.mark_complete }}{% endif %}
                     </button>
                   </form>
                 </div>
@@ -3439,13 +3454,13 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
                   <div class="photo-grid">
                     {% if shift.before_photo_url %}
                       <div class="photo-item">
-                        <div class="meta-label">Before</div>
+                        <div class="meta-label">{{ ui.before }}</div>
                         <img src="{{ shift.before_photo_url }}" alt="Before photo for {{ shift.site_name }}">
                       </div>
                     {% endif %}
                     {% if shift.after_photo_url %}
                       <div class="photo-item">
-                        <div class="meta-label">After</div>
+                        <div class="meta-label">{{ ui.after }}</div>
                         <img src="{{ shift.after_photo_url }}" alt="After photo for {{ shift.site_name }}">
                       </div>
                     {% endif %}
@@ -3456,16 +3471,16 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
           </div>
         {% else %}
           <div class="empty-state">
-            <h2 class="h5 text-dark mb-2">You’re all clear ✨</h2>
-            <p class="mb-0">No shifts scheduled for today. Check back later or reach out to your manager if you were expecting a mission.</p>
+            <h2 class="h5 text-dark mb-2">{{ ui.today_empty_title }}</h2>
+            <p class="mb-0">{{ ui.today_empty_message }}</p>
           </div>
         {% endif %}
       </section>
 
       <section id="upcoming" class="section">
         <div class="section-head">
-          <span class="section-eyebrow">Next</span>
-          <h2 class="section-title">Upcoming jobs</h2>
+          <span class="section-eyebrow">{{ ui.next }}</span>
+          <h2 class="section-title">{{ ui.upcoming_jobs }}</h2>
         </div>
         <div class="timeline">
           {% if upcoming_jobs %}
@@ -3479,19 +3494,19 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
                 {% if job.instructions %}
                   <div class="timeline-meta">{{ job.instructions }}</div>
                 {% endif %}
-                <span class="status-pill" data-state="{{ job.status_label }}">{{ job.status_label }}</span>
+                <span class="status-pill" data-state="{{ job.status_key }}">{{ job.status_label }}</span>
               </article>
             {% endfor %}
           {% else %}
-            <div class="empty-state">No upcoming jobs yet.</div>
+            <div class="empty-state">{{ ui.upcoming_empty }}</div>
           {% endif %}
         </div>
       </section>
 
       <section id="history" class="section">
         <div class="section-head">
-          <span class="section-eyebrow">History</span>
-          <h2 class="section-title">Recent missions</h2>
+          <span class="section-eyebrow">{{ ui.history }}</span>
+          <h2 class="section-title">{{ ui.recent_missions }}</h2>
         </div>
         <div class="timeline">
           {% if history %}
@@ -3500,19 +3515,19 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
                 <h3>{{ item.site_name }}</h3>
                 <div class="timeline-meta">{{ item.day_label }} · {{ item.time_window }}</div>
                 <div class="meta-chip-row">
-                  <span class="meta-chip">Scheduled · {{ item.scheduled_duration }}</span>
+                  <span class="meta-chip">{{ ui.scheduled }} · {{ item.scheduled_duration }}</span>
                   {% if item.has_actual_duration %}
-                    <span class="meta-chip meta-chip--accent">Actual · {{ item.actual_duration }}</span>
+                    <span class="meta-chip meta-chip--accent">{{ ui.actual }} · {{ item.actual_duration }}</span>
                   {% endif %}
                 </div>
-                <span class="status-pill" data-state="{{ item.status_label }}">{{ item.status_label }}</span>
+                <span class="status-pill" data-state="{{ item.status_key }}">{{ item.status_label }}</span>
                 {% if item.instructions %}
                   <div class="timeline-meta">{{ item.instructions }}</div>
                 {% endif %}
               </article>
             {% endfor %}
           {% else %}
-            <div class="empty-state">No missions logged yet.</div>
+            <div class="empty-state">{{ ui.history_empty }}</div>
           {% endif %}
         </div>
       </section>
@@ -3521,15 +3536,15 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
     <nav class="bottom-nav">
       <a class="nav-link active" href="#today" data-target="today">
         <span class="icon" aria-hidden="true">🗓</span>
-        <span>Today</span>
+        <span>{{ ui.today }}</span>
       </a>
       <a class="nav-link" href="#upcoming" data-target="upcoming">
         <span class="icon" aria-hidden="true">⏭</span>
-        <span>Next</span>
+        <span>{{ ui.next }}</span>
       </a>
       <a class="nav-link" href="#history" data-target="history">
         <span class="icon" aria-hidden="true">📜</span>
-        <span>History</span>
+        <span>{{ ui.history }}</span>
       </a>
     </nav>
   </div>
@@ -3584,7 +3599,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
         overlay.className = 'confetti-overlay';
         const message = document.createElement('div');
         message.className = 'confetti-message';
-        message.textContent = 'Mission complete! 🎉';
+        message.textContent = {{ ui.confetti_complete|tojson }};
         overlay.appendChild(message);
 
         const colors = ['#bef264', '#f97316', '#22d3ee', '#facc15', '#fb7185'];
@@ -3627,7 +3642,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/employee-sw.js').catch(() => {});
+        navigator.serviceWorker.register('/employee-sw.js', { scope: '/employee/' }).catch(() => {});
       });
     }
   </script>
@@ -5095,26 +5110,27 @@ SCHEDULE_TEMPLATE = """
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1rem;">
         <div>
           <h3 style="margin:0; font-size:1.3rem; color:#0f172a;">Einsätze importieren</h3>
-          <p style="margin:0.5rem 0 0; color:#475569;">Wählen Sie den Quellmonat und die Anzahl der Monate aus, um die die Einsätze vorwärts kopiert werden sollen.</p>
+          <p style="margin:0.5rem 0 0; color:#475569;">Wählen Sie die Quellwoche (relative zur aktuellen Woche) und wie viele Wochen vorwärts kopiert werden sollen.</p>
         </div>
         <button type="button" id="previous-month-import-close" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#64748b;">×</button>
       </div>
       <div style="display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
         <div style="flex:1; min-width:220px;">
-          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Quellmonat</label>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Quellwoche (zurück)</label>
           <select id="previous-month-import-source-offset" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
-            <option value="1" selected>Vorheriger Monat</option>
-            <option value="0">Aktueller Monat</option>
-            <option value="2">2 Monate zurück</option>
-            <option value="3">3 Monate zurück</option>
+            <option value="0" selected>Aktuelle Woche</option>
+            <option value="1">1 Woche zurück</option>
+            <option value="2">2 Wochen zurück</option>
+            <option value="3">3 Wochen zurück</option>
           </select>
         </div>
         <div style="flex:1; min-width:220px;">
-          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Zielmonat</label>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Ziel (Wochen vorwärts)</label>
           <select id="previous-month-import-target-offset" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
-            <option value="1" selected>+1 Monat</option>
-            <option value="2">+2 Monate</option>
-            <option value="3">+3 Monate</option>
+            <option value="1" selected>+1 Woche</option>
+            <option value="2">+2 Wochen</option>
+            <option value="3">+3 Wochen</option>
+            <option value="4">+4 Wochen</option>
           </select>
         </div>
       </div>
@@ -5271,7 +5287,7 @@ SCHEDULE_TEMPLATE = """
         const targetOffset = Number(document.getElementById('previous-month-import-target-offset')?.value || 1);
         console.log('Setting modal display to flex');
         importModal.style.display = 'flex';
-        importContent.innerHTML = '<div class="alert alert-info" role="alert">Lade Einsätze aus dem ausgewählten Monat...</div>';
+        importContent.innerHTML = '<div class="alert alert-info" role="alert">Lade Einsätze aus der ausgewählten Woche...</div>';
         importSubmitBtn.disabled = true;
         try {
           const params = new URLSearchParams({
@@ -6018,6 +6034,22 @@ def _language_before_request():
     session["lang"] = requested
 
 
+@app.before_request
+def _cleanup_shift_photos_before_request():
+  global _LAST_SHIFT_PHOTO_CLEANUP_DATE
+  if request.path.startswith("/static/"):
+    return
+  today_marker = date.today()
+  if _LAST_SHIFT_PHOTO_CLEANUP_DATE == today_marker:
+    return
+  db = SessionLocal()
+  try:
+    _cleanup_expired_shift_photos(db)
+    _LAST_SHIFT_PHOTO_CLEANUP_DATE = today_marker
+  finally:
+    db.close()
+
+
 @app.route("/set-language/<lang_code>")
 def set_language(lang_code: str):
   normalized = (lang_code or "").strip().lower()
@@ -6041,6 +6073,8 @@ def _language_context_processor():
 def _language_after_request(response):
   content_type = (response.content_type or "").lower()
   if "text/html" not in content_type:
+    return response
+  if request.path == "/login" or request.path.startswith("/employee"):
     return response
   try:
     html = response.get_data(as_text=True)
@@ -7154,6 +7188,7 @@ class Employee(Base):
   login_email = Column(String(255), unique=True)
   login_code = Column(String(64), unique=True)
   login_pin_hash = Column(String(255))
+  login_pin_plain = Column(String(32))
   profile_phone = Column(String(64))
   profile_emergency_name = Column(String(255))
   profile_emergency_phone = Column(String(64))
@@ -7286,6 +7321,7 @@ _ensure_sqlite_column(engine, "shifts", "created_at", "DATETIME")
 _ensure_sqlite_column(engine, "employees", "login_email", "TEXT")
 _ensure_sqlite_column(engine, "employees", "login_code", "TEXT")
 _ensure_sqlite_column(engine, "employees", "login_pin_hash", "TEXT")
+_ensure_sqlite_column(engine, "employees", "login_pin_plain", "TEXT")
 _ensure_sqlite_column(engine, "employees", "profile_phone", "TEXT")
 _ensure_sqlite_column(engine, "employees", "profile_emergency_name", "TEXT")
 _ensure_sqlite_column(engine, "employees", "profile_emergency_phone", "TEXT")
@@ -7377,6 +7413,76 @@ def _remove_photo(path: str | None) -> None:
     logging.debug("Failed to remove phot/o %s", path)
 
 
+SHIFT_PHOTO_RETENTION_DAYS = 30
+_LAST_SHIFT_PHOTO_CLEANUP_DATE: date | None = None
+
+
+def _cleanup_expired_shift_photos(db) -> int:
+  cutoff = datetime.utcnow() - timedelta(days=SHIFT_PHOTO_RETENTION_DAYS)
+  removed_count = 0
+  changed = False
+  shifts = (
+    db.query(Shift)
+    .filter(or_(Shift.before_photo_path.isnot(None), Shift.after_photo_path.isnot(None)))
+    .all()
+  )
+  for shift in shifts:
+    for field_name in ("before_photo_path", "after_photo_path"):
+      path = getattr(shift, field_name)
+      if not path:
+        continue
+      absolute = path if os.path.isabs(path) else os.path.join(APP_ROOT, "static", path)
+      try:
+        if not os.path.isfile(absolute):
+          setattr(shift, field_name, None)
+          changed = True
+          continue
+        mtime = datetime.utcfromtimestamp(os.path.getmtime(absolute))
+        if mtime < cutoff:
+          _remove_photo(path)
+          setattr(shift, field_name, None)
+          removed_count += 1
+          changed = True
+      except OSError:
+        logging.exception("Failed checking expiry for shift photo %s", path)
+  if changed:
+    db.commit()
+  return removed_count
+
+
+def _build_admin_shift_photo_items(db, limit: int = 24) -> list[dict[str, Any]]:
+  items: list[dict[str, Any]] = []
+  shifts = (
+    db.query(Shift)
+    .options(joinedload(Shift.employee), joinedload(Shift.site))
+    .filter(or_(Shift.before_photo_path.isnot(None), Shift.after_photo_path.isnot(None)))
+    .order_by(Shift.created_at.desc(), Shift.id.desc())
+    .all()
+  )
+  for shift in shifts:
+    for kind, path in (("before", shift.before_photo_path), ("after", shift.after_photo_path)):
+      if not path:
+        continue
+      absolute = path if os.path.isabs(path) else os.path.join(APP_ROOT, "static", path)
+      if not os.path.isfile(absolute):
+        continue
+      try:
+        modified_at = datetime.utcfromtimestamp(os.path.getmtime(absolute))
+      except OSError:
+        continue
+      age_days = max((datetime.utcnow() - modified_at).days, 0)
+      items.append({
+        "kind": kind,
+        "url": url_for("static", filename=path),
+        "employee_name": shift.employee.name if shift.employee else "—",
+        "site_name": shift.site.name if shift.site else "—",
+        "day": shift.day.strftime("%d.%m.%Y") if shift.day else "—",
+        "time_window": f"{shift.start_time.strftime('%H:%M')} – {shift.end_time.strftime('%H:%M')}",
+        "age_days": age_days,
+      })
+  return items[:limit]
+
+
 def _save_profile_image(file_obj, prefix: str, replace_path: str | None = None) -> str | None:
   if not file_obj or not getattr(file_obj, "filename", None):
     return None
@@ -7465,6 +7571,7 @@ def _generate_missing_employee_credentials(db) -> dict[int, dict[str, str | None
     if not current_pin_hash:
       pin_generated = _generate_employee_pin()
       emp.login_pin_hash = generate_password_hash(pin_generated)
+      emp.login_pin_plain = pin_generated
       any_changes = True
     if code_generated or pin_generated:
       updated[emp.id] = {
@@ -8917,8 +9024,269 @@ def _employee_redirect_target(next_url: str | None) -> str:
   return url_for("employee_dashboard")
 
 
+EMPLOYEE_LANG_DEFAULT = "en"
+EMPLOYEE_LANG_SUPPORTED = ("en", "de", "uk")
+EMPLOYEE_LANG_LABELS = {
+  "en": "English",
+  "de": "Deutsch",
+  "uk": "Українська",
+}
+
+EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
+  "en": {
+    "login_secure_access": "Secure access",
+    "login_title": "Sign in",
+    "login_username": "Username or login code",
+    "login_password": "Password / PIN",
+    "login_button": "Login",
+    "login_hint": "Admins use their username and password. Employees use their work email or login code plus PIN.",
+    "login_invalid": "Invalid credentials",
+    "login_required": "Username and password are required",
+    "language": "Language",
+    "dashboard_title": "Crew dashboard",
+    "sign_out": "Sign out",
+    "welcome": "Hi {name}!",
+    "today": "Today",
+    "next": "Next",
+    "history": "History",
+    "your_missions": "Your missions",
+    "upcoming_jobs": "Upcoming jobs",
+    "recent_missions": "Recent missions",
+    "location": "Location",
+    "instructions": "Instructions",
+    "duration": "Duration",
+    "scheduled": "Scheduled",
+    "actual": "Actual",
+    "checkpoints": "Checkpoints",
+    "clock_in": "Clock in",
+    "clocked_in": "Clocked in ✔",
+    "clock_out": "Clock-out",
+    "open_maps": "Open in Maps",
+    "mark_complete": "Mark complete",
+    "completed": "Completed 🎉",
+    "upload_before": "Upload before photo",
+    "replace_before": "Replace before photo",
+    "upload_after": "Upload after photo",
+    "replace_after": "Replace after photo",
+    "before": "Before",
+    "after": "After",
+    "today_empty_title": "You’re all clear ✨",
+    "today_empty_message": "No shifts scheduled for today. Check back later or reach out to your manager if you were expecting a mission.",
+    "upcoming_empty": "No upcoming jobs yet.",
+    "history_empty": "No missions logged yet.",
+    "friendly_none": "No jobs scheduled right now.",
+    "friendly_one": "You have 1 mission waiting.",
+    "friendly_many": "{count} missions lined up for today.",
+    "status_scheduled": "Scheduled",
+    "status_in_progress": "In progress",
+    "status_completed": "Completed",
+    "scheduled_job": "Scheduled job",
+    "address_soon": "Address coming soon",
+    "no_special_instructions": "No special instructions today.",
+    "no_notes": "No notes recorded.",
+    "date_tbd": "Date to be set",
+    "time_tbd": "Time to be scheduled",
+    "starts": "Starts {time}",
+    "ends": "Ends {time}",
+    "shift_not_found": "That shift was not found for your profile.",
+    "shift_not_today": "This shift is not scheduled for today.",
+    "clocked_in_success": "Clocked in. Go make it shine!",
+    "photo_type_required": "Please choose whether this is a before or after photo.",
+    "photo_select_first": "Choose a photo to upload first.",
+    "photo_type_invalid": "Unsupported file type. Use PNG, JPG, or JPEG.",
+    "photo_save_error": "Could not save that photo. Please try again.",
+    "photo_saved": "{label} photo saved. Nice work!",
+    "complete_success": "Shift complete! Thanks for going the extra mile.",
+    "confetti_complete": "Mission complete! 🎉",
+  },
+  "de": {
+    "login_secure_access": "Sicherer Zugang",
+    "login_title": "Anmelden",
+    "login_username": "Benutzername oder Login-Code",
+    "login_password": "Passwort / PIN",
+    "login_button": "Login",
+    "login_hint": "Admins nutzen Benutzername und Passwort. Mitarbeitende nutzen E-Mail oder Login-Code plus PIN.",
+    "login_invalid": "Ungültige Anmeldedaten",
+    "login_required": "Benutzername und Passwort sind erforderlich",
+    "language": "Sprache",
+    "dashboard_title": "Mitarbeiter-Dashboard",
+    "sign_out": "Abmelden",
+    "welcome": "Hallo {name}!",
+    "today": "Heute",
+    "next": "Nächste",
+    "history": "Verlauf",
+    "your_missions": "Deine Einsätze",
+    "upcoming_jobs": "Bevorstehende Einsätze",
+    "recent_missions": "Letzte Einsätze",
+    "location": "Ort",
+    "instructions": "Anweisungen",
+    "duration": "Dauer",
+    "scheduled": "Geplant",
+    "actual": "Ist",
+    "checkpoints": "Zeitstempel",
+    "clock_in": "Einstempeln",
+    "clocked_in": "Eingestempelt ✔",
+    "clock_out": "Ausstempeln",
+    "open_maps": "In Maps öffnen",
+    "mark_complete": "Als erledigt markieren",
+    "completed": "Erledigt 🎉",
+    "upload_before": "Vorher-Foto hochladen",
+    "replace_before": "Vorher-Foto ersetzen",
+    "upload_after": "Nachher-Foto hochladen",
+    "replace_after": "Nachher-Foto ersetzen",
+    "before": "Vorher",
+    "after": "Nachher",
+    "today_empty_title": "Für heute alles erledigt ✨",
+    "today_empty_message": "Für heute sind keine Schichten geplant. Schau später nochmal vorbei oder kontaktiere deine Leitung.",
+    "upcoming_empty": "Noch keine kommenden Einsätze.",
+    "history_empty": "Noch keine Einsätze im Verlauf.",
+    "friendly_none": "Aktuell sind keine Einsätze geplant.",
+    "friendly_one": "Du hast 1 Einsatz heute.",
+    "friendly_many": "{count} Einsätze für heute geplant.",
+    "status_scheduled": "Geplant",
+    "status_in_progress": "Läuft",
+    "status_completed": "Erledigt",
+    "scheduled_job": "Geplanter Einsatz",
+    "address_soon": "Adresse folgt",
+    "no_special_instructions": "Heute keine besonderen Anweisungen.",
+    "no_notes": "Keine Notizen vorhanden.",
+    "date_tbd": "Datum offen",
+    "time_tbd": "Zeit wird geplant",
+    "starts": "Start {time}",
+    "ends": "Ende {time}",
+    "shift_not_found": "Diese Schicht wurde für dein Profil nicht gefunden.",
+    "shift_not_today": "Diese Schicht ist nicht für heute geplant.",
+    "clocked_in_success": "Eingestempelt. Viel Erfolg!",
+    "photo_type_required": "Bitte auswählen, ob es ein Vorher- oder Nachher-Foto ist.",
+    "photo_select_first": "Bitte zuerst ein Foto auswählen.",
+    "photo_type_invalid": "Dateityp nicht unterstützt. Bitte PNG, JPG oder JPEG nutzen.",
+    "photo_save_error": "Foto konnte nicht gespeichert werden. Bitte erneut versuchen.",
+    "photo_saved": "{label}-Foto gespeichert. Super!",
+    "complete_success": "Schicht abgeschlossen. Danke für deinen Einsatz.",
+    "confetti_complete": "Einsatz erledigt! 🎉",
+  },
+  "uk": {
+    "login_secure_access": "Безпечний вхід",
+    "login_title": "Увійти",
+    "login_username": "Ім'я користувача або код входу",
+    "login_password": "Пароль / PIN",
+    "login_button": "Увійти",
+    "login_hint": "Адміни входять за логіном і паролем. Співробітники — за робочим email або кодом входу та PIN.",
+    "login_invalid": "Невірні облікові дані",
+    "login_required": "Потрібні ім'я користувача та пароль",
+    "language": "Мова",
+    "dashboard_title": "Панель співробітника",
+    "sign_out": "Вийти",
+    "welcome": "Привіт, {name}!",
+    "today": "Сьогодні",
+    "next": "Далі",
+    "history": "Історія",
+    "your_missions": "Ваші зміни",
+    "upcoming_jobs": "Майбутні зміни",
+    "recent_missions": "Останні зміни",
+    "location": "Локація",
+    "instructions": "Інструкції",
+    "duration": "Тривалість",
+    "scheduled": "Заплановано",
+    "actual": "Фактично",
+    "checkpoints": "Відмітки",
+    "clock_in": "Почати зміну",
+    "clocked_in": "Почато ✔",
+    "clock_out": "Завершено",
+    "open_maps": "Відкрити в Maps",
+    "mark_complete": "Позначити завершено",
+    "completed": "Завершено 🎉",
+    "upload_before": "Завантажити фото «до»",
+    "replace_before": "Замінити фото «до»",
+    "upload_after": "Завантажити фото «після»",
+    "replace_after": "Замінити фото «після»",
+    "before": "До",
+    "after": "Після",
+    "today_empty_title": "На сьогодні все виконано ✨",
+    "today_empty_message": "На сьогодні змін немає. Перевірте пізніше або зверніться до менеджера.",
+    "upcoming_empty": "Поки що немає майбутніх змін.",
+    "history_empty": "Історія змін порожня.",
+    "friendly_none": "Зараз немає запланованих змін.",
+    "friendly_one": "На сьогодні у вас 1 зміна.",
+    "friendly_many": "На сьогодні заплановано {count} змін.",
+    "status_scheduled": "Заплановано",
+    "status_in_progress": "В процесі",
+    "status_completed": "Завершено",
+    "scheduled_job": "Запланована зміна",
+    "address_soon": "Адресу буде додано",
+    "no_special_instructions": "Сьогодні без додаткових інструкцій.",
+    "no_notes": "Немає приміток.",
+    "date_tbd": "Дату буде визначено",
+    "time_tbd": "Час буде визначено",
+    "starts": "Початок {time}",
+    "ends": "Завершення {time}",
+    "shift_not_found": "Зміну для вашого профілю не знайдено.",
+    "shift_not_today": "Ця зміна не запланована на сьогодні.",
+    "clocked_in_success": "Ви відмітились. Гарної роботи!",
+    "photo_type_required": "Вкажіть, це фото «до» чи «після».",
+    "photo_select_first": "Спочатку оберіть фото для завантаження.",
+    "photo_type_invalid": "Непідтримуваний тип файлу. Використайте PNG, JPG або JPEG.",
+    "photo_save_error": "Не вдалося зберегти фото. Спробуйте ще раз.",
+    "photo_saved": "Фото «{label}» збережено. Чудово!",
+    "complete_success": "Зміну завершено. Дякуємо!",
+    "confetti_complete": "Зміну завершено! 🎉",
+  },
+}
+
+
+def _normalize_employee_lang(raw: str | None) -> str:
+  value = (raw or "").strip().lower()
+  alias = {
+    "en": "en",
+    "english": "en",
+    "de": "de",
+    "deutsch": "de",
+    "german": "de",
+    "uk": "uk",
+    "ua": "uk",
+    "ukrainian": "uk",
+    "ukranian": "uk",
+    "українська": "uk",
+  }
+  return alias.get(value, EMPLOYEE_LANG_DEFAULT)
+
+
+def _get_employee_lang() -> str:
+  selected = (
+    request.args.get("lang")
+    or request.form.get("lang")
+    or session.get("employee_lang")
+    or EMPLOYEE_LANG_DEFAULT
+  )
+  lang = _normalize_employee_lang(selected)
+  session["employee_lang"] = lang
+  return lang
+
+
+def _employee_text(lang: str, key: str, **kwargs) -> str:
+  bundle = EMPLOYEE_TEXTS.get(lang) or EMPLOYEE_TEXTS[EMPLOYEE_LANG_DEFAULT]
+  template = bundle.get(key) or EMPLOYEE_TEXTS[EMPLOYEE_LANG_DEFAULT].get(key) or key
+  if kwargs:
+    try:
+      return template.format(**kwargs)
+    except Exception:
+      return template
+  return template
+
+
+@app.route("/employee-sw.js")
+def employee_service_worker():
+  return send_file(
+    os.path.join(APP_ROOT, "static", "employee-sw.js"),
+    mimetype="application/javascript",
+    max_age=0,
+  )
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
+  lang = _get_employee_lang()
+  ui = EMPLOYEE_TEXTS.get(lang, EMPLOYEE_TEXTS[EMPLOYEE_LANG_DEFAULT])
   next_url = _safe_next_url()
   if session.get("role") == "admin" and session.get("auth"):
     return redirect(next_url or url_for("admin_dashboard"))
@@ -8960,12 +9328,20 @@ def login():
           session["employee_id"] = employee.id
           session["employee_name"] = employee.name
           session["employee_code"] = employee.login_code
+          session["employee_lang"] = lang
           return redirect(_employee_redirect_target(next_url))
-      error = "Invalid credentials"
+      error = _employee_text(lang, "login_invalid")
     else:
-      error = "Username and password are required"
+      error = _employee_text(lang, "login_required")
 
-  return render_template_string(LOGIN_TEMPLATE, error=error, next_value=next_url)
+  return render_template_string(
+    LOGIN_TEMPLATE,
+    error=error,
+    next_value=next_url,
+    lang=lang,
+    ui=ui,
+    lang_labels=EMPLOYEE_LANG_LABELS,
+  )
 
 
 @app.route("/employee")
@@ -8974,6 +9350,8 @@ def login():
 def employee_dashboard():
   employee_id = session.get("employee_id")
   employee_name = session.get("employee_name", "Team member")
+  lang = _get_employee_lang()
+  ui = EMPLOYEE_TEXTS.get(lang, EMPLOYEE_TEXTS[EMPLOYEE_LANG_DEFAULT])
   today = date.today()
   db = SessionLocal()
   shift_cards = []
@@ -9001,23 +9379,23 @@ def employee_dashboard():
     start = shift_obj.start_time
     end = shift_obj.end_time
     if start and end:
-      start_label = start.strftime("%I:%M %p").lstrip("0")
-      end_label = end.strftime("%I:%M %p").lstrip("0")
+      start_label = start.strftime("%H:%M")
+      end_label = end.strftime("%H:%M")
       return f"{start_label} – {end_label}"
     if start:
-      start_label = start.strftime("%I:%M %p").lstrip("0")
-      return f"Starts {start_label}"
+      start_label = start.strftime("%H:%M")
+      return _employee_text(lang, "starts", time=start_label)
     if end:
-      end_label = end.strftime("%I:%M %p").lstrip("0")
-      return f"Ends {end_label}"
-    return "Time to be scheduled"
+      end_label = end.strftime("%H:%M")
+      return _employee_text(lang, "ends", time=end_label)
+    return _employee_text(lang, "time_tbd")
 
   def _status_text(shift_obj: Shift) -> str:
     if shift_obj.clock_out_at:
-      return "Completed"
+      return _employee_text(lang, "status_completed")
     if shift_obj.clock_in_at:
-      return "In progress"
-    return "Scheduled"
+      return _employee_text(lang, "status_in_progress")
+    return _employee_text(lang, "status_scheduled")
 
   try:
     todays_shifts = (
@@ -9027,29 +9405,29 @@ def employee_dashboard():
       .all()
     )
     for shift in todays_shifts:
-      site_name = shift.site.name if shift.site else "Scheduled job"
-      address = (shift.site.address or "Address coming soon") if shift.site else "Address coming soon"
+      site_name = shift.site.name if shift.site else _employee_text(lang, "scheduled_job")
+      address = (shift.site.address or _employee_text(lang, "address_soon")) if shift.site else _employee_text(lang, "address_soon")
       map_url = None
       if shift.site and shift.site.address:
         map_url = f"https://www.google.com/maps/search/?api=1&query={quote_plus(shift.site.address)}"
 
-      start_label = shift.start_time.strftime("%I:%M %p").lstrip("0")
-      end_label = shift.end_time.strftime("%I:%M %p").lstrip("0")
+      start_label = shift.start_time.strftime("%H:%M")
+      end_label = shift.end_time.strftime("%H:%M")
 
       clocked_in = bool(shift.clock_in_at)
       clocked_out = bool(shift.clock_out_at)
       if clocked_out:
-        status_label = "Complete"
-        status_badge = "badge-complete"
+        status_label = _employee_text(lang, "status_completed")
+        status_key = "completed"
       elif clocked_in:
-        status_label = "In progress"
-        status_badge = "badge-progress"
+        status_label = _employee_text(lang, "status_in_progress")
+        status_key = "in_progress"
       else:
-        status_label = "Scheduled"
-        status_badge = "badge-scheduled"
+        status_label = _employee_text(lang, "status_scheduled")
+        status_key = "scheduled"
 
-      clock_in_display = shift.clock_in_at.strftime("%I:%M %p") if shift.clock_in_at else "—"
-      clock_out_display = shift.clock_out_at.strftime("%I:%M %p") if shift.clock_out_at else "—"
+      clock_in_display = shift.clock_in_at.strftime("%H:%M") if shift.clock_in_at else "—"
+      clock_out_display = shift.clock_out_at.strftime("%H:%M") if shift.clock_out_at else "—"
 
       scheduled_minutes = _scheduled_minutes(shift)
       actual_minutes = None
@@ -9072,10 +9450,10 @@ def employee_dashboard():
           "site_name": site_name,
           "address": address,
           "map_url": map_url,
-          "instructions": (shift.instructions or "No special instructions today."),
+          "instructions": (shift.instructions or _employee_text(lang, "no_special_instructions")),
           "time_window": f"{start_label} – {end_label}",
           "status_label": status_label,
-          "status_badge": status_badge,
+          "status_key": status_key,
           "clock_in_display": clock_in_display,
           "clock_out_display": clock_out_display,
           "clocked_in": clocked_in,
@@ -9100,15 +9478,17 @@ def employee_dashboard():
     )
 
     for shift in upcoming_shifts:
-      site_name = shift.site.name if shift.site else "Scheduled job"
+      site_name = shift.site.name if shift.site else _employee_text(lang, "scheduled_job")
       address = shift.site.address if shift.site and shift.site.address else None
+      status_key = "completed" if shift.clock_out_at else ("in_progress" if shift.clock_in_at else "scheduled")
       upcoming_cards.append(
         {
           "id": shift.id,
           "site_name": site_name,
-          "day_label": shift.day.strftime("%a, %d %b %Y") if shift.day else "Date to be set",
+          "day_label": shift.day.strftime("%d.%m.%Y") if shift.day else _employee_text(lang, "date_tbd"),
           "time_window": _time_window_label(shift),
           "status_label": _status_text(shift),
+          "status_key": status_key,
           "address": address,
           "instructions": shift.instructions or None,
         }
@@ -9130,23 +9510,27 @@ def employee_dashboard():
         actual_minutes = max(int(delta_actual.total_seconds() // 60), 0)
 
       if shift.clock_out_at:
-        status_label = "Completed"
+        status_label = _employee_text(lang, "status_completed")
+        status_key = "completed"
       elif shift.clock_in_at:
-        status_label = "In progress"
+        status_label = _employee_text(lang, "status_in_progress")
+        status_key = "in_progress"
       else:
-        status_label = "Scheduled"
+        status_label = _employee_text(lang, "status_scheduled")
+        status_key = "scheduled"
 
       history_cards.append(
         {
           "id": shift.id,
-          "site_name": shift.site.name if shift.site else "Scheduled job",
-          "day_label": shift.day.strftime("%a, %d %b %Y"),
+          "site_name": shift.site.name if shift.site else _employee_text(lang, "scheduled_job"),
+          "day_label": shift.day.strftime("%d.%m.%Y"),
           "time_window": _time_window_label(shift),
           "status_label": status_label,
+          "status_key": status_key,
           "scheduled_duration": _format_minutes(scheduled_minutes),
           "actual_duration": _format_minutes(actual_minutes),
           "has_actual_duration": actual_minutes is not None,
-          "instructions": shift.instructions or "No notes recorded.",
+          "instructions": shift.instructions or _employee_text(lang, "no_notes"),
         }
       )
   finally:
@@ -9154,15 +9538,19 @@ def employee_dashboard():
 
   count = len(shift_cards)
   if count == 0:
-    friendly_message = "No jobs scheduled right now."
+    friendly_message = _employee_text(lang, "friendly_none")
   elif count == 1:
-    friendly_message = "You have 1 mission waiting."
+    friendly_message = _employee_text(lang, "friendly_one")
   else:
-    friendly_message = f"{count} missions lined up for today."
+    friendly_message = _employee_text(lang, "friendly_many", count=count)
 
-  today_label = today.strftime("%A %d %b %Y")
+  today_label = today.strftime("%d.%m.%Y")
   return render_template_string(
     EMPLOYEE_DASHBOARD_TEMPLATE,
+    lang=lang,
+    ui=ui,
+    lang_labels=EMPLOYEE_LANG_LABELS,
+    welcome_message=_employee_text(lang, "welcome", name=employee_name),
     employee_name=employee_name,
     today_label=today_label,
     friendly_message=friendly_message,
@@ -9176,6 +9564,7 @@ def employee_dashboard():
 @employee_login_required
 def employee_clock_in(shift_id: int):
   employee_id = session.get("employee_id")
+  lang = _get_employee_lang()
   lat = _coerce_float(request.form.get("lat"))
   lng = _coerce_float(request.form.get("lng"))
 
@@ -9183,11 +9572,11 @@ def employee_clock_in(shift_id: int):
   try:
     shift = db.get(Shift, shift_id)
     if not shift or shift.employee_id != employee_id:
-      flash("That shift was not found for your profile.")
+      flash(_employee_text(lang, "shift_not_found"))
       return redirect(url_for("employee_dashboard"))
 
     if shift.day != date.today():
-      flash("This shift is not scheduled for today.")
+      flash(_employee_text(lang, "shift_not_today"))
       return redirect(url_for("employee_dashboard"))
 
     if not shift.clock_in_at:
@@ -9197,7 +9586,7 @@ def employee_clock_in(shift_id: int):
     if lng is not None:
       shift.clock_in_lng = lng
     db.commit()
-    flash("Clocked in. Go make it shine!")
+    flash(_employee_text(lang, "clocked_in_success"))
   finally:
     db.close()
 
@@ -9208,6 +9597,7 @@ def employee_clock_in(shift_id: int):
 @employee_login_required
 def employee_upload_photo(shift_id: int):
   employee_id = session.get("employee_id")
+  lang = _get_employee_lang()
   photo_type = (request.form.get("photo_type") or "").strip().lower()
   file = request.files.get("photo")
 
@@ -9215,19 +9605,19 @@ def employee_upload_photo(shift_id: int):
   try:
     shift = db.get(Shift, shift_id)
     if not shift or shift.employee_id != employee_id:
-      flash("That shift was not found for your profile.")
+      flash(_employee_text(lang, "shift_not_found"))
       return redirect(url_for("employee_dashboard"))
 
     if photo_type not in {"before", "after"}:
-      flash("Please choose whether this is a before or after photo.")
+      flash(_employee_text(lang, "photo_type_required"))
       return redirect(url_for("employee_dashboard"))
 
     if not file or not file.filename:
-      flash("Choose a photo to upload first.")
+      flash(_employee_text(lang, "photo_select_first"))
       return redirect(url_for("employee_dashboard"))
 
     if not _allowed_image(file.filename):
-      flash("Unsupported file type. Use PNG, JPG, or JPEG.")
+      flash(_employee_text(lang, "photo_type_invalid"))
       return redirect(url_for("employee_dashboard"))
 
     ext = os.path.splitext(file.filename)[1].lower()
@@ -9238,11 +9628,11 @@ def employee_upload_photo(shift_id: int):
       file.save(destination)
     except OSError:
       logging.exception("Failed to save uploaded photo for shift %s", shift_id)
-      flash("Could not save that photo. Please try again.")
+      flash(_employee_text(lang, "photo_save_error"))
       return redirect(url_for("employee_dashboard"))
 
     relative_path = os.path.join("uploads", safe_name).replace(os.sep, "/")
-    photo_label = "Before" if photo_type == "before" else "After"
+    photo_label = _employee_text(lang, "before") if photo_type == "before" else _employee_text(lang, "after")
     if photo_type == "before":
       _remove_photo(shift.before_photo_path)
       shift.before_photo_path = relative_path
@@ -9251,7 +9641,7 @@ def employee_upload_photo(shift_id: int):
       shift.after_photo_path = relative_path
 
     db.commit()
-    flash(f"{photo_label} photo saved. Nice work!")
+    flash(_employee_text(lang, "photo_saved", label=photo_label))
   finally:
     db.close()
 
@@ -9262,6 +9652,7 @@ def employee_upload_photo(shift_id: int):
 @employee_login_required
 def employee_complete_shift(shift_id: int):
   employee_id = session.get("employee_id")
+  lang = _get_employee_lang()
   lat = _coerce_float(request.form.get("lat"))
   lng = _coerce_float(request.form.get("lng"))
 
@@ -9269,11 +9660,11 @@ def employee_complete_shift(shift_id: int):
   try:
     shift = db.get(Shift, shift_id)
     if not shift or shift.employee_id != employee_id:
-      flash("That shift was not found for your profile.")
+      flash(_employee_text(lang, "shift_not_found"))
       return redirect(url_for("employee_dashboard"))
 
     if shift.day != date.today():
-      flash("This shift is not scheduled for today.")
+      flash(_employee_text(lang, "shift_not_today"))
       return redirect(url_for("employee_dashboard"))
 
     if not shift.clock_in_at:
@@ -9285,7 +9676,7 @@ def employee_complete_shift(shift_id: int):
       shift.clock_out_lng = lng
 
     db.commit()
-    flash("Shift complete! Thanks for going the extra mile.")
+    flash(_employee_text(lang, "complete_success"))
   finally:
     db.close()
 
@@ -9829,14 +10220,15 @@ def schedule_preview_import_previous_month():
         source_offset_raw = request.args.get("source_offset", "1")
         target_offset_raw = request.args.get("target_offset", "1")
         try:
-            source_offset = max(0, min(int(source_offset_raw), 12))
+            source_offset = max(0, min(int(source_offset_raw), 52))
         except (ValueError, TypeError):
             source_offset = 1
         try:
-            target_offset = max(1, min(int(target_offset_raw), 12))
+            target_offset = max(1, min(int(target_offset_raw), 52))
         except (ValueError, TypeError):
             target_offset = 1
-        first_day, last_day = _month_range_by_offset(reference_day=date.today(), months_back=source_offset)
+        # interpret offsets as weeks (source_offset weeks back, target_offset weeks forward)
+        first_day, last_day = _week_range_by_offset(reference_day=date.today(), weeks_back=source_offset)
         shifts = (
             db.query(Shift)
             .filter(Shift.day >= first_day, Shift.day <= last_day)
@@ -9849,21 +10241,29 @@ def schedule_preview_import_previous_month():
             # skip employees explicitly marked inactive
             if not getattr(emp, 'is_active', False):
                 continue
-            target_day = _add_months(s.day, target_offset)
-            conflict_msg = _find_employee_schedule_conflict(
-                db, s.employee_id, target_day, s.start_time, s.end_time, s.site_id
-            )
+            # check conflicts for each week 1..target_offset
+            conflict_msgs: list[str] = []
+            target_days: list[str] = []
+            for k in range(1, target_offset + 1):
+                td = _add_weeks(s.day, k)
+                target_days.append(td.strftime("%Y-%m-%d"))
+                cm = _find_employee_schedule_conflict(
+                    db, s.employee_id, td, s.start_time, s.end_time, s.site_id
+                )
+                if cm:
+                    conflict_msgs.append(f"{td.strftime('%d.%m.%Y')}: {cm}")
             site = s.site if s.site else db.get(Site, s.site_id)
             items.append({
-              "id": s.id,
-              "employee": emp.name if emp else "-",
-              "active": True,
-              "site": site.name if site else "-",
+                "id": s.id,
+                "employee": emp.name if emp else "-",
+                "active": True,
+                "site": site.name if site else "-",
                 "from_day": s.day.strftime("%Y-%m-%d"),
-                "to_day": target_day.strftime("%Y-%m-%d"),
+                "to_day": f"next {target_offset} week(s)",
+                "to_days": target_days,
                 "time": f"{s.start_time.strftime('%H:%M')}–{s.end_time.strftime('%H:%M')}",
-                "conflict": conflict_msg is not None,
-                "conflict_message": conflict_msg,
+                "conflict": len(conflict_msgs) > 0,
+                "conflict_message": "\n".join(conflict_msgs) if conflict_msgs else None,
             })
         # sort items by employee name ascending
         items = sorted(items, key=lambda it: (it.get('employee') or '').lower())
@@ -9895,14 +10295,14 @@ def schedule_import_previous_month():
                 except (ValueError, TypeError):
                     continue
         try:
-            source_offset = max(0, min(int(source_offset_raw), 12))
+          source_offset = max(0, min(int(source_offset_raw), 52))
         except (ValueError, TypeError):
-            source_offset = 1
+          source_offset = 1
         try:
-            target_offset = max(1, min(int(target_offset_raw), 12))
+          target_offset = max(1, min(int(target_offset_raw), 52))
         except (ValueError, TypeError):
-            target_offset = 1
-        first_day, last_day = _month_range_by_offset(reference_day=date.today(), months_back=source_offset)
+          target_offset = 1
+        first_day, last_day = _week_range_by_offset(reference_day=date.today(), weeks_back=source_offset)
         query = db.query(Shift).filter(Shift.day >= first_day, Shift.day <= last_day)
         if selected_ids:
             query = query.filter(Shift.id.in_(selected_ids))
@@ -9912,36 +10312,39 @@ def schedule_import_previous_month():
         skipped_existing = 0
         skipped_inactive = 0
         for s in shifts:
-            emp = s.employee if s.employee else db.get(Employee, s.employee_id)
-            target_day = _add_months(s.day, target_offset)
+          emp = s.employee if s.employee else db.get(Employee, s.employee_id)
+          # for target weeks 1..target_offset, create a copy per week if no existing/conflict
+          for k in range(1, target_offset + 1):
+            td = _add_weeks(s.day, k)
+            # skip if exact same shift already exists
             existing = (
-                db.query(Shift)
-                .filter(
-                    Shift.employee_id == s.employee_id,
-                    Shift.site_id == s.site_id,
-                    Shift.day == target_day,
-                    Shift.start_time == s.start_time,
-                    Shift.end_time == s.end_time,
-                )
-                .first()
+              db.query(Shift)
+              .filter(
+                Shift.employee_id == s.employee_id,
+                Shift.site_id == s.site_id,
+                Shift.day == td,
+                Shift.start_time == s.start_time,
+                Shift.end_time == s.end_time,
+              )
+              .first()
             )
             if existing:
-                skipped_existing += 1
-                continue
-            target_day = _add_months(s.day, target_offset)
+              skipped_existing += 1
+              continue
+            # check conflict for this target week
             conflict_msg = _find_employee_schedule_conflict(
-                db, s.employee_id, target_day, s.start_time, s.end_time, s.site_id
+              db, s.employee_id, td, s.start_time, s.end_time, s.site_id
             )
             if conflict_msg:
-                skipped_conflict += 1
-                continue
+              skipped_conflict += 1
+              continue
             new_shift = Shift(
-                employee_id=s.employee_id,
-                site_id=s.site_id,
-                day=target_day,
-                start_time=s.start_time,
-                end_time=s.end_time,
-                instructions=s.instructions,
+              employee_id=s.employee_id,
+              site_id=s.site_id,
+              day=td,
+              start_time=s.start_time,
+              end_time=s.end_time,
+              instructions=s.instructions,
             )
             db.add(new_shift)
             created += 1
@@ -10021,6 +10424,7 @@ def admin_employees():
           if not (employee.login_pin_hash or "").strip():
             generated_pin = _generate_employee_pin()
             employee.login_pin_hash = generate_password_hash(generated_pin)
+            employee.login_pin_plain = generated_pin
           # handle optional profile image upload
           file_obj = request.files.get("profile_image")
           if file_obj:
@@ -10096,11 +10500,14 @@ def admin_employees():
           existing_codes = _collect_existing_codes(db, exclude_id=emp.id)
           if not (emp.login_code or "").strip():
             emp.login_code = _generate_employee_login_code(emp.name, existing_codes)
-          new_pin = _generate_employee_pin()
-          emp.login_pin_hash = generate_password_hash(new_pin)
+          new_pin = (emp.login_pin_plain or "").strip()
+          if not new_pin:
+            new_pin = _generate_employee_pin()
+            emp.login_pin_hash = generate_password_hash(new_pin)
+            emp.login_pin_plain = new_pin
           db.commit()
           _remember_credentials_for_session(emp.id, emp.login_code, new_pin)
-          flash(f"Anmeldedaten aktualisiert für {emp.name}.", 'success')
+          flash(f"Anmeldedaten geteilt für {emp.name}.", 'success')
         else:
           flash("Fehler beim Aktualisieren der Anmeldedaten.", 'warning')
         return redirect(redirect_url)
@@ -10125,6 +10532,7 @@ def admin_employees():
               flash("PINs must be exactly 4 digits.", "warning")
               return redirect(redirect_url)
             emp.login_pin_hash = generate_password_hash(new_pin)
+            emp.login_pin_plain = new_pin
             pin_snippet = new_pin
           db.commit()
           if pin_snippet:
@@ -11296,6 +11704,18 @@ def _month_range_by_offset(reference_day: date | None = None, months_back: int =
   return source_month_first, next_month - timedelta(days=1)
 
 
+def _week_range_by_offset(reference_day: date | None = None, weeks_back: int = 0) -> tuple[date, date]:
+  """Return Monday..Sunday range for the week that is `weeks_back` before the reference week.
+
+  weeks_back=0 -> current week, 1 -> previous week, etc.
+  """
+  ref = reference_day or date.today()
+  # find Monday of current week
+  monday = ref - timedelta(days=ref.weekday())
+  source_monday = monday - timedelta(weeks=weeks_back)
+  return source_monday, source_monday + timedelta(days=6)
+
+
 def _previous_month_range(reference_day: date | None = None) -> tuple[date, date]:
   return _month_range_by_offset(reference_day, 1)
 
@@ -11339,6 +11759,13 @@ def _add_months(original_date: date, months: int) -> date:
     else:
       next_month = date(year, month + 1, 1)
     return next_month - timedelta(days=1)
+
+
+def _add_weeks(original_date: date, weeks: int) -> date:
+  try:
+    return original_date + timedelta(weeks=weeks)
+  except Exception:
+    return original_date
 
 
 def _auto_generate_monthly_invoices(

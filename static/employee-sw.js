@@ -1,5 +1,6 @@
-const CACHE_NAME = "crew-dashboard-v1";
+const CACHE_NAME = "crew-dashboard-v2";
 const OFFLINE_ASSETS = [
+  "/employee",
   "/employee/dashboard",
   "/static/manifest.json",
   "/static/logo.png"
@@ -31,6 +32,11 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET" || !request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
+  const requestUrl = new URL(request.url);
+  if (!requestUrl.pathname.startsWith("/employee") && !requestUrl.pathname.startsWith("/static")) {
     return;
   }
 
