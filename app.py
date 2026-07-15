@@ -100,6 +100,17 @@ ADMIN_TEMPLATE = """
     .metric-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#475569; margin-bottom:0.35rem; }
     .metric-value { font-size:2rem; font-weight:600; color:#0f172a; margin-bottom:0.1rem; }
     .metric-sub { font-size:0.85rem; color:#64748b; }
+    .summary-meter { width: 100%; height: 0.55rem; border-radius: 999px; background:#e2e8f0; overflow:hidden; }
+    .summary-meter-fill { height:100%; background-image:linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%); border-radius:999px; }
+    .chart-card { border-radius:1rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.4rem; min-height:420px; box-shadow:0 18px 32px rgba(15,23,42,0.08); }
+    .chart-header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:1.5rem; }
+    .chart-summary-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+    .chart-summary-item { border-radius:0.85rem; border:1px solid #e2e8f0; background:#f8fafc; padding:1rem; }
+    .chart-summary-item .metric-label { margin-bottom:0.35rem; color:#475569; }
+    .chart-summary-item .metric-value { font-size:1.35rem; font-weight:700; color:#0f172a; }
+    .chart-wrapper { position:relative; min-height:320px; }
+    canvas { width:100% !important; }
+    .chart-pill { display:inline-flex; align-items:center; gap:0.35rem; border-radius:999px; padding:0.35rem 0.8rem; background:#eef2ff; color:#0f172a; font-size:0.85rem; }
     .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
     .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
     .btn:hover { transform:translateY(-1px); box-shadow:0 14px 26px rgba(15,23,42,0.12); }
@@ -205,113 +216,222 @@ ADMIN_TEMPLATE = """
       {% endwith %}
 
       <header class="mb-4">
-        <div class="badge-soft mb-2">Operations overview</div>
-        <h1 class="h4 text-dark mb-1">This week at a glance</h1>
-        <p class="text-secondary mb-0">{{ today_label }} · Week {{ week_label }}</p>
+        <div class="badge-soft mb-2">Financial dashboard</div>
+        <h1 class="h4 text-dark mb-1">Revenue & invoice analytics</h1>
+        <p class="text-secondary mb-0">{{ period_label }} · as of {{ today_label }}</p>
       </header>
 
       <section class="metrics-grid mb-4">
         <div class="metric-card">
-          <div class="metric-label">Employees</div>
-          <div class="metric-value">{{ stats.employees }}</div>
-          <div class="metric-sub">Active in the roster</div>
+          <div class="metric-label">Total invoices</div>
+          <div class="metric-value">{{ stats.total_invoices }}</div>
+          <div class="metric-sub">All invoices created</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Sites</div>
-          <div class="metric-value">{{ stats.sites }}</div>
-          <div class="metric-sub">Locations to cover</div>
+          <div class="metric-label">Total billed</div>
+          <div class="metric-value">{{ "%.2f"|format(stats.total_revenue) }} €</div>
+          <div class="metric-sub">Gross amount across invoices</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Shifts this week</div>
-          <div class="metric-value">{{ stats.weekly_shifts }}</div>
-          <div class="metric-sub">Scheduled between {{ week_label }}</div>
+          <div class="metric-label">Collected</div>
+          <div class="metric-value">{{ "%.2f"|format(stats.paid_revenue) }} €</div>
+          <div class="metric-sub">Paid invoices</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">New leads</div>
-          <div class="metric-value">{{ stats.new_leads }}</div>
-          <div class="metric-sub">Arrived in the last 7 days</div>
+          <div class="metric-label">Outstanding</div>
+          <div class="metric-value">{{ "%.2f"|format(stats.outstanding_revenue) }} €</div>
+          <div class="metric-sub">Unpaid and draft amount</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Unassigned sites</div>
-          <div class="metric-value">{{ stats.unassigned_sites }}</div>
-          <div class="metric-sub">Need a shift this week</div>
+          <div class="metric-label">Overdue invoices</div>
+          <div class="metric-value">{{ stats.overdue_invoices }}</div>
+          <div class="metric-sub">Need priority follow-up</div>
         </div>
       </section>
 
-      <section class="row g-3">
-        <div class="col-12 col-lg-6">
-          <div class="card-surface">
-            <h2 class="h6 text-uppercase text-secondary mb-3">Recently added employees</h2>
-            {% if recent_employees %}
-              {% for emp in recent_employees %}
-                <div class="list-entry">
-                  <div class="list-title">{{ emp.name }}</div>
-                  <div class="list-sub">{{ emp.role or 'No role yet' }}</div>
-                </div>
-              {% endfor %}
-            {% else %}
-              <p class="placeholder mb-0">No employees registered yet.</p>
-            {% endif %}
-            <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-primary mt-3">Manage employees</a>
+      <section class="card-surface mb-4">
+        <div class="d-flex flex-wrap justify-content-between gap-3 align-items-center">
+          <div>
+            <h2 class="h6 text-uppercase text-secondary mb-2">Live revenue charts</h2>
+            <p class="placeholder mb-0">Track the last 6 billing months and export the data anytime.</p>
           </div>
-        </div>
-        <div class="col-12 col-lg-6">
-          <div class="card-surface">
-            <h2 class="h6 text-uppercase text-secondary mb-3">Newest sites</h2>
-            {% if recent_sites %}
-              {% for site in recent_sites %}
-                <div class="list-entry">
-                  <div class="list-title">{{ site.name }}</div>
-                  <div class="list-sub">{{ site.address or 'Address TBD' }}</div>
-                </div>
-              {% endfor %}
-            {% else %}
-              <p class="placeholder mb-0">No sites have been added yet.</p>
-            {% endif %}
-            <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-outline-primary mt-3">Manage sites</a>
+          <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ url_for('admin_invoices') }}" class="btn btn-sm btn-outline-primary">Open invoices</a>
+            <a href="{{ url_for('admin_dashboard_download_report') }}" class="btn btn-sm btn-primary">Download CSV</a>
           </div>
         </div>
       </section>
 
-      <section class="row g-3 mt-1">
-        <div class="col-12 col-lg-7">
-          <div class="card-surface">
-            <h2 class="h6 text-uppercase text-secondary mb-3">Upcoming shifts</h2>
-            {% if upcoming_shifts %}
-              {% for shift in upcoming_shifts %}
-                <div class="list-entry d-flex justify-content-between align-items-start">
-                  <div>
-                    <div class="list-title">{{ shift.employee.name if shift.employee else 'Unassigned' }}</div>
-                    <div class="list-sub">{{ shift.site.name if shift.site else 'No site set' }}</div>
-                  </div>
-                  <div class="text-end text-secondary small">
-                    {{ shift.day.strftime('%d %b') }} · {{ shift.start_time.strftime('%H:%M') }} – {{ shift.end_time.strftime('%H:%M') }}
-                  </div>
-                </div>
-              {% endfor %}
-            {% else %}
-              <p class="placeholder mb-0">No shifts scheduled yet. Add some from the schedule view.</p>
-            {% endif %}
-            <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-primary mt-3">Go to schedule</a>
+      <section class="row g-3 mb-4">
+        <div class="col-12 col-xl-8">
+          <div class="chart-card">
+            <div class="chart-header">
+              <div>
+                <h2 class="h6 text-uppercase text-secondary mb-2">Revenue & hours performance</h2>
+                <p class="placeholder mb-0">Interactive trends for invoice volume, revenue, and billed hours.</p>
+              </div>
+              <div class="d-flex gap-2 flex-wrap align-items-center">
+                <span class="chart-pill">Revenue</span>
+                <span class="chart-pill">Hours</span>
+              </div>
+            </div>
+            <div class="chart-summary-grid">
+              <div class="chart-summary-item">
+                <div class="metric-label">Average invoice</div>
+                <div class="metric-value">{{ "%.2f"|format(stats.total_revenue / stats.total_invoices) if stats.total_invoices else "0.00" }} €</div>
+              </div>
+              <div class="chart-summary-item">
+                <div class="metric-label">This month</div>
+                <div class="metric-value">{{ "%.2f"|format(stats.income_this_month) }} €</div>
+              </div>
+              <div class="chart-summary-item">
+                <div class="metric-label">Outstanding</div>
+                <div class="metric-value">{{ "%.2f"|format(stats.outstanding_revenue) }} €</div>
+              </div>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="revenueChart"></canvas>
+            </div>
           </div>
         </div>
-        <div class="col-12 col-lg-5">
-          <div class="card-surface">
-            <h2 class="h6 text-uppercase text-secondary mb-3">Sites without coverage</h2>
-            {% if unassigned_sites_sample %}
-              {% for site in unassigned_sites_sample %}
-                <div class="list-entry">
-                  <div class="list-title">{{ site.name }}</div>
-                  <div class="list-sub">{{ site.address or 'Address TBD' }}</div>
-                </div>
+        <div class="col-12 col-xl-4">
+          <div class="chart-card p-0 mb-3" style="padding:1.2rem;">
+            <div class="chart-header mb-3">
+              <div>
+                <h2 class="h6 text-uppercase text-secondary mb-2">Invoices trend</h2>
+                <p class="placeholder mb-0">Invoice volume for each month.</p>
+              </div>
+            </div>
+            <div class="chart-wrapper" style="min-height:310px;">
+              <canvas id="invoiceCountChart"></canvas>
+            </div>
+          </div>
+          <div class="card-surface p-3">
+            <h2 class="h6 text-uppercase text-secondary mb-3">Monthly breakdown</h2>
+            <ul class="list-unstyled mb-0">
+              {% for summary in monthly_summaries %}
+                <li class="py-3 border-bottom">
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fw-semibold">{{ summary.month_name }}</span>
+                    <span>{{ "%.2f"|format(summary.total_income) }} €</span>
+                  </div>
+                  <div class="small text-muted">{{ summary.invoice_count }} invoices · {{ summary.total_hours }} hours</div>
+                </li>
               {% endfor %}
-            {% else %}
-              <p class="placeholder mb-0">All sites are covered for the current week.</p>
-            {% endif %}
-            <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-outline-primary mt-3">Assign coverage</a>
+            </ul>
           </div>
         </div>
       </section>
+
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+      <script>
+        const dashboardLabels = {{ chart_labels|tojson }};
+        const revenueData = {{ chart_income|tojson }};
+        const invoiceCountData = {{ chart_invoice_counts|tojson }};
+        const hoursData = {{ chart_hours|tojson }};
+
+        const revenueCtx = document.getElementById('revenueChart');
+        if (revenueCtx) {
+          new Chart(revenueCtx, {
+            type: 'line',
+            data: {
+              labels: dashboardLabels,
+              datasets: [
+                {
+                  label: 'Revenue (€)',
+                  data: revenueData,
+                  borderColor: '#0f766e',
+                  backgroundColor: 'rgba(15,118,110,0.18)',
+                  tension: 0.32,
+                  fill: true,
+                  pointRadius: 5,
+                  pointHoverRadius: 7,
+                  pointBackgroundColor: '#0f766e',
+                  pointBorderColor: '#ffffff',
+                  pointBorderWidth: 2,
+                },
+                {
+                  label: 'Hours billed',
+                  data: hoursData,
+                  borderColor: '#2563eb',
+                  backgroundColor: 'rgba(37,99,235,0.18)',
+                  tension: 0.32,
+                  fill: true,
+                  pointRadius: 5,
+                  pointHoverRadius: 7,
+                  pointBackgroundColor: '#2563eb',
+                  pointBorderColor: '#ffffff',
+                  pointBorderWidth: 2,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: { usePointStyle: true, padding: 16, boxWidth: 10 },
+                },
+                tooltip: {
+                  mode: 'index',
+                  intersect: false,
+                  padding: 12,
+                  callbacks: {
+                    label: function(context) {
+                      return context.dataset.label + ': ' + context.formattedValue + (context.dataset.label.includes('Revenue') ? ' €' : ' hrs');
+                    }
+                  }
+                }
+              },
+              interaction: { mode: 'index', intersect: false },
+              scales: {
+                x: { grid: { display: false }, ticks: { color: '#475569' } },
+                y: { beginAtZero: true, ticks: { precision: 0, color: '#475569' }, grid: { color: 'rgba(148,163,184,0.18)' } },
+              },
+            },
+          });
+        }
+
+        const invoiceCountCtx = document.getElementById('invoiceCountChart');
+        if (invoiceCountCtx) {
+          new Chart(invoiceCountCtx, {
+            type: 'bar',
+            data: {
+              labels: dashboardLabels,
+              datasets: [
+                {
+                  label: 'Invoices',
+                  data: invoiceCountData,
+                  backgroundColor: 'rgba(15,118,110,0.85)',
+                  borderColor: '#0f766e',
+                  borderWidth: 1,
+                  borderRadius: 12,
+                  barThickness: 32,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return context.dataset.label + ': ' + context.formattedValue;
+                    }
+                  }
+                }
+              },
+              scales: {
+                x: { grid: { display: false }, ticks: { color: '#475569' } },
+                y: { beginAtZero: true, ticks: { precision: 0, color: '#475569' }, grid: { color: 'rgba(148,163,184,0.18)' } },
+              },
+            },
+          });
+        }
+      </script>
     </main>
   </div>
   <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
@@ -4913,14 +5033,6 @@ SCHEDULE_TEMPLATE = """
             {% if selected_site %}
               <span class="insight-badge">Standort: {{ selected_site.name }}</span>
             {% endif %}
-            {% if free_filter %}
-              <span class="insight-badge">Nur freie Mitarbeitende</span>
-              {% if free_day %}
-                <span class="insight-badge">Frei am {{ free_day }}</span>
-              {% elif free_week_start %}
-                <span class="insight-badge">Frei ab Woche {{ free_week_start }}</span>
-              {% endif %}
-            {% endif %}
           </div>
           <form method="get" action="{{ url_for('schedule_dashboard') }}" class="filter-toolbar">
             <input type="hidden" name="weeks" value="{{ weeks }}">
@@ -4943,17 +5055,35 @@ SCHEDULE_TEMPLATE = """
               </select>
             </div>
             <div>
-              <div class="form-check" style="padding-top:0.5rem;">
-                <input class="form-check-input" type="checkbox" id="schedule_free" name="free" value="1" {% if free_filter %}checked{% endif %} onchange="this.form.submit()">
-                <label class="form-check-label small mb-0" for="schedule_free">Nur freie Mitarbeitende</label>
-              </div>
-              <div class="mt-2">
-                <label class="form-label small mb-1" for="schedule_free_day">Am Tag frei</label>
-                <input type="date" class="form-control form-control-sm" id="schedule_free_day" name="free_day" value="{{ free_day or '' }}" onchange="document.getElementById('schedule_free').checked=true; this.form.submit()">
-              </div>
-              <div class="mt-2">
-                <label class="form-label small mb-1" for="schedule_free_week_start">Startwoche frei (Montag)</label>
-                <input type="date" class="form-control form-control-sm" id="schedule_free_week_start" name="free_week_start" value="{{ free_week_start or '' }}" onchange="document.getElementById('schedule_free').checked=true; this.form.submit()">
+              <div class="collapse-panel" style="padding-top:0.25rem;">
+                <button type="button" id="free-filter-toggle" class="btn btn-sm btn-outline-secondary" style="width:100%; text-align:left; font-weight:600;" onclick="toggleFreeFilterPanel()">Nur freie Mitarbeitende ▾</button>
+                <div id="free-filter-content" style="display:none; margin-top:0.6rem;">
+                  <div style="display:grid; grid-template-columns:repeat(1,1fr); gap:0.5rem;">
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                      <div style="flex:1; min-width:170px;">
+                        <label class="form-label small mb-1" for="free_start_date">Startdatum</label>
+                        <input type="date" class="form-control form-control-sm" id="free_start_date" name="free_start_date" value="{{ free_day or '' }}">
+                      </div>
+                      <div style="flex:1; min-width:170px;">
+                        <label class="form-label small mb-1" for="free_end_date">Enddatum</label>
+                        <input type="date" class="form-control form-control-sm" id="free_end_date" name="free_end_date" value="{{ free_week_start or '' }}">
+                      </div>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                      <div style="flex:1; min-width:170px;">
+                        <label class="form-label small mb-1" for="free_start_time">Von (Uhrzeit)</label>
+                        <input type="time" class="form-control form-control-sm" id="free_start_time" name="free_start_time" value="">
+                      </div>
+                      <div style="flex:1; min-width:170px;">
+                        <label class="form-label small mb-1" for="free_end_time">Bis (Uhrzeit)</label>
+                        <input type="time" class="form-control form-control-sm" id="free_end_time" name="free_end_time" value="">
+                      </div>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:0.25rem;">
+                      <button type="button" class="btn btn-sm btn-outline-primary" onclick="showFreeEmployeesModal()">Mitarbeitende anzeigen</button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             <div>
@@ -4981,11 +5111,6 @@ SCHEDULE_TEMPLATE = """
                 <i class="bi bi-trash"></i> Ausgewählte löschen (<span id="selected-count">0</span>)
               </button>
             </div>
-            {% if free_filter and visible_employees|length == 0 %}
-              <div class="alert alert-warning mb-3" role="alert" style="border-radius:0.85rem;">
-                Keine freien Mitarbeitenden für den gewählten Zeitraum gefunden. Bitte Filter anpassen.
-              </div>
-            {% endif %}
             {% if not has_any_shifts and not free_filter %}
               <div class="alert alert-warning mb-3" role="alert" style="border-radius:0.85rem;">
                 Keine Einsätze im ausgewählten Zeitraum ({{ week_days[0].strftime('%d.%m.%Y') }} – {{ week_days[-1].strftime('%d.%m.%Y') }}){% if selected_site %} für {{ selected_site.name }}{% endif %}{% if selected_employee %} ({{ selected_employee.name }}){% endif %}. Bitte Startwoche/Filter anpassen oder unten einen neuen Einsatz anlegen.
@@ -5055,13 +5180,19 @@ SCHEDULE_TEMPLATE = """
           <form method="post" class="small">
             <div class="form-grid">
               <div class="form-field">
-                <label class="form-label small-note text-uppercase" for="employee_id">Mitarbeiter</label>
-                <select class="form-select form-select-sm" id="employee_id" name="employee_id" required>
-                  <option value="">Mitarbeiter wählen…</option>
-                  {% for emp in employees %}
-                    <option value="{{ emp.id }}">{{ emp.name }}{% if emp.role %} — {{ emp.role }}{% endif %}</option>
-                  {% endfor %}
-                </select>
+                <label class="form-label small-note text-uppercase">Mitarbeiter</label>
+                <details class="collapse-panel">
+                  <summary class="form-select form-select-sm" style="cursor:pointer; padding:0.65rem 0.75rem; border:1px solid #cbd5e1; border-radius:0.5rem; background:#f8fafc;">Mitarbeiter auswählen</summary>
+                  <div style="margin-top:0.75rem; display:flex; flex-direction:column; gap:0.35rem; max-height:16rem; overflow:auto; padding-right:0.25rem;">
+                    {% for emp in employees %}
+                      <label style="display:flex; align-items:center; gap:0.6rem;">
+                        <input type="checkbox" name="employee_id" value="{{ emp.id }}">
+                        <span>{{ emp.name }}{% if emp.role %} — {{ emp.role }}{% endif %}</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+                </details>
+                <div class="small-note mt-1">Öffnen Sie das Feld und wählen Sie mehrere Mitarbeiter.</div>
               </div>
               <div class="form-field">
                 <label class="form-label small-note text-uppercase" for="site_id">Standort</label>
@@ -5184,6 +5315,84 @@ SCHEDULE_TEMPLATE = """
       </form>
     </div>
   </div>
+
+  <!-- Free employees modal -->
+  <div id="free-employees-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10005; align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:1rem; padding:1rem; max-width:680px; width:94%; max-height:80vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+        <h3 style="margin:0; font-size:1.1rem; color:#0f172a;">Freie Mitarbeitende</h3>
+        <button type="button" onclick="document.getElementById('free-employees-modal').style.display='none'" style="background:none; border:none; font-size:1.25rem; cursor:pointer; color:#94a3b8;">×</button>
+      </div>
+      <div id="free-employees-content" style="min-height:3rem;">
+        <div class="small-note">Suche läuft...</div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.75rem;">
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('free-employees-modal').style.display='none'">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function showFreeEmployeesModal(){
+      const startDate = document.getElementById('free_start_date').value;
+      const endDate = document.getElementById('free_end_date').value || startDate;
+      const startTime = document.getElementById('free_start_time').value;
+      const endTime = document.getElementById('free_end_time').value;
+      const siteIdElem = document.getElementById('filter_site_id');
+      const siteId = siteIdElem ? siteIdElem.value : '';
+      if(!startDate){
+        alert('Bitte ein Startdatum wählen.');
+        return;
+      }
+      const params = new URLSearchParams({free_start_date: startDate, free_end_date: endDate});
+      if(startTime) params.set('free_start_time', startTime);
+      if(endTime) params.set('free_end_time', endTime);
+      if(siteId) params.set('site_id', siteId);
+      const url = `/schedule/free-available?${params.toString()}`;
+      const container = document.getElementById('free-employees-content');
+      container.innerHTML = '<div class="small-note">Suche läuft...</div>';
+      document.getElementById('free-employees-modal').style.display = 'flex';
+      try{
+        const resp = await fetch(url, {credentials: 'same-origin'});
+        if(!resp.ok){
+          const err = await resp.json().catch(()=>({error: 'Fehler'}));
+          container.innerHTML = `<div class="alert alert-danger">Fehler: ${err.error || resp.statusText}</div>`;
+          return;
+        }
+        const data = await resp.json();
+        const items = data.items || [];
+        if(items.length === 0){
+          container.innerHTML = '<div class="small-note">Keine freien Mitarbeitenden im gewählten Zeitraum gefunden.</div>';
+          return;
+        }
+        const list = document.createElement('div');
+        list.style.display = 'grid';
+        list.style.gridTemplateColumns = 'repeat(2, 1fr)';
+        list.style.gap = '0.5rem';
+        items.forEach(it => {
+          const card = document.createElement('div');
+          card.style.padding = '0.6rem';
+          card.style.border = '1px solid #e6eef3';
+          card.style.borderRadius = '0.5rem';
+          card.innerHTML = `<strong>${it.name}</strong>${it.role ? ' — ' + it.role : ''}`;
+          list.appendChild(card);
+        });
+        container.innerHTML = '';
+        container.appendChild(list);
+      }catch(e){
+        container.innerHTML = '<div class="alert alert-danger">Netzwerkfehler beim Laden.</div>';
+      }
+    }
+
+    function toggleFreeFilterPanel(){
+      const content = document.getElementById('free-filter-content');
+      const toggle = document.getElementById('free-filter-toggle');
+      if(!content || !toggle) return;
+      const isHidden = content.style.display === 'none' || content.style.display === '';
+      content.style.display = isHidden ? 'block' : 'none';
+      toggle.textContent = isHidden ? 'Nur freie Mitarbeitende ▴' : 'Nur freie Mitarbeitende ▾';
+    }
+  </script>
 
   <!-- Sammelbearbeitung Einsätze Modal -->
   <div id="batch-edit-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
@@ -8929,57 +9138,136 @@ def _build_admin_dashboard_context(db):
   today = date.today()
   week_start = today - timedelta(days=today.weekday())
   week_end = week_start + timedelta(days=7)
+  current_month = today.strftime("%Y-%m")
+
+  total_invoices = db.query(func.count(Invoice.id)).scalar() or 0
+  total_revenue = db.query(func.coalesce(func.sum(Invoice.total_amount), 0.0)).scalar() or 0.0
+  paid_revenue = db.query(func.coalesce(func.sum(Invoice.total_amount), 0.0)).filter(Invoice.status == "paid").scalar() or 0.0
+  outstanding_revenue = db.query(func.coalesce(func.sum(Invoice.total_amount), 0.0)).filter(Invoice.status != "paid").scalar() or 0.0
+  overdue_count = db.query(func.count(Invoice.id)).filter(Invoice.status == "overdue").scalar() or 0
+  invoices_this_month = db.query(func.count(Invoice.id)).filter(Invoice.billing_month == current_month).scalar() or 0
+  income_this_month = db.query(func.coalesce(func.sum(Invoice.total_amount), 0.0)).filter(Invoice.billing_month == current_month).scalar() or 0.0
 
   stats = {
-    "employees": db.query(func.count(Employee.id)).scalar() or 0,
-    "sites": db.query(func.count(Site.id)).scalar() or 0,
-    "weekly_shifts": db.query(func.count(Shift.id))
-    .filter(Shift.day >= week_start, Shift.day < week_end)
-    .scalar()
-    or 0,
-    "new_leads": db.query(func.count(Lead.id))
-    .filter(Lead.created_at >= datetime.utcnow() - timedelta(days=7))
-    .scalar()
-    or 0,
+    "total_invoices": total_invoices,
+    "total_revenue": total_revenue,
+    "paid_revenue": paid_revenue,
+    "outstanding_revenue": outstanding_revenue,
+    "overdue_invoices": overdue_count,
+    "invoices_this_month": invoices_this_month,
+    "income_this_month": income_this_month,
   }
 
-  assigned_site_rows = (
-    db.query(Shift.site_id)
-    .filter(Shift.day >= week_start, Shift.day < week_end)
-    .distinct()
+  months = []
+  month_year = today.month
+  month_year_year = today.year
+  for _ in range(6):
+    months.append(f"{month_year_year:04d}-{month_year:02d}")
+    month_year -= 1
+    if month_year < 1:
+      month_year = 12
+      month_year_year -= 1
+
+  monthly_rows = (
+    db.query(
+      Invoice.billing_month,
+      func.count(Invoice.id).label("invoice_count"),
+      func.coalesce(func.sum(Invoice.total_amount), 0.0).label("total_income"),
+      func.coalesce(func.sum(Invoice.total_hours), 0.0).label("total_hours"),
+    )
+    .filter(Invoice.billing_month.in_(months))
+    .group_by(Invoice.billing_month)
     .all()
   )
-  assigned_site_ids = [row[0] for row in assigned_site_rows if row[0] is not None]
-  if assigned_site_ids:
-    unassigned_query = db.query(Site).filter(~Site.id.in_(assigned_site_ids))
-  else:
-    unassigned_query = db.query(Site)
-  unassigned_count = unassigned_query.count()
-  stats["unassigned_sites"] = unassigned_count
-  unassigned_sample = unassigned_query.order_by(Site.name).limit(5).all()
 
-  recent_employees = (
-    db.query(Employee).order_by(Employee.id.desc()).limit(5).all()
+  monthly_map = {row.billing_month: row for row in monthly_rows}
+
+  site_rows = (
+    db.query(
+      Invoice.billing_month,
+      Site.id,
+      Site.name.label("site_name"),
+      func.coalesce(func.sum(Invoice.total_amount), 0.0).label("income"),
+      func.coalesce(func.sum(Invoice.total_hours), 0.0).label("hours"),
+      func.avg(Invoice.hourly_rate).label("hourly_rate"),
+    )
+    .join(Site)
+    .filter(Invoice.billing_month.in_(months))
+    .group_by(Invoice.billing_month, Site.id, Site.name)
+    .all()
   )
-  recent_sites = db.query(Site).order_by(Site.id.desc()).limit(5).all()
-  upcoming_shifts = (
-    db.query(Shift)
-    .filter(Shift.day >= today)
-    .order_by(Shift.day.asc(), Shift.start_time.asc())
+
+  sites_by_month = {}
+  for row in site_rows:
+    sites_by_month.setdefault(row.billing_month, []).append(
+      {
+        "site_name": row.site_name,
+        "income": float(row.income),
+        "hours": float(row.hours),
+        "hourly_rate": float(row.hourly_rate or 0.0),
+      }
+    )
+
+  max_income = max((float(row.total_income) for row in monthly_rows), default=0.0) or 1.0
+  monthly_summaries = []
+  chart_labels = []
+  chart_income = []
+  chart_invoice_counts = []
+  chart_hours = []
+
+  for month in months:
+    row = monthly_map.get(month)
+    if row:
+      total_income = float(row.total_income)
+      total_hours = float(row.total_hours)
+      invoice_count = int(row.invoice_count)
+    else:
+      total_income = 0.0
+      total_hours = 0.0
+      invoice_count = 0
+
+    monthly_summaries.append(
+      {
+        "month_name": date(int(month[:4]), int(month[5:]), 1).strftime("%b %Y"),
+        "billing_month": month,
+        "total_income": total_income,
+        "total_hours": total_hours,
+        "invoice_count": invoice_count,
+        "fill_ratio": int((total_income / max_income) * 100),
+        "sites": sorted(sites_by_month.get(month, []), key=lambda item: item["income"], reverse=True),
+      }
+    )
+    chart_labels.append(date(int(month[:4]), int(month[5:]), 1).strftime("%b %Y"))
+    chart_income.append(total_income)
+    chart_invoice_counts.append(invoice_count)
+    chart_hours.append(total_hours)
+
+  recent_invoices = db.query(Invoice).order_by(Invoice.created_at.desc()).limit(6).all()
+  due_soon = (
+    db.query(Invoice)
+    .filter(
+      Invoice.status.in_(("sent", "overdue")),
+      Invoice.due_date != None,
+      Invoice.due_date <= datetime.combine(today + timedelta(days=14), time.max),
+    )
+    .order_by(Invoice.due_date.asc())
     .limit(6)
     .all()
   )
 
-  week_label = f"{week_start.strftime('%d %b')} – {(week_end - timedelta(days=1)).strftime('%d %b')}"
+  period_label = today.strftime("%B %Y")
   today_label = today.strftime("%A %d %b %Y")
 
   return {
     "stats": stats,
-    "recent_employees": recent_employees,
-    "recent_sites": recent_sites,
-    "upcoming_shifts": upcoming_shifts,
-    "unassigned_sites_sample": unassigned_sample,
-    "week_label": week_label,
+    "monthly_summaries": monthly_summaries,
+    "chart_labels": chart_labels,
+    "chart_income": chart_income,
+    "chart_invoice_counts": chart_invoice_counts,
+    "chart_hours": chart_hours,
+    "recent_invoices": recent_invoices,
+    "due_soon": due_soon,
+    "period_label": period_label,
     "today_label": today_label,
   }
 
@@ -9977,7 +10265,15 @@ def schedule_dashboard():
     db = SessionLocal()
     try:
         if request.method == "POST":
-            emp_id = request.form.get("employee_id")
+            employee_ids_raw = [ (e or "").strip() for e in request.form.getlist("employee_id") ]
+            employee_ids = []
+            for emp_str in employee_ids_raw:
+              if not emp_str:
+                continue
+              try:
+                employee_ids.append(int(emp_str))
+              except ValueError:
+                continue
             site_id = request.form.get("site_id")
             day_values_raw = [ (d or "").strip() for d in request.form.getlist("day") ]
             if not any(day_values_raw):
@@ -10001,7 +10297,7 @@ def schedule_dashboard():
                 continue
               seen_days.add(day_val)
               day_values.append(day_val)
-            if emp_id and site_id and day_values and start_str and duration_hours_str:
+            if employee_ids and site_id and day_values and start_str and duration_hours_str:
               try:
                 start_val = datetime.strptime(start_str, "%H:%M").time()
               except ValueError:
@@ -10014,32 +10310,35 @@ def schedule_dashboard():
                 duration_delta = timedelta(hours=duration_hours)
                 created = 0
                 blocked_messages: list[str] = []
-                for day_val in day_values:
-                  end_dt = datetime.combine(day_val, start_val) + duration_delta
-                  end_val = end_dt.time()
+                for employee_id in employee_ids:
+                  employee = db.get(Employee, employee_id)
+                  employee_label = employee.name if employee else f"Mitarbeiter {employee_id}"
+                  for day_val in day_values:
+                    end_dt = datetime.combine(day_val, start_val) + duration_delta
+                    end_val = end_dt.time()
 
-                  conflict_message = _find_employee_schedule_conflict(
-                    db,
-                    employee_id=int(emp_id),
-                    day=day_val,
-                    start_time=start_val,
-                    end_time=end_val,
-                    site_id=int(site_id),
-                  )
-                  if conflict_message:
-                    blocked_messages.append(f"{day_val.strftime('%d.%m.%Y')}: {conflict_message}")
-                    continue
+                    conflict_message = _find_employee_schedule_conflict(
+                      db,
+                      employee_id=employee_id,
+                      day=day_val,
+                      start_time=start_val,
+                      end_time=end_val,
+                      site_id=int(site_id),
+                    )
+                    if conflict_message:
+                      blocked_messages.append(f"{employee_label} ({day_val.strftime('%d.%m.%Y')}): {conflict_message}")
+                      continue
 
-                  shift = Shift(
-                    employee_id=int(emp_id),
-                    site_id=int(site_id),
-                    day=day_val,
-                    start_time=start_val,
-                    end_time=end_val,
-                    instructions=instructions_val,
-                  )
-                  db.add(shift)
-                  created += 1
+                    shift = Shift(
+                      employee_id=employee_id,
+                      site_id=int(site_id),
+                      day=day_val,
+                      start_time=start_val,
+                      end_time=end_val,
+                      instructions=instructions_val,
+                    )
+                    db.add(shift)
+                    created += 1
                 if created:
                   db.commit()
                   flash(f"{created} Einsatz/Einsätze wurden eingeplant.")
@@ -10051,7 +10350,6 @@ def schedule_dashboard():
 
         selected_employee_id = request.args.get("employee_id", type=int)
         selected_site_id = request.args.get("site_id", type=int)
-        free_filter = request.args.get("free", default="0") == "1"
         free_day_str = (request.args.get("free_day") or "").strip()
         free_week_start_str = (request.args.get("free_week_start") or "").strip()
         free_day = None
@@ -10123,50 +10421,15 @@ def schedule_dashboard():
             if matched:
               filtered_matrix[key] = matched
 
-        free_employee_ids = None
-        if free_filter:
-          if free_day is not None:
-            scheduled_employee_ids = {
-              row[0]
-              for row in db.query(Shift.employee_id)
-              .filter(Shift.day == free_day)
-              .distinct()
-              .all()
-              if row[0] is not None
-            }
-          else:
-            week_start = free_week_start if free_week_start is not None else (start_date_val or date.today() - timedelta(days=date.today().weekday()))
-            week_end = week_start + timedelta(days=7)
-            scheduled_employee_ids = {
-              row[0]
-              for row in db.query(Shift.employee_id)
-              .filter(Shift.day >= week_start, Shift.day < week_end)
-              .distinct()
-              .all()
-              if row[0] is not None
-            }
-          free_employee_ids = {e.id for e in employees if e.id not in scheduled_employee_ids}
-          if selected_employee_id:
-            if selected_employee and selected_employee.id in free_employee_ids:
-              visible_employees = [selected_employee]
-            else:
-              visible_employees = []
-          else:
-            visible_employees = [e for e in employees if e.id in free_employee_ids]
+        grid_employee_ids = {e.id for e in visible_employees}
+        shift_days_for_grid = {day for (emp_id, day) in filtered_matrix.keys() if emp_id in grid_employee_ids}
+        # Keep the full selected period in the grid, even when some days are empty.
+        visible_days = week_days
+        has_any_shifts = bool(shift_days_for_grid)
 
-        if free_filter:
-          visible_days = week_days
-          has_any_shifts = True
-        else:
-          grid_employee_ids = {e.id for e in visible_employees}
-          shift_days_for_grid = {day for (emp_id, day) in filtered_matrix.keys() if emp_id in grid_employee_ids}
-          # Keep the full selected period in the grid, even when some days are empty.
-          visible_days = week_days
-          has_any_shifts = bool(shift_days_for_grid)
-
-          if not selected_employee:
-            shift_employee_ids_for_grid = {emp_id for (emp_id, _day) in filtered_matrix.keys()}
-            visible_employees = [e for e in employees if e.id in shift_employee_ids_for_grid]
+        if not selected_employee:
+          shift_employee_ids_for_grid = {emp_id for (emp_id, _day) in filtered_matrix.keys()}
+          visible_employees = [e for e in employees if e.id in shift_employee_ids_for_grid]
 
         pdf_params = {"week": week_days[0].isoformat()}
         pdf_params["weeks"] = weeks
@@ -10202,7 +10465,6 @@ def schedule_dashboard():
             selected_site=selected_site,
             pdf_url=pdf_url,
             hours_pdf_url=hours_pdf_url,
-            free_filter=free_filter,
             free_day=free_day_str,
             free_week_start=free_week_start_str,
             active_page="schedule",
@@ -10360,6 +10622,90 @@ def schedule_import_previous_month():
         db.close()
 
 
+@app.route("/schedule/free-available")
+@login_required
+def schedule_free_available():
+    """Return JSON list of active employees who are free for the given date range and time interval.
+
+    Query params:
+      - free_start_date (YYYY-MM-DD) required
+      - free_end_date (YYYY-MM-DD) optional (defaults to start_date)
+      - free_start_time (HH:MM) optional
+      - free_end_time (HH:MM) optional
+      - site_id optional to limit by site
+    """
+    db = SessionLocal()
+    try:
+      start_date_str = (request.args.get("free_start_date") or "").strip()
+      if not start_date_str:
+        return jsonify({"error":"missing free_start_date"}), 400
+      try:
+        start_date_val = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+      except ValueError:
+        return jsonify({"error":"invalid free_start_date"}), 400
+      end_date_str = (request.args.get("free_end_date") or start_date_str).strip()
+      try:
+        end_date_val = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+      except ValueError:
+        return jsonify({"error":"invalid free_end_date"}), 400
+      if end_date_val < start_date_val:
+        return jsonify({"error":"end date before start date"}), 400
+
+      start_time_str = (request.args.get("free_start_time") or "").strip()
+      end_time_str = (request.args.get("free_end_time") or "").strip()
+      interval_start = None
+      interval_end = None
+      if start_time_str and end_time_str:
+        try:
+          interval_start = datetime.strptime(start_time_str, "%H:%M").time()
+          interval_end = datetime.strptime(end_time_str, "%H:%M").time()
+        except ValueError:
+          return jsonify({"error":"invalid time format"}), 400
+
+      site_id = request.args.get("site_id", type=int)
+
+      # collect candidate employees (only active ones)
+      employees = (
+        db.query(Employee)
+        .filter((Employee.is_active == True) | (Employee.is_active == None))
+        .order_by(Employee.name.asc())
+        .all()
+      )
+      free_list = []
+      # iterate employees and check for any overlapping shift in the interval
+      delta_days = (end_date_val - start_date_val).days
+      for emp in employees:
+        has_conflict = False
+        for d_off in range(delta_days + 1):
+          day = start_date_val + timedelta(days=d_off)
+          q = db.query(Shift).filter(Shift.employee_id == emp.id, Shift.day == day)
+          if site_id:
+            q = q.filter(Shift.site_id == site_id)
+          shifts = q.all()
+          for s in shifts:
+            # if no time interval specified, any shift on that day counts as conflict
+            if interval_start is None or interval_end is None:
+              has_conflict = True
+              break
+            # check time overlap: shift.start < interval_end and shift.end > interval_start
+            try:
+              s_start = s.start_time
+              s_end = s.end_time
+            except Exception:
+              continue
+            if (s_start < interval_end) and (s_end > interval_start):
+              has_conflict = True
+              break
+          if has_conflict:
+            break
+        if not has_conflict:
+          free_list.append({"id": emp.id, "name": emp.name, "role": emp.role})
+
+      return jsonify(items=free_list)
+    finally:
+      db.close()
+
+
 @app.route("/admin")
 @login_required
 def admin_dashboard():
@@ -10379,6 +10725,33 @@ def admin_dashboard():
 @login_required
 def dashboard_redirect():
   return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin/dashboard/download-report", methods=["GET"])
+@login_required
+def admin_dashboard_download_report():
+  db = SessionLocal()
+  try:
+    context = _build_admin_dashboard_context(db)
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerow(["Month", "Invoice Count", "Total Income (€)", "Total Hours"])
+    for summary in context["monthly_summaries"]:
+      writer.writerow([
+        summary["month_name"],
+        summary["invoice_count"],
+        f"{summary['total_income']:.2f}",
+        f"{summary['total_hours']:.2f}",
+      ])
+    csv_buffer.seek(0)
+    return send_file(
+      io.BytesIO(csv_buffer.getvalue().encode("utf-8")),
+      mimetype="text/csv",
+      as_attachment=True,
+      download_name="dashboard_monthly_income.csv",
+    )
+  finally:
+    db.close()
 
 
 @app.route("/admin/employees", methods=["GET", "POST"])
