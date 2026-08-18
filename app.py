@@ -53,11 +53,11 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker, scoped_
 
 ADMIN_TEMPLATE = """
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing — Admin Overview</title>
+  <title>Putzelf Marketing — {{ i18n.financial_dashboard }}</title>
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -136,6 +136,7 @@ ADMIN_TEMPLATE = """
     .btn-link { background:none; box-shadow:none; color:#0f766e; }
     .btn-link:hover { color:#0c615b; }
     .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.2rem; height:100%; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .monthly-breakdown { max-height: calc(100vh - 420px); overflow:auto; padding-right:0.5rem; }
     .list-entry { border-bottom:1px solid #e2e8f0; padding:0.6rem 0; }
     .list-entry:last-child { border-bottom:none; }
     .list-title { font-weight:600; color:#0f172a; }
@@ -187,20 +188,16 @@ ADMIN_TEMPLATE = """
   <div class="app-shell">
     <aside id="admin-sidebar" class="sidebar">
       <div class="sidebar-section-title">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Overview</span></a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Manage employees</span></a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Manage sites</span></a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">Profile</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Assign coverage</span></a>
-      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
-      <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">Invoices</span></a>
-      <div class="sidebar-section-title">Konto</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
-      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
-    </aside>
-    <main class="main-shell">
-      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">{{ i18n.overview }}</span></a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">{{ i18n.manage_employees }}</span></a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">{{ i18n.manage_sites }}</span></a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">{{ i18n.profile }}</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">{{ i18n.assign_coverage }}</span></a>
+      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a> #}
+      <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">{{ i18n.crawler }}</span></a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">{{ i18n.invoices }}</span></a>
+      <div class="sidebar-section-title">{{ i18n.account }}</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">{{ i18n.log_out }}</span></a>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
     <main class="main-shell">
@@ -216,222 +213,79 @@ ADMIN_TEMPLATE = """
       {% endwith %}
 
       <header class="mb-4">
-        <div class="badge-soft mb-2">Financial dashboard</div>
-        <h1 class="h4 text-dark mb-1">Revenue & invoice analytics</h1>
-        <p class="text-secondary mb-0">{{ period_label }} · as of {{ today_label }}</p>
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+          <div>
+            <div class="badge-soft mb-2">{{ i18n.financial_dashboard }}</div>
+            <h1 class="h4 text-dark mb-1">{{ i18n.revenue_invoice_analytics }}</h1>
+            <p class="text-secondary mb-0">{{ period_label }} · {{ today_label }}</p>
+          </div>
+          <form method="get" class="d-flex align-items-center gap-2 mb-0">
+            <label class="small text-secondary mb-0" for="admin-lang-select">{{ i18n.language_label }}</label>
+            <select id="admin-lang-select" name="lang" class="form-select form-select-sm" onchange="this.form.submit()">
+              <option value="en" {% if lang == 'en' %}selected{% endif %}>English</option>
+              <option value="de" {% if lang == 'de' %}selected{% endif %}>Deutsch</option>
+            </select>
+          </form>
+        </div>
       </header>
 
       <section class="metrics-grid mb-4">
         <div class="metric-card">
-          <div class="metric-label">Total invoices</div>
+          <div class="metric-label">{{ i18n.total_invoices }}</div>
           <div class="metric-value">{{ stats.total_invoices }}</div>
-          <div class="metric-sub">All invoices created</div>
+          <div class="metric-sub">{{ i18n.track_hint }}</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Total billed</div>
+          <div class="metric-label">{{ i18n.total_billed }}</div>
           <div class="metric-value">{{ "%.2f"|format(stats.total_revenue) }} €</div>
-          <div class="metric-sub">Gross amount across invoices</div>
+          <div class="metric-sub">{{ i18n.track_hint }}</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Collected</div>
+          <div class="metric-label">{{ i18n.collected }}</div>
           <div class="metric-value">{{ "%.2f"|format(stats.paid_revenue) }} €</div>
-          <div class="metric-sub">Paid invoices</div>
+          <div class="metric-sub">{{ i18n.track_hint }}</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Outstanding</div>
+          <div class="metric-label">{{ i18n.outstanding }}</div>
           <div class="metric-value">{{ "%.2f"|format(stats.outstanding_revenue) }} €</div>
-          <div class="metric-sub">Unpaid and draft amount</div>
+          <div class="metric-sub">{{ i18n.track_hint }}</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Overdue invoices</div>
+          <div class="metric-label">{{ i18n.overdue_invoices }}</div>
           <div class="metric-value">{{ stats.overdue_invoices }}</div>
-          <div class="metric-sub">Need priority follow-up</div>
-        </div>
-      </section>
-
-      <section class="card-surface mb-4">
-        <div class="d-flex flex-wrap justify-content-between gap-3 align-items-center">
-          <div>
-            <h2 class="h6 text-uppercase text-secondary mb-2">Live revenue charts</h2>
-            <p class="placeholder mb-0">Track the last 6 billing months and export the data anytime.</p>
-          </div>
-          <div class="d-flex gap-2 flex-wrap">
-            <a href="{{ url_for('admin_invoices') }}" class="btn btn-sm btn-outline-primary">Open invoices</a>
-            <a href="{{ url_for('admin_dashboard_download_report') }}" class="btn btn-sm btn-primary">Download CSV</a>
-          </div>
+          <div class="metric-sub">{{ i18n.track_hint }}</div>
         </div>
       </section>
 
       <section class="row g-3 mb-4">
-        <div class="col-12 col-xl-8">
-          <div class="chart-card">
-            <div class="chart-header">
-              <div>
-                <h2 class="h6 text-uppercase text-secondary mb-2">Revenue & hours performance</h2>
-                <p class="placeholder mb-0">Interactive trends for invoice volume, revenue, and billed hours.</p>
-              </div>
-              <div class="d-flex gap-2 flex-wrap align-items-center">
-                <span class="chart-pill">Revenue</span>
-                <span class="chart-pill">Hours</span>
-              </div>
-            </div>
-            <div class="chart-summary-grid">
-              <div class="chart-summary-item">
-                <div class="metric-label">Average invoice</div>
-                <div class="metric-value">{{ "%.2f"|format(stats.total_revenue / stats.total_invoices) if stats.total_invoices else "0.00" }} €</div>
-              </div>
-              <div class="chart-summary-item">
-                <div class="metric-label">This month</div>
-                <div class="metric-value">{{ "%.2f"|format(stats.income_this_month) }} €</div>
-              </div>
-              <div class="chart-summary-item">
-                <div class="metric-label">Outstanding</div>
-                <div class="metric-value">{{ "%.2f"|format(stats.outstanding_revenue) }} €</div>
-              </div>
-            </div>
-            <div class="chart-wrapper">
-              <canvas id="revenueChart"></canvas>
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-xl-4">
-          <div class="chart-card p-0 mb-3" style="padding:1.2rem;">
-            <div class="chart-header mb-3">
-              <div>
-                <h2 class="h6 text-uppercase text-secondary mb-2">Invoices trend</h2>
-                <p class="placeholder mb-0">Invoice volume for each month.</p>
-              </div>
-            </div>
-            <div class="chart-wrapper" style="min-height:310px;">
-              <canvas id="invoiceCountChart"></canvas>
-            </div>
-          </div>
+        <div class="col-12">
           <div class="card-surface p-3">
-            <h2 class="h6 text-uppercase text-secondary mb-3">Monthly breakdown</h2>
-            <ul class="list-unstyled mb-0">
-              {% for summary in monthly_summaries %}
-                <li class="py-3 border-bottom">
-                  <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="fw-semibold">{{ summary.month_name }}</span>
-                    <span>{{ "%.2f"|format(summary.total_income) }} €</span>
-                  </div>
-                  <div class="small text-muted">{{ summary.invoice_count }} invoices · {{ summary.total_hours }} hours</div>
-                </li>
-              {% endfor %}
-            </ul>
+            <div class="d-flex flex-wrap justify-content-between gap-3 align-items-center mb-3">
+              <div>
+                <h2 class="h6 text-uppercase text-secondary mb-2">{{ i18n.monthly_breakdown }}</h2>
+                <p class="placeholder mb-0">{{ i18n.track_hint }}</p>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <a href="{{ url_for('admin_invoices') }}" class="btn btn-sm btn-outline-primary">{{ i18n.open_invoices }}</a>
+                <a href="{{ url_for('admin_dashboard_download_report') }}" class="btn btn-sm btn-primary">{{ i18n.download_csv }}</a>
+              </div>
+            </div>
+            <div class="monthly-breakdown">
+              <ul class="list-unstyled mb-0">
+                {% for summary in monthly_summaries %}
+                  <li class="py-3 border-bottom">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <span class="fw-semibold">{{ summary.month_name }}</span>
+                      <span>{{ "%.2f"|format(summary.total_income) }} €</span>
+                    </div>
+                    <div class="small text-muted">{{ summary.invoice_count }} invoices · {{ summary.total_hours }} hours</div>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
           </div>
         </div>
       </section>
-
-      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-      <script>
-        const dashboardLabels = {{ chart_labels|tojson }};
-        const revenueData = {{ chart_income|tojson }};
-        const invoiceCountData = {{ chart_invoice_counts|tojson }};
-        const hoursData = {{ chart_hours|tojson }};
-
-        const revenueCtx = document.getElementById('revenueChart');
-        if (revenueCtx) {
-          new Chart(revenueCtx, {
-            type: 'line',
-            data: {
-              labels: dashboardLabels,
-              datasets: [
-                {
-                  label: 'Revenue (€)',
-                  data: revenueData,
-                  borderColor: '#0f766e',
-                  backgroundColor: 'rgba(15,118,110,0.18)',
-                  tension: 0.32,
-                  fill: true,
-                  pointRadius: 5,
-                  pointHoverRadius: 7,
-                  pointBackgroundColor: '#0f766e',
-                  pointBorderColor: '#ffffff',
-                  pointBorderWidth: 2,
-                },
-                {
-                  label: 'Hours billed',
-                  data: hoursData,
-                  borderColor: '#2563eb',
-                  backgroundColor: 'rgba(37,99,235,0.18)',
-                  tension: 0.32,
-                  fill: true,
-                  pointRadius: 5,
-                  pointHoverRadius: 7,
-                  pointBackgroundColor: '#2563eb',
-                  pointBorderColor: '#ffffff',
-                  pointBorderWidth: 2,
-                },
-              ],
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  position: 'bottom',
-                  labels: { usePointStyle: true, padding: 16, boxWidth: 10 },
-                },
-                tooltip: {
-                  mode: 'index',
-                  intersect: false,
-                  padding: 12,
-                  callbacks: {
-                    label: function(context) {
-                      return context.dataset.label + ': ' + context.formattedValue + (context.dataset.label.includes('Revenue') ? ' €' : ' hrs');
-                    }
-                  }
-                }
-              },
-              interaction: { mode: 'index', intersect: false },
-              scales: {
-                x: { grid: { display: false }, ticks: { color: '#475569' } },
-                y: { beginAtZero: true, ticks: { precision: 0, color: '#475569' }, grid: { color: 'rgba(148,163,184,0.18)' } },
-              },
-            },
-          });
-        }
-
-        const invoiceCountCtx = document.getElementById('invoiceCountChart');
-        if (invoiceCountCtx) {
-          new Chart(invoiceCountCtx, {
-            type: 'bar',
-            data: {
-              labels: dashboardLabels,
-              datasets: [
-                {
-                  label: 'Invoices',
-                  data: invoiceCountData,
-                  backgroundColor: 'rgba(15,118,110,0.85)',
-                  borderColor: '#0f766e',
-                  borderWidth: 1,
-                  borderRadius: 12,
-                  barThickness: 32,
-                },
-              ],
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: { display: false },
-                tooltip: {
-                  callbacks: {
-                    label: function(context) {
-                      return context.dataset.label + ': ' + context.formattedValue;
-                    }
-                  }
-                }
-              },
-              scales: {
-                x: { grid: { display: false }, ticks: { color: '#475569' } },
-                y: { beginAtZero: true, ticks: { precision: 0, color: '#475569' }, grid: { color: 'rgba(148,163,184,0.18)' } },
-              },
-            },
-          });
-        }
-      </script>
     </main>
   </div>
   <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
@@ -476,13 +330,73 @@ ADMIN_TEMPLATE = """
       });
     }
   </script>
+  <script>
+    // Schedule a morning 6:00 AM local notification (best-effort client-side)
+    (function() {
+      const todaysCount = {{ todays_shifts_count|default(0)|tojson }} || 0;
+      const todaysList = {{ todays_shifts_for_notify|default([])|tojson }} || [];
+      const uiToday = {{ (ui.today|default('Today'))|tojson }};
+      const uiYourMissions = {{ (ui.your_missions|default('Your missions'))|tojson }};
+
+      function msUntilNext6AM() {
+        const now = new Date();
+        const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6, 0, 0, 0);
+        if (now.getHours() >= 6) {
+          next.setDate(next.getDate() + 1);
+        }
+        return Math.max(0, next - now);
+      }
+
+      function showMorningNotification() {
+        if (!('Notification' in window)) return;
+        if (Notification.permission !== 'granted') return;
+        if (todaysCount <= 0) return;
+
+        const title = todaysCount > 1 ? `${todaysCount} ${uiYourMissions}` : uiYourMissions;
+        let body = '';
+        if (todaysList.length === 1) {
+          body = `${todaysList[0].site_name} · ${todaysList[0].time_window}`;
+        } else if (todaysList.length > 1) {
+          body = todaysList.slice(0,3).map(s => `${s.site_name} (${s.time_window})`).join('\n');
+        }
+        const opt = { body };
+        try { new Notification(title, opt); } catch (e) { /* ignore */ }
+      }
+
+      function ensurePermissionAndSchedule() {
+        if (!('Notification' in window)) return;
+        if (Notification.permission === 'default') {
+          Notification.requestPermission().then(() => {
+            // schedule after permission resolved
+            const ms = msUntilNext6AM();
+            setTimeout(function tick() {
+              showMorningNotification();
+              // reschedule for next day
+              setTimeout(tick, 24*3600*1000);
+            }, ms);
+          });
+        } else if (Notification.permission === 'granted') {
+          const ms = msUntilNext6AM();
+          setTimeout(function tick() {
+            showMorningNotification();
+            setTimeout(tick, 24*3600*1000);
+          }, ms);
+        }
+      }
+
+      // Try to schedule when the page is loaded. This works while the PWA is open in the background or foreground.
+      if (window.location.pathname.startsWith('/employee')) {
+        ensurePermissionAndSchedule();
+      }
+    })();
+  </script>
 </body>
 </html>
 """
 
 ADMIN_EMPLOYEES_TEMPLATE = """
 <!doctype html>
-<html lang="de">
+<html lang="{{ lang }}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -670,16 +584,16 @@ ADMIN_EMPLOYEES_TEMPLATE = """
   <div class="app-shell">
     <aside id="admin-sidebar" class="sidebar">
       <div class="sidebar-section-title">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Übersicht</span></a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Mitarbeiter verwalten</span></a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Standorte verwalten</span></a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">Profiles</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Einsatzplanung</span></a>
-      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
-      <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">Rechnungen</span></a>
-      <div class="sidebar-section-title">Konto</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Abmelden</span></a>
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">{{ i18n.overview }}</span></a>
+      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">{{ i18n.manage_employees }}</span></a>
+      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">{{ i18n.manage_sites }}</span></a>
+      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">{{ i18n.profile }}</span></a>
+      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">{{ i18n.assign_coverage }}</span></a>
+      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a> #}
+      <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">{{ i18n.crawler }}</span></a>
+      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">{{ i18n.invoices }}</span></a>
+      <div class="sidebar-section-title">{{ i18n.account }}</div>
+      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">{{ i18n.log_out }}</span></a>
       <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
     </aside>
     <main class="main-shell">
@@ -709,19 +623,19 @@ ADMIN_EMPLOYEES_TEMPLATE = """
       {% endwith %}
 
       <header class="mb-4">
-        <div class="badge-soft mb-2">Teamverzeichnis</div>
-        <h1 class="h4 text-dark mb-1">Mitarbeiter verwalten</h1>
+        <div class="badge-soft mb-2">{{ i18n.team_directory }}</div>
+        <h1 class="h4 text-dark mb-1">{{ i18n.manage_employees }}</h1>
         <p class="text-secondary mb-0">
           {% if filtered_employees %}
-            Zeige {{ page_employees }} von {{ filtered_employees }} passenden Mitarbeitern
+            {{ i18n.currently_shown }} {{ page_employees }} {{ i18n.of }} {{ filtered_employees }}
           {% else %}
-            Keine Mitarbeiter passen zu den aktuellen Filtern
+            {{ i18n.no_matching_employees }}
           {% endif %}
-          · {{ total_employees }} insgesamt · {{ today_shifts }} Schichten heute
+          · {{ total_employees }} {{ i18n.total_employees }} · {{ today_shifts }} {{ i18n.scheduled_today }}
         </p>
       </header>
       <div class="mb-3 d-flex justify-content-end">
-        <a href="{{ url_for('admin_profiles', tab='employees') }}" class="btn btn-sm btn-outline-primary">Mitarbeiterprofile öffnen</a>
+        <a href="{{ url_for('admin_profiles', tab='employees') }}" class="btn btn-sm btn-outline-primary">{{ i18n.open_employee_profiles }}</a>
       </div>
 
       <section class="stats-grid">
@@ -746,28 +660,14 @@ ADMIN_EMPLOYEES_TEMPLATE = """
       <section class="card-surface mb-4">
         <form method="get" class="row g-2 align-items-end">
           <div class="col-sm-8">
-            <label class="form-label" for="employee_search">Mitarbeiter suchen</label>
+            <label class="form-label" for="employee_search">{{ i18n.employee_search_label }}</label>
             <div class="input-group input-group-sm">
-              <input type="text" class="form-control" id="employee_search" name="q" value="{{ search_q or '' }}" placeholder="Nach Name oder Rolle suchen">
-              <button class="btn btn-outline-primary" type="submit" title="Suchen"><i class="bi bi-search"></i></button>
+              <input type="text" class="form-control" id="employee_search" name="q" value="{{ search_q or '' }}" placeholder="{{ i18n.search_placeholder }}">
+              <button class="btn btn-outline-primary" type="submit" title="{{ i18n.employee_search_label }}"><i class="bi bi-search"></i></button>
             </div>
           </div>
-          <div class="col-sm-4">
-            <div class="form-check mb-2">
-              <input class="form-check-input" type="checkbox" id="employee_free" name="free" value="1" {% if free_filter %}checked{% endif %} onchange="this.form.submit()">
-              <label class="form-check-label" for="employee_free">Nur freie Mitarbeiter</label>
-            </div>
-            <div class="row g-2 mb-2">
-              <div class="col-12">
-                <label class="form-label small mb-1" for="free_day">Am Tag frei</label>
-                <input type="date" class="form-control form-control-sm" id="free_day" name="free_day" value="{{ free_day or '' }}" onchange="document.getElementById('employee_free').checked=true; this.form.submit()">
-              </div>
-              <div class="col-12">
-                <label class="form-label small mb-1" for="free_week_start">Woche ab</label>
-                <input type="date" class="form-control form-control-sm" id="free_week_start" name="free_week_start" value="{{ free_week_start or '' }}" onchange="document.getElementById('employee_free').checked=true; this.form.submit()">
-              </div>
-            </div>
-            <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-secondary w-100" title="Filter zurücksetzen"><i class="bi bi-x-circle"></i></a>
+          <div class="col-sm-4 d-flex align-items-start justify-content-end">
+            <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-secondary w-100" title="{{ i18n.reset_filters }}"><i class="bi bi-x-circle"></i> {{ i18n.reset_filters }}</a>
           </div>
         </form>
       </section>
@@ -1376,7 +1276,7 @@ ADMIN_SITES_TEMPLATE = """
       <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Standorte verwalten</span></a>
       <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">Profile</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Einsätze zuweisen</span></a>
-      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a>
+      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a> #}
       <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
       <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">Rechnungen</span></a>
       <div class="sidebar-section-title">Account</div>
@@ -1777,7 +1677,7 @@ INVOICE_LIST_TEMPLATE = """
       <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
       <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
-      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
+      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a> #}
       <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
       <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
       <div class="sidebar-section-title">Account</div>
@@ -2103,7 +2003,7 @@ INCOME_REPORT_TEMPLATE = """
       <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
       <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
-      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
+      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a> #}
       <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
       <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
       <div class="sidebar-section-title">Account</div>
@@ -2337,7 +2237,7 @@ INCOME_REPORT_TEMPLATE = """
       <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
       <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
-      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
+      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a> #}
       <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
       <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
       <div class="sidebar-section-title">Account</div>
@@ -2577,7 +2477,7 @@ INVOICE_FORM_TEMPLATE = """
       <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
       <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
-      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
+      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a> #}
       <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
       <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
       <div class="sidebar-section-title">Account</div>
@@ -3066,7 +2966,7 @@ INVOICE_VIEW_TEMPLATE = """
       <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
       <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
       <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
-      <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a>
+      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a> #}
       <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
       <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
       <div class="sidebar-section-title">Account</div>
@@ -3719,7 +3619,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
         overlay.className = 'confetti-overlay';
         const message = document.createElement('div');
         message.className = 'confetti-message';
-        message.textContent = {{ ui.confetti_complete|tojson }};
+        message.textContent = {{ (ui.confetti_complete|default('Done!'))|tojson }};
         overlay.appendChild(message);
 
         const colors = ['#bef264', '#f97316', '#22d3ee', '#facc15', '#fb7185'];
@@ -3940,10 +3840,10 @@ LEADS_TEMPLATE = """
           <span class="nav-pill-icon">🗓</span>
           <span class="nav-text">Assign coverage</span>
         </a>
-        <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">
-          <span class="nav-pill-icon">📇</span>
-          <span class="nav-text">Lead-Center</span>
-        </a>
+<!--         <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">
+                <span class="nav-pill-icon">📇</span>
+                <span class="nav-text">Lead-Center</span>
+              </a> -->
         <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">
           <span class="nav-pill-icon">◎</span>
           <span class="nav-text">Crawler</span>
@@ -4526,10 +4426,10 @@ HTML_TEMPLATE = """
           <span class="nav-pill-icon">🗓</span>
           <span class="nav-text">Assign coverage</span>
         </a>
-        <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">
-          <span class="nav-pill-icon">📇</span>
-          <span class="nav-text">Lead-Center</span>
-        </a>
+<!--         <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">
+                <span class="nav-pill-icon">📇</span>
+                <span class="nav-text">Lead-Center</span>
+              </a> -->
         <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">
           <span class="nav-pill-icon">◎</span>
           <span class="nav-text">Crawler</span>
@@ -4956,10 +4856,10 @@ SCHEDULE_TEMPLATE = """
           <span class="nav-pill-icon">🗓</span>
           <span class="nav-text">Assign coverage</span>
         </a>
-        <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">
-          <span class="nav-pill-icon">📇</span>
-          <span class="nav-text">Lead-Center</span>
-        </a>
+<!--         <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">
+                <span class="nav-pill-icon">📇</span>
+                <span class="nav-text">Lead-Center</span>
+              </a> -->
         <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">
           <span class="nav-pill-icon">◎</span>
           <span class="nav-text">Crawler</span>
@@ -5036,6 +4936,11 @@ SCHEDULE_TEMPLATE = """
           </div>
           <form method="get" action="{{ url_for('schedule_dashboard') }}" class="filter-toolbar">
             <input type="hidden" name="weeks" value="{{ weeks }}">
+            <input type="hidden" name="days" value="{{ request.args.get('days', '') }}">
+            <input type="hidden" name="free_day" value="{{ free_day or '' }}">
+            <input type="hidden" name="free_week_start" value="{{ free_week_start or '' }}">
+            <input type="hidden" name="free_start_time" value="{{ request.args.get('free_start_time', '') }}">
+            <input type="hidden" name="free_end_time" value="{{ request.args.get('free_end_time', '') }}">
             <div>
               <label class="form-label" for="filter_employee_id">Mitarbeiterfokus</label>
               <select class="form-select form-select-sm" id="filter_employee_id" name="employee_id" onchange="this.form.submit()">
@@ -7589,6 +7494,42 @@ def _allowed_image(filename: str | None) -> bool:
   return ext in ALLOWED_IMAGE_EXTENSIONS
 
 
+def _slugify_path_segment(value: str | None, fallback: str) -> str:
+  raw = (value or "").strip()
+  if not raw:
+    return fallback
+  safe = secure_filename(raw).lower().replace("_", "-")
+  return safe or fallback
+
+
+def _build_shift_proof_relative_path(shift, photo_type: str, filename: str) -> str:
+  now = datetime.utcnow()
+  year = now.strftime("%Y")
+  month = now.strftime("%m")
+  employee_segment = _slugify_path_segment(
+    shift.employee.name if shift.employee else None,
+    f"employee-{shift.employee_id}",
+  )
+  site_segment = _slugify_path_segment(
+    shift.site.name if shift.site else None,
+    f"place-{shift.site_id}",
+  )
+  ext = os.path.splitext(filename)[1].lower()
+  safe_file_name = secure_filename(
+    f"shift-{shift.id}-{photo_type}-{secrets.token_hex(6)}{ext}"
+  )
+  return os.path.join(
+    "uploads",
+    "proofs",
+    year,
+    month,
+    employee_segment,
+    site_segment,
+    photo_type,
+    safe_file_name,
+  ).replace(os.sep, "/")
+
+
 def _coerce_float(value: str | None) -> float | None:
   try:
     if value is None:
@@ -9134,7 +9075,103 @@ def _site_exists(db, name: str, address: str, exclude_id: int | None = None) -> 
     return db.query(q.exists()).scalar()
 
 
+def _get_admin_lang() -> str:
+  chosen = (request.args.get("lang") or session.get("admin_lang") or "en").lower()
+  if chosen not in ("en", "de"):
+    chosen = "en"
+  session["admin_lang"] = chosen
+  return chosen
+
+ADMIN_I18N = {
+  "en": {
+    "language_label": "Language",
+    "overview": "Overview",
+    "manage_employees": "Manage employees",
+    "manage_sites": "Manage sites",
+    "profile": "Profile",
+    "assign_coverage": "Assign coverage",
+    "crawler": "Crawler",
+    "invoices": "Invoices",
+    "account": "Account",
+    "log_out": "Log out",
+    "financial_dashboard": "Financial dashboard",
+    "revenue_invoice_analytics": "Revenue & invoice analytics",
+    "total_invoices": "Total invoices",
+    "total_billed": "Total billed",
+    "collected": "Collected",
+    "outstanding": "Outstanding",
+    "overdue_invoices": "Overdue invoices",
+    "live_revenue_charts": "Live revenue charts",
+    "track_hint": "Track the last 6 billing months and export the data anytime.",
+    "open_invoices": "Open invoices",
+    "download_csv": "Download CSV",
+    "revenue_hours_performance": "Revenue & hours performance",
+    "revenue_hours_hint": "Interactive trends for invoice volume, revenue, and billed hours.",
+    "average_invoice": "Average invoice",
+    "this_month": "This month",
+    "outstanding_label": "Outstanding",
+    "monthly_breakdown": "Monthly breakdown",
+    "team_directory": "Team directory",
+    "employee_search_label": "Search employees",
+    "open_employee_profiles": "Open employee profiles",
+    "total_employees": "Total employees",
+    "currently_shown": "Currently shown",
+    "scheduled_today": "Scheduled today",
+    "unassigned_this_week": "Unassigned this week",
+    "search_placeholder": "Search by name or role",
+    "reset_filters": "Reset filters",
+    "of": "of",
+    "no_matching_employees": "No matching employees",
+  },
+  "de": {
+    "language_label": "Sprache",
+    "overview": "Übersicht",
+    "manage_employees": "Mitarbeiter verwalten",
+    "manage_sites": "Standorte verwalten",
+    "profile": "Profile",
+    "assign_coverage": "Einsatzplanung",
+    "crawler": "Crawler",
+    "invoices": "Rechnungen",
+    "account": "Konto",
+    "log_out": "Abmelden",
+    "financial_dashboard": "Finanzübersicht",
+    "revenue_invoice_analytics": "Umsatz- & Rechnungsanalyse",
+    "total_invoices": "Rechnungen gesamt",
+    "total_billed": "Gesamtbetrag",
+    "collected": "Eingegangen",
+    "outstanding": "Ausstehend",
+    "overdue_invoices": "Überfällige Rechnungen",
+    "live_revenue_charts": "Live-Umsatzdiagramme",
+    "track_hint": "Verfolge die letzten 6 Abrechnungsmonate und exportiere die Daten jederzeit.",
+    "open_invoices": "Rechnungen öffnen",
+    "download_csv": "CSV herunterladen",
+    "revenue_hours_performance": "Umsatz- & Stundenentwicklung",
+    "revenue_hours_hint": "Interaktive Trends für Rechnungsanzahl, Umsatz und gebuchte Stunden.",
+    "average_invoice": "Durchschnittliche Rechnung",
+    "this_month": "Diesen Monat",
+    "outstanding_label": "Ausstehend",
+    "monthly_breakdown": "Monatliche Übersicht",
+    "team_directory": "Teamverzeichnis",
+    "employee_search_label": "Mitarbeiter suchen",
+    "open_employee_profiles": "Mitarbeiterprofile öffnen",
+    "total_employees": "Mitarbeiter gesamt",
+    "currently_shown": "Aktuell angezeigt",
+    "scheduled_today": "Heute eingeplant",
+    "unassigned_this_week": "Diese Woche ohne Einsatz",
+    "search_placeholder": "Nach Name oder Rolle suchen",
+    "reset_filters": "Filter zurücksetzen",
+    "of": "von",
+    "no_matching_employees": "Keine passenden Mitarbeiter",
+  },
+}
+
+def _get_admin_i18n(lang: str):
+  return ADMIN_I18N.get(lang, ADMIN_I18N["en"])
+
+
 def _build_admin_dashboard_context(db):
+  lang = _get_admin_lang()
+  i18n = _get_admin_i18n(lang)
   today = date.today()
   week_start = today - timedelta(days=today.weekday())
   week_end = week_start + timedelta(days=7)
@@ -9257,18 +9294,50 @@ def _build_admin_dashboard_context(db):
 
   period_label = today.strftime("%B %Y")
   today_label = today.strftime("%A %d %b %Y")
+  # admin language selection (query param or session)
+  lang = (request.args.get("lang") or session.get("admin_lang") or "en").lower()
+  if lang not in ("en", "de"):
+    lang = "en"
+
+  ADMIN_I18N = {
+    "en": {
+      "live_revenue_charts": "Live revenue charts",
+      "track_hint": "Track the last 6 billing months and export the data anytime.",
+      "open_invoices": "Open invoices",
+      "download_csv": "Download CSV",
+      "revenue_hours_performance": "Revenue & hours performance",
+      "revenue_hours_hint": "Interactive trends for invoice volume, revenue, and billed hours.",
+      "average_invoice": "Average invoice",
+      "this_month": "This month",
+      "outstanding": "Outstanding",
+      "monthly_breakdown": "Monthly breakdown",
+    },
+    "de": {
+      "live_revenue_charts": "Live-Umsatzdiagramme",
+      "track_hint": "Verfolge die letzten 6 Abrechnungsmonate und exportiere die Daten jederzeit.",
+      "open_invoices": "Rechnungen öffnen",
+      "download_csv": "CSV herunterladen",
+      "revenue_hours_performance": "Umsatz- & Stundenentwicklung",
+      "revenue_hours_hint": "Interaktive Trends für Rechnungsanzahl, Umsatz und gebuchte Stunden.",
+      "average_invoice": "Durchschnittliche Rechnung",
+      "this_month": "Diesen Monat",
+      "outstanding": "Ausstehend",
+      "monthly_breakdown": "Monatliche Übersicht",
+    },
+  }
 
   return {
     "stats": stats,
     "monthly_summaries": monthly_summaries,
     "chart_labels": chart_labels,
     "chart_income": chart_income,
-    "chart_invoice_counts": chart_invoice_counts,
     "chart_hours": chart_hours,
     "recent_invoices": recent_invoices,
     "due_soon": due_soon,
     "period_label": period_label,
     "today_label": today_label,
+    "lang": lang,
+    "i18n": i18n,
   }
 
 
@@ -9845,6 +9914,8 @@ def employee_dashboard():
     shifts=shift_cards,
     upcoming_jobs=upcoming_cards,
     history=history_cards,
+    todays_shifts_count=len(shift_cards),
+    todays_shifts_for_notify=[{"site_name": s["site_name"], "time_window": s["time_window"]} for s in shift_cards],
   )
 
 
@@ -9908,9 +9979,10 @@ def employee_upload_photo(shift_id: int):
       flash(_employee_text(lang, "photo_type_invalid"))
       return redirect(url_for("employee_dashboard"))
 
-    ext = os.path.splitext(file.filename)[1].lower()
-    safe_name = secure_filename(f"shift{shift_id}_{photo_type}_{secrets.token_hex(6)}{ext}")
-    destination = os.path.join(app.config["UPLOAD_FOLDER"], safe_name)
+    relative_path = _build_shift_proof_relative_path(shift, photo_type, file.filename)
+    upload_subpath = relative_path[len("uploads/") :].replace("/", os.sep)
+    destination = os.path.join(app.config["UPLOAD_FOLDER"], upload_subpath)
+    os.makedirs(os.path.dirname(destination), exist_ok=True)
 
     try:
       file.save(destination)
@@ -9919,7 +9991,6 @@ def employee_upload_photo(shift_id: int):
       flash(_employee_text(lang, "photo_save_error"))
       return redirect(url_for("employee_dashboard"))
 
-    relative_path = os.path.join("uploads", safe_name).replace(os.sep, "/")
     photo_label = _employee_text(lang, "before") if photo_type == "before" else _employee_text(lang, "after")
     if photo_type == "before":
       _remove_photo(shift.before_photo_path)
@@ -10346,7 +10417,8 @@ def schedule_dashboard():
                   flash(blocked_messages[0], "warning")
                 if not created and not blocked_messages:
                   flash("Es konnte kein Einsatz eingeplant werden.", "warning")
-            return redirect(url_for("schedule_dashboard"))
+            query_args = request.args.to_dict(flat=False)
+            return redirect(url_for("schedule_dashboard", **query_args))
 
         selected_employee_id = request.args.get("employee_id", type=int)
         selected_site_id = request.args.get("site_id", type=int)
@@ -10712,9 +10784,12 @@ def admin_dashboard():
   db = SessionLocal()
   try:
     context = _build_admin_dashboard_context(db)
+    # ensure older templates expecting `ui` still work by providing a ui bundle
+    ui_bundle = context.get("i18n") if isinstance(context.get("i18n"), dict) else {}
     return render_template_string(
       ADMIN_TEMPLATE,
       active_page="dashboard",
+      ui=ui_bundle,
       **context,
     )
   finally:
@@ -10758,6 +10833,8 @@ def admin_dashboard_download_report():
 @login_required
 def admin_employees():
   db = SessionLocal()
+  lang = _get_admin_lang()
+  i18n = _get_admin_i18n(lang)
   try:
     search_q = (request.args.get("q") or "").strip()
     if request.method == "POST":
@@ -11079,6 +11156,8 @@ def admin_employees():
     return render_template_string(
       ADMIN_EMPLOYEES_TEMPLATE,
       active_page="employees",
+      lang=lang,
+      i18n=i18n,
       employees=employees,
       shift_counts=shift_counts,
       total_employees=total_employees,
