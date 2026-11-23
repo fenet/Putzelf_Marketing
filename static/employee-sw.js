@@ -1,9 +1,10 @@
-const CACHE_NAME = "crew-dashboard-v2";
+const CACHE_NAME = "elfs-plan-employee-v3";
 const OFFLINE_ASSETS = [
   "/employee",
   "/employee/dashboard",
   "/static/manifest.json",
-  "/static/logo.png"
+  "/static/employee-icon-192.png",
+  "/static/employee-icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -36,6 +37,9 @@ self.addEventListener("fetch", (event) => {
   }
 
   const requestUrl = new URL(request.url);
+  if (requestUrl.pathname.startsWith("/employee/api/")) {
+    return;
+  }
   if (!requestUrl.pathname.startsWith("/employee") && !requestUrl.pathname.startsWith("/static")) {
     return;
   }

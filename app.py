@@ -10,6 +10,7 @@ import sys
 import secrets
 from collections import deque
 from datetime import datetime, date, time, timedelta
+from zoneinfo import ZoneInfo
 from functools import wraps
 from typing import Any, Tuple
 from urllib.parse import urljoin, urldefrag, urlparse, quote_plus, urlencode
@@ -23,6 +24,7 @@ from bs4 import BeautifulSoup
 from flask import (
   Flask,
   request,
+  render_template,
   send_file,
   render_template_string,
   jsonify,
@@ -48,8 +50,11 @@ from sqlalchemy import (
   Text,
   text,
   Float,
+  UniqueConstraint,
+  event,
 )
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker, scoped_session, joinedload
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker, scoped_session, joinedload, Session as SQLAlchemySession
+from sqlalchemy import inspect as sqlalchemy_inspect
 
 ADMIN_TEMPLATE = """
 <!doctype html>
@@ -57,7 +62,7 @@ ADMIN_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing — {{ i18n.financial_dashboard }}</title>
+  <title>Elf's Plan — {{ i18n.financial_dashboard }}</title>
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -182,29 +187,118 @@ ADMIN_TEMPLATE = """
       }
       .mobile-nav-toggle:focus { outline: 2px solid rgba(15,118,110,0.4); outline-offset: 2px; }
     }
+    /* Admin overview refresh */
+    .admin-dashboard { --dash-ink:#17233b; --dash-muted:#72809a; --dash-blue:#356ae6; --dash-canvas:#f4f6fb; min-height:100vh; background:var(--dash-canvas); color:var(--dash-ink); font-size:15px; }
+    .admin-shell { grid-template-columns:252px minmax(0,1fr); min-height:100vh; background:var(--dash-canvas); transition:grid-template-columns .22s ease; }
+    .admin-sidebar { position:sticky; top:0; height:100vh; min-width:0; padding:1.15rem .9rem; gap:.45rem; color:#f7f9ff; background:linear-gradient(180deg,#17233b 0%,#202f51 100%); border-right:1px solid #273754; box-shadow:8px 0 28px rgba(16,29,53,.08); }
+    .admin-brand { display:flex; align-items:center; gap:.75rem; min-height:58px; padding:.25rem .4rem .8rem; margin-bottom:.45rem; border-bottom:1px solid rgba(226,232,240,.14); color:#fff; text-decoration:none; }
+    .admin-brand-mark { width:42px; height:42px; display:grid; place-items:center; flex:none; overflow:hidden; border-radius:13px; background:#fff; box-shadow:0 5px 14px rgba(7,16,36,.2); }
+    .admin-brand-mark img { width:100%; height:100%; object-fit:contain; }
+    .admin-brand-text { min-width:0; display:grid; line-height:1.2; }
+    .admin-brand-text strong { color:#fff; font-size:.98rem; letter-spacing:-.02em; }
+    .admin-brand-text small { margin-top:.25rem; color:#aebbd2; font-size:.72rem; }
+    .admin-sidebar .sidebar-section-title { padding:.75rem .7rem .35rem; color:#9eacc5; font-size:.67rem; font-weight:700; letter-spacing:.12em; }
+    .admin-sidebar .nav-pill { min-height:42px; padding:.57rem .7rem; border-radius:10px; color:#d4dced; font-size:.88rem; font-weight:550; }
+    .admin-sidebar .nav-pill .nav-icon { width:1.25rem; flex:none; color:#aebbd2; text-align:center; font-size:1rem; }
+    .admin-sidebar .nav-pill.active { color:#fff; background:linear-gradient(100deg,rgba(70,119,235,.33),rgba(70,119,235,.13)); box-shadow:inset 3px 0 #78a2ff; }
+    .admin-sidebar .nav-pill.active .nav-icon { color:#a9c4ff; }
+    .admin-sidebar .nav-pill:hover { color:#fff; background:rgba(226,232,240,.09); box-shadow:none; }
+    .admin-sidebar .nav-pill-logout { margin-top:.2rem; border:1px solid rgba(226,232,240,.15); background:rgba(226,232,240,.06); color:#e4eaf5; }
+    .admin-sidebar .nav-pill-logout .nav-icon { color:#e4eaf5; }
+    .admin-sidebar-footer { margin-top:auto; padding:.8rem .55rem .15rem; border-top:1px solid rgba(226,232,240,.14); color:#9eacc5; font-size:.73rem; }
+    .admin-sidebar-collapse { width:32px; height:32px; display:grid; place-items:center; align-self:flex-end; margin:0 .2rem .1rem; border:1px solid rgba(226,232,240,.2); border-radius:9px; color:#d8e2f3; background:rgba(226,232,240,.07); }
+    .admin-sidebar-collapse:hover { color:#fff; background:rgba(226,232,240,.15); }
+    .admin-main { min-width:0; padding:1.45rem clamp(1rem,2.2vw,2.25rem) 2.25rem; background:var(--dash-canvas); }
+    .admin-topbar { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1.55rem; }
+    .admin-mobile-menu { display:none; }
+    .admin-heading { min-width:0; }
+    .admin-heading-eyebrow { display:flex; align-items:center; gap:.45rem; margin-bottom:.35rem; color:var(--dash-muted); font-size:.74rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; }
+    .admin-heading-eyebrow i { color:var(--dash-blue); }
+    .admin-heading h1 { margin:0; color:var(--dash-ink); font-size:clamp(1.35rem,2vw,1.75rem); font-weight:720; letter-spacing:-.04em; }
+    .admin-heading p { margin:.35rem 0 0; color:var(--dash-muted); font-size:.88rem; }
+    .admin-topbar-actions { display:flex; align-items:center; justify-content:flex-end; gap:.8rem; }
+    .admin-date-chip { display:flex; align-items:center; gap:.5rem; padding:.55rem .75rem; border:1px solid #e1e7f0; border-radius:11px; color:#52617a; background:#fff; font-size:.79rem; white-space:nowrap; }
+    .admin-date-chip i { color:#7384a1; }
+    .language-picker { display:flex; gap:.22rem; padding:.22rem; border:1px solid #e1e7f0; border-radius:11px; background:#fff; box-shadow:0 3px 10px rgba(28,44,72,.04); }
+    .language-option { display:inline-flex; align-items:center; gap:.36rem; min-height:34px; padding:.32rem .58rem; border:0; border-radius:8px; color:#69778f; background:transparent; font-size:.78rem; font-weight:650; }
+    .language-option:hover { color:#253653; background:#f4f6fa; }
+    .language-option.is-active { color:#244fba; background:#edf3ff; }
+    .language-option .flag { font-size:1rem; line-height:1; }
+    .dashboard-notices:empty { display:none; }
+    .dashboard-notices .alert { border:1px solid #e1e7f0; border-radius:12px; box-shadow:0 5px 15px rgba(27,43,69,.04); }
+    .metrics-grid { grid-template-columns:repeat(5,minmax(0,1fr)); gap:.85rem; margin-bottom:1.1rem!important; }
+    .metric-card { position:relative; min-width:0; min-height:142px; padding:1rem 1rem .9rem; overflow:hidden; border:1px solid #e5eaf2; border-radius:15px; background:#fff; box-shadow:0 8px 24px rgba(28,44,72,.045); }
+    .metric-card::after { position:absolute; top:-34px; right:-28px; width:100px; height:100px; content:""; border-radius:50%; background:var(--metric-tint,#eff4ff); opacity:.75; }
+    .metric-topline { position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.7rem; }
+    .metric-label { margin:0; color:#687790; font-size:.69rem; font-weight:700; letter-spacing:.055em; line-height:1.3; text-transform:uppercase; }
+    .metric-icon { position:relative; z-index:1; width:32px; height:32px; display:grid; place-items:center; flex:none; border-radius:10px; color:var(--metric-color,#356ae6); background:var(--metric-tint,#eff4ff); font-size:.95rem; }
+    .metric-value { position:relative; z-index:1; margin:0; color:#1d2b43; font-size:clamp(1.28rem,1.8vw,1.75rem); font-weight:720; letter-spacing:-.04em; line-height:1.15; overflow-wrap:anywhere; }
+    .metric-sub { position:relative; z-index:1; margin-top:.42rem; color:#8a96aa; font-size:.73rem; line-height:1.3; }
+    .dashboard-panel { padding:1.25rem; border:1px solid #e4e9f1; border-radius:16px; background:#fff; box-shadow:0 9px 26px rgba(28,44,72,.045); }
+    .dashboard-panel-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; padding-bottom:.95rem; border-bottom:1px solid #edf0f5; }
+    .dashboard-panel-heading h2 { margin:0; color:#25344d; font-size:1rem; font-weight:700; letter-spacing:-.02em; text-transform:none!important; }
+    .dashboard-panel-heading p { margin:.3rem 0 0; color:#8390a4; font-size:.81rem; }
+    .dashboard-panel-actions { display:flex; flex-wrap:wrap; gap:.45rem; }
+    .monthly-breakdown { max-height:calc(100vh - 400px); min-height:210px; overflow:auto; padding:.25rem .25rem 0 0; }
+    .month-entry { padding:.88rem .15rem; border-bottom:1px solid #f0f2f6; }
+    .month-entry:last-child { border-bottom:0; }
+    .month-entry-top { display:flex; justify-content:space-between; align-items:center; gap:.8rem; }
+    .month-entry-title { display:flex; align-items:center; gap:.6rem; color:#34435c; font-size:.86rem; font-weight:650; }
+    .month-entry-dot { width:8px; height:8px; border-radius:50%; background:#4e7bea; box-shadow:0 0 0 4px #edf2ff; }
+    .month-entry-amount { color:#1e2e48; font-size:.9rem; font-weight:700; white-space:nowrap; }
+    .month-entry-meta { display:flex; justify-content:space-between; gap:.8rem; margin:.56rem 0 .38rem; color:#8995a8; font-size:.73rem; }
+    .month-entry-track { height:5px; overflow:hidden; border-radius:99px; background:#edf0f5; }
+    .month-entry-track span { display:block; height:100%; min-width:2px; border-radius:99px; background:linear-gradient(90deg,#4f7bea,#72a0ff); }
+    .btn { font-size:.84rem; font-weight:650; }
+    .btn-sm { font-size:.78rem; }
+    .admin-sidebar-collapsed .admin-shell { grid-template-columns:78px minmax(0,1fr); }
+    .admin-sidebar-collapsed .admin-sidebar { padding-inline:.65rem; }
+    .admin-sidebar-collapsed .admin-brand { justify-content:center; padding-inline:0; }
+    .admin-sidebar-collapsed .admin-brand-text, .admin-sidebar-collapsed .admin-sidebar .sidebar-section-title, .admin-sidebar-collapsed .admin-sidebar-footer { display:none; }
+    .admin-sidebar-collapsed .admin-sidebar .nav-pill { justify-content:center; padding-inline:.4rem; }
+    .admin-sidebar-collapsed .admin-sidebar .nav-text { display:none; }
+    .admin-sidebar-collapsed .admin-sidebar .nav-pill .nav-icon { width:auto; font-size:1.05rem; }
+    .admin-sidebar-collapsed .admin-sidebar-collapse { align-self:center; }
+    @media(max-width:1200px) { .metrics-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+    @media(max-width:992px) {
+      .admin-shell { grid-template-columns:minmax(0,1fr); }
+      .admin-sidebar { position:fixed; left:0; top:0; z-index:1050; display:flex; width:min(84vw,290px); height:100dvh; transform:translateX(-105%); transition:transform .22s ease; }
+      body.mobile-nav-open .admin-sidebar { transform:translateX(0); }
+      .admin-sidebar-collapse { display:none; }
+      .admin-mobile-menu { width:38px; height:38px; display:grid; place-items:center; flex:none; border:1px solid #dfe5ef; border-radius:11px; color:#40516d; background:#fff; }
+      .admin-topbar { align-items:flex-start; }
+      .admin-topbar-actions { flex-wrap:wrap; }
+      .admin-date-chip { display:none; }
+    }
+    @media(max-width:640px) {
+      .admin-main { padding:1rem .8rem 1.4rem; }
+      .admin-topbar { align-items:center; gap:.55rem; margin-bottom:1.15rem; }
+      .admin-heading { flex:1; }
+      .admin-heading h1 { font-size:1.25rem; }
+      .admin-heading p { font-size:.76rem; }
+      .admin-topbar-actions { gap:.4rem; }
+      .language-picker { padding:.16rem; }
+      .language-option { min-height:32px; padding:.27rem .38rem; font-size:.72rem; }
+      .metrics-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.6rem; }
+      .metric-card { min-height:128px; padding:.78rem; }
+      .metric-label { font-size:.63rem; }
+      .metric-icon { width:29px; height:29px; }
+      .metric-sub { font-size:.68rem; }
+      .dashboard-panel { padding:.9rem; }
+      .dashboard-panel-heading { flex-direction:column; }
+      .dashboard-panel-actions { width:100%; }
+      .dashboard-panel-actions .btn { flex:1; }
+      .monthly-breakdown { max-height:none; }
+    }
   </style>
 </head>
 <body>
-  <div class="app-shell">
-    <aside id="admin-sidebar" class="sidebar">
-      <div class="sidebar-section-title">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">{{ i18n.overview }}</span></a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">{{ i18n.manage_employees }}</span></a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">{{ i18n.manage_sites }}</span></a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">{{ i18n.profile }}</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">{{ i18n.assign_coverage }}</span></a>
-      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a> #}
-      <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">{{ i18n.crawler }}</span></a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">{{ i18n.invoices }}</span></a>
-      <div class="sidebar-section-title">{{ i18n.account }}</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">{{ i18n.log_out }}</span></a>
-      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
-    </aside>
-    <main class="main-shell">
-      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
+  <div class="app-shell admin-shell">
+{% include "partials/admin_sidebar.html" %}
+    <main class="main-shell admin-main">
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-          <div class="mb-3">
+          <div class="dashboard-notices mb-3">
             {% for category, message in messages %}
               <div class="alert alert-{{ 'warning' if category == 'warning' else 'info' }} border-0 text-dark" role="alert">{{ message }}</div>
             {% endfor %}
@@ -212,78 +306,63 @@ ADMIN_TEMPLATE = """
         {% endif %}
       {% endwith %}
 
-      <header class="mb-4">
-        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-          <div>
-            <div class="badge-soft mb-2">{{ i18n.financial_dashboard }}</div>
-            <h1 class="h4 text-dark mb-1">{{ i18n.revenue_invoice_analytics }}</h1>
-            <p class="text-secondary mb-0">{{ period_label }} · {{ today_label }}</p>
-          </div>
-          <form method="get" class="d-flex align-items-center gap-2 mb-0">
-            <label class="small text-secondary mb-0" for="admin-lang-select">{{ i18n.language_label }}</label>
-            <select id="admin-lang-select" name="lang" class="form-select form-select-sm" onchange="this.form.submit()">
-              <option value="en" {% if lang == 'en' %}selected{% endif %}>English</option>
-              <option value="de" {% if lang == 'de' %}selected{% endif %}>Deutsch</option>
-            </select>
+      <header class="admin-topbar">
+
+        <div class="admin-heading">
+          <div class="admin-heading-eyebrow"><i class="bi bi-bar-chart-line-fill" aria-hidden="true"></i>{{ i18n.financial_dashboard }}</div>
+          <h1>{{ i18n.revenue_invoice_analytics }}</h1>
+          <p>{{ today_label }}</p>
+        </div>
+        <div class="admin-topbar-actions">
+          <div class="admin-date-chip"><i class="bi bi-calendar3" aria-hidden="true"></i><span>{{ period_label }}</span></div>
+          <form method="get" class="language-picker" aria-label="{{ i18n.language_label }}">
+            <button type="submit" name="lang" value="en" class="language-option {{ 'is-active' if lang == 'en' else '' }}" aria-pressed="{{ 'true' if lang == 'en' else 'false' }}" title="English"><span class="flag" aria-hidden="true">&#127468;&#127463;</span><span>EN</span></button>
+            <button type="submit" name="lang" value="de" class="language-option {{ 'is-active' if lang == 'de' else '' }}" aria-pressed="{{ 'true' if lang == 'de' else 'false' }}" title="Deutsch"><span class="flag" aria-hidden="true">&#127465;&#127466;</span><span>DE</span></button>
           </form>
         </div>
       </header>
 
-      <section class="metrics-grid mb-4">
-        <div class="metric-card">
-          <div class="metric-label">{{ i18n.total_invoices }}</div>
-          <div class="metric-value">{{ stats.total_invoices }}</div>
-          <div class="metric-sub">{{ i18n.track_hint }}</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">{{ i18n.total_billed }}</div>
-          <div class="metric-value">{{ "%.2f"|format(stats.total_revenue) }} €</div>
-          <div class="metric-sub">{{ i18n.track_hint }}</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">{{ i18n.collected }}</div>
-          <div class="metric-value">{{ "%.2f"|format(stats.paid_revenue) }} €</div>
-          <div class="metric-sub">{{ i18n.track_hint }}</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">{{ i18n.outstanding }}</div>
-          <div class="metric-value">{{ "%.2f"|format(stats.outstanding_revenue) }} €</div>
-          <div class="metric-sub">{{ i18n.track_hint }}</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">{{ i18n.overdue_invoices }}</div>
-          <div class="metric-value">{{ stats.overdue_invoices }}</div>
-          <div class="metric-sub">{{ i18n.track_hint }}</div>
-        </div>
+      <section class="metrics-grid mb-4" aria-label="{{ i18n.financial_dashboard }}">
+        <article class="metric-card" style="--metric-color:#416fe0;--metric-tint:#edf2ff">
+          <div class="metric-topline"><div class="metric-label">{{ i18n.total_invoices }}</div><span class="metric-icon"><i class="bi bi-receipt"></i></span></div>
+          <div class="metric-value">{{ stats.total_invoices }}</div><div class="metric-sub">{{ i18n.this_month }} &middot; {{ stats.invoices_this_month }} {{ i18n.invoices|lower }}</div>
+        </article>
+        <article class="metric-card" style="--metric-color:#12856b;--metric-tint:#e8f7f2">
+          <div class="metric-topline"><div class="metric-label">{{ i18n.total_billed }}</div><span class="metric-icon"><i class="bi bi-currency-euro"></i></span></div>
+          <div class="metric-value">{{ "%.2f"|format(stats.total_revenue) }} &euro;</div><div class="metric-sub">{{ i18n.this_month }} &middot; {{ "%.2f"|format(stats.income_this_month) }} &euro;</div>
+        </article>
+        <article class="metric-card" style="--metric-color:#23815e;--metric-tint:#eaf6ef">
+          <div class="metric-topline"><div class="metric-label">{{ i18n.collected }}</div><span class="metric-icon"><i class="bi bi-check2-circle"></i></span></div>
+          <div class="metric-value">{{ "%.2f"|format(stats.paid_revenue) }} &euro;</div><div class="metric-sub">{{ i18n.paid_invoices }}</div>
+        </article>
+        <article class="metric-card" style="--metric-color:#a16a12;--metric-tint:#fff5df">
+          <div class="metric-topline"><div class="metric-label">{{ i18n.outstanding }}</div><span class="metric-icon"><i class="bi bi-hourglass-split"></i></span></div>
+          <div class="metric-value">{{ "%.2f"|format(stats.outstanding_revenue) }} &euro;</div><div class="metric-sub">{{ i18n.open_invoices }}</div>
+        </article>
+        <article class="metric-card" style="--metric-color:#c04e46;--metric-tint:#fff0ee">
+          <div class="metric-topline"><div class="metric-label">{{ i18n.overdue_invoices }}</div><span class="metric-icon"><i class="bi bi-exclamation-circle"></i></span></div>
+          <div class="metric-value">{{ stats.overdue_invoices }}</div><div class="metric-sub">{{ i18n.needs_attention }}</div>
+        </article>
       </section>
 
-      <section class="row g-3 mb-4">
-        <div class="col-12">
-          <div class="card-surface p-3">
-            <div class="d-flex flex-wrap justify-content-between gap-3 align-items-center mb-3">
-              <div>
-                <h2 class="h6 text-uppercase text-secondary mb-2">{{ i18n.monthly_breakdown }}</h2>
-                <p class="placeholder mb-0">{{ i18n.track_hint }}</p>
-              </div>
-              <div class="d-flex gap-2 flex-wrap">
-                <a href="{{ url_for('admin_invoices') }}" class="btn btn-sm btn-outline-primary">{{ i18n.open_invoices }}</a>
-                <a href="{{ url_for('admin_dashboard_download_report') }}" class="btn btn-sm btn-primary">{{ i18n.download_csv }}</a>
-              </div>
-            </div>
-            <div class="monthly-breakdown">
-              <ul class="list-unstyled mb-0">
-                {% for summary in monthly_summaries %}
-                  <li class="py-3 border-bottom">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                      <span class="fw-semibold">{{ summary.month_name }}</span>
-                      <span>{{ "%.2f"|format(summary.total_income) }} €</span>
-                    </div>
-                    <div class="small text-muted">{{ summary.invoice_count }} invoices · {{ summary.total_hours }} hours</div>
-                  </li>
-                {% endfor %}
-              </ul>
-            </div>
+      <section class="dashboard-panel">
+        <div class="dashboard-panel-heading">
+          <div><h2>{{ i18n.monthly_breakdown }}</h2><p>{{ i18n.revenue_hours_hint }}</p></div>
+          <div class="dashboard-panel-actions">
+            <a href="{{ url_for('admin_invoices') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-receipt me-1"></i>{{ i18n.open_invoices }}</a>
+            <a href="{{ url_for('admin_dashboard_download_report') }}" class="btn btn-sm btn-primary"><i class="bi bi-download me-1"></i>{{ i18n.download_csv }}</a>
           </div>
+        </div>
+        <div class="monthly-breakdown">
+          <ul class="list-unstyled mb-0">
+            {% for summary in monthly_summaries %}
+              <li class="month-entry">
+                <div class="month-entry-top"><div class="month-entry-title"><span class="month-entry-dot" aria-hidden="true"></span>{{ summary.month_name }}</div><span class="month-entry-amount">{{ "%.2f"|format(summary.total_income) }} &euro;</span></div>
+                <div class="month-entry-meta"><span>{{ summary.invoice_count }} {{ i18n.invoices|lower }}</span><span>{{ summary.total_hours }} {{ i18n.hours|lower }}</span></div>
+                <div class="month-entry-track" role="img" aria-label="{{ summary.fill_ratio }}% {{ i18n.of }} {{ i18n.total_billed|lower }}"><span style="width:{{ summary.fill_ratio }}%"></span></div>
+              </li>
+            {% endfor %}
+          </ul>
         </div>
       </section>
     </main>
@@ -291,6 +370,23 @@ ADMIN_TEMPLATE = """
   <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+    (function() {
+      const body = document.body;
+      const button = document.getElementById('admin-sidebar-collapse');
+      const icon = button?.querySelector('i');
+      const key = 'elfs-plan-admin-sidebar';
+      const setCollapsed = (collapsed) => {
+        body.classList.toggle('admin-sidebar-collapsed', collapsed);
+        button?.setAttribute('aria-expanded', String(!collapsed));
+        button?.setAttribute('aria-label', collapsed ? 'Expand navigation' : 'Collapse navigation');
+        button?.setAttribute('title', collapsed ? 'Expand navigation' : 'Collapse navigation');
+        if (icon) icon.className = collapsed ? 'bi bi-chevron-bar-right' : 'bi bi-chevron-bar-left';
+        try { localStorage.setItem(key, collapsed ? '1' : '0'); } catch (_error) {}
+      };
+      try { setCollapsed(localStorage.getItem(key) === '1'); } catch (_error) { setCollapsed(false); }
+      button?.addEventListener('click', () => setCollapsed(!body.classList.contains('admin-sidebar-collapsed')));
+    })();
+
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
@@ -330,791 +426,284 @@ ADMIN_TEMPLATE = """
       });
     }
   </script>
-  <script>
-    // Schedule a morning 6:00 AM local notification (best-effort client-side)
-    (function() {
-      const todaysCount = {{ todays_shifts_count|default(0)|tojson }} || 0;
-      const todaysList = {{ todays_shifts_for_notify|default([])|tojson }} || [];
-      const uiToday = {{ (ui.today|default('Today'))|tojson }};
-      const uiYourMissions = {{ (ui.your_missions|default('Your missions'))|tojson }};
 
-      function msUntilNext6AM() {
-        const now = new Date();
-        const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6, 0, 0, 0);
-        if (now.getHours() >= 6) {
-          next.setDate(next.getDate() + 1);
-        }
-        return Math.max(0, next - now);
-      }
-
-      function showMorningNotification() {
-        if (!('Notification' in window)) return;
-        if (Notification.permission !== 'granted') return;
-        if (todaysCount <= 0) return;
-
-        const title = todaysCount > 1 ? `${todaysCount} ${uiYourMissions}` : uiYourMissions;
-        let body = '';
-        if (todaysList.length === 1) {
-          body = `${todaysList[0].site_name} · ${todaysList[0].time_window}`;
-        } else if (todaysList.length > 1) {
-          body = todaysList.slice(0,3).map(s => `${s.site_name} (${s.time_window})`).join('\n');
-        }
-        const opt = { body };
-        try { new Notification(title, opt); } catch (e) { /* ignore */ }
-      }
-
-      function ensurePermissionAndSchedule() {
-        if (!('Notification' in window)) return;
-        if (Notification.permission === 'default') {
-          Notification.requestPermission().then(() => {
-            // schedule after permission resolved
-            const ms = msUntilNext6AM();
-            setTimeout(function tick() {
-              showMorningNotification();
-              // reschedule for next day
-              setTimeout(tick, 24*3600*1000);
-            }, ms);
-          });
-        } else if (Notification.permission === 'granted') {
-          const ms = msUntilNext6AM();
-          setTimeout(function tick() {
-            showMorningNotification();
-            setTimeout(tick, 24*3600*1000);
-          }, ms);
-        }
-      }
-
-      // Try to schedule when the page is loaded. This works while the PWA is open in the background or foreground.
-      if (window.location.pathname.startsWith('/employee')) {
-        ensurePermissionAndSchedule();
-      }
-    })();
-  </script>
 </body>
 </html>
 """
 
 ADMIN_EMPLOYEES_TEMPLATE = """
 <!doctype html>
-<html lang="{{ lang }}">
+<html lang="{{ current_lang }}">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing — Mitarbeiter</title>
-  <meta name="theme-color" content="#ffffff" />
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="/static/logo.png">
-  <link rel="manifest" href="/static/admin-manifest.json">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Elf's Plan - Employee database</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
   <style>
-    :root {
-      --accent: #0f766e;
-      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
-      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
-      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
-      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
-      --btn-grad-danger: linear-gradient(135deg,#f87171 0%,#ef4444 50%,#dc2626 100%);
-      --btn-grad-danger-hover: linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);
-      --btn-grad-info: linear-gradient(135deg,#38bdf8 0%,#0ea5e9 50%,#2563eb 100%);
-      --btn-grad-info-hover: linear-gradient(135deg,#0ea5e9 0%,#2563eb 50%,#1d4ed8 100%);
-      --btn-grad-success: linear-gradient(135deg,#22c55e 0%,#16a34a 50%,#15803d 100%);
-      --btn-grad-success-hover: linear-gradient(135deg,#16a34a 0%,#15803d 50%,#166534 100%);
-      --btn-grad-light: linear-gradient(135deg,#ffffff 0%,#f1f5f9 100%);
-      --btn-grad-light-hover: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
-    }
-    body { background:#f1f5f9; color:#0f172a; font-size:1.05rem; }
-    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); background:#ffffff; }
-    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; color:#0f172a; }
-    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; }
-    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
-    .nav-pill.active, .nav-pill:hover { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
-    .nav-text { display:inline; }
-    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; }
-    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
-    .main-shell { padding:1.75rem; background:#ffffff; }
-    .badge-soft { border-radius:999px; border:1px solid #d6d3f0; color:#6366f1; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
-    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.25rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
-    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#475569; }
-    .form-control, .form-select, .input-group-text {
-      background:#ffffff;
-      color:#0f172a;
-      border:1.5px solid #94a3b8;
-    }
-    .form-control::placeholder { color:#64748b; opacity:1; }
-    .form-control:focus, .form-select:focus {
-      border-color:#0f766e;
-      box-shadow:0 0 0 3px rgba(15,118,110,0.15);
-      background:#ffffff;
-      color:#0f172a;
-    }
-    .little-card { border-radius:0.85rem; border:1px solid #e2e8f0; background:#f8fafc; }
-    .credential-box { border-radius:0.85rem; border:1px solid #cbd5f5; background:#f8fafc; padding:1rem; }
-    .credential-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:0.75rem; }
-    .credential-label { font-size:0.72rem; letter-spacing:0.12em; text-transform:uppercase; color:#64748b; }
-    .credential-value { font-size:1rem; font-weight:600; color:#0f172a; }
-    .credential-note { font-size:0.78rem; color:#0f766e; }
-    .credential-actions { display:flex; flex-wrap:wrap; gap:0.5rem; }
-    .employee-action-buttons { display:flex; flex-wrap:wrap; gap:0.5rem; justify-content:flex-end; }
-    .employee-action-buttons .btn { flex:1 1 120px; }
-    .flatpickr-calendar { z-index: 9999 !important; }
-    .flatpickr-calendar.inline { display: none !important; }
-    @media(max-width:768px){ .employee-action-buttons { justify-content:flex-start; } .employee-action-buttons .btn { flex:1 1 100%; } }
-    .assignment-section { border-radius:0.75rem; border:1px dashed #cbd5f5; background:#f8fafc; padding:0.85rem; }
-    .assignment-collapse { margin:0; border-radius:0.6rem; overflow:hidden; background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 8px 16px rgba(15,23,42,0.05); }
-    .assignment-collapse + .assignment-collapse { margin-top:0.65rem; }
-    .assignment-collapse summary { cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:0.75rem 0.85rem; font-weight:600; color:#0f172a; user-select:none; }
-    .assignment-collapse summary::-webkit-details-marker { display:none; }
-    .assignment-count { font-size:0.82rem; letter-spacing:0.08em; text-transform:uppercase; color:#64748b; }
-    .assignment-list { margin:0; padding:0.15rem 0.85rem 0.8rem; list-style:none; display:grid; gap:0.6rem; }
-    .assignment-list li { padding:0.6rem 0.55rem 0.55rem; border-radius:0.6rem; border:1px solid #e2e8f0; background:#ffffff; }
-    .assignment-primary { font-weight:600; color:#0f172a; }
-    .assignment-meta { font-size:0.85rem; color:#64748b; }
-    .assignment-status { font-size:0.78rem; color:#94a3b8; text-transform:uppercase; letter-spacing:0.08em; margin-top:0.2rem; }
-    .credential-edit { border:1px dashed #cbd5f5; border-radius:0.75rem; padding:1rem; background:#ffffff; }
-    .placeholder { color:#94a3b8; font-size:0.85rem; }
-    .mobile-nav-toggle { display:none; }
-    .mobile-nav-backdrop { display:none; }
-    .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-bottom:1.5rem; }
-    .stat-card { border-radius:0.85rem; border:1px solid #e2e8f0; background:#ffffff; padding:1rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
-    .stat-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#475569; margin-bottom:0.35rem; }
-    .stat-value { font-size:1.6rem; font-weight:600; color:#0f172a; }
-    .toast-container { position:fixed; bottom:2rem; right:2rem; z-index:2000; display:flex; flex-direction:column; gap:0.75rem; max-width:400px; pointer-events:none; }
-    .toast-container.mobile { bottom:1rem; right:1rem; max-width:calc(100vw - 2rem); }
-    .toast { display:flex; align-items:flex-start; gap:0.75rem; padding:1rem 1.25rem; border-radius:0.85rem; box-shadow:0 16px 32px rgba(15,23,42,0.15); background:#ffffff; border-left:4px solid #64748b; pointer-events:auto; animation:slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); position:relative; overflow:hidden; }
-    .toast.success { border-left-color:#22c55e; background:linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%); }
-    .toast.error { border-left-color:#ef4444; background:linear-gradient(135deg, #fef2f2 0%, #ffffff 100%); }
-    .toast.warning { border-left-color:#f59e0b; background:linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); }
-    .toast.info { border-left-color:#3b82f6; background:linear-gradient(135deg, #eff6ff 0%, #ffffff 100%); }
-    .toast-icon { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; flex-shrink:0; font-size:1rem; }
-    .toast.success .toast-icon { background:#ecfdf5; color:#22c55e; }
-    .toast.error .toast-icon { background:#fef2f2; color:#ef4444; }
-    .toast.warning .toast-icon { background:#fffbeb; color:#f59e0b; }
-    .toast.info .toast-icon { background:#eff6ff; color:#3b82f6; }
-    .toast-content { display:flex; flex-direction:column; gap:0.25rem; flex:1; }
-    .toast-title { font-weight:600; color:#0f172a; font-size:0.95rem; }
-    .toast.success .toast-title { color:#15803d; }
-    .toast.error .toast-title { color:#991b1b; }
-    .toast.warning .toast-title { color:#92400e; }
-    .toast.info .toast-title { color:#1e40af; }
-    .toast-message { font-size:0.85rem; color:#64748b; line-height:1.4; }
-    .toast.success .toast-message { color:#166534; }
-    .toast.error .toast-message { color:#7f1d1d; }
-    .toast.warning .toast-message { color:#78350f; }
-    .toast.info .toast-message { color:#1e3a8a; }
-    .toast-close { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border:none; background:none; cursor:pointer; color:#94a3b8; border-radius:4px; transition:background 0.2s ease; flex-shrink:0; }
-    .toast-close:hover { background:rgba(15,23,42,0.08); color:#64748b; }
-    .toast-progress { position:absolute; bottom:0; left:0; height:3px; background:currentColor; border-radius:0 0 0.85rem 0; animation:progress linear 5s forwards; }
-    .toast.success .toast-progress { color:#22c55e; }
-    .toast.error .toast-progress { color:#ef4444; }
-    .toast.warning .toast-progress { color:#f59e0b; }
-    .toast.info .toast-progress { color:#3b82f6; }
-    @keyframes slideIn { from { transform:translateX(400px); opacity:0; } to { transform:translateX(0); opacity:1; } }
-    @keyframes progress { from { width:100%; } to { width:0%; } }
-    @media(max-width:640px) { .toast-container { bottom:1rem; right:1rem; max-width:calc(100vw - 2rem); } .toast { gap:0.5rem; padding:0.9rem 1rem; font-size:0.9rem; } }
-    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
-    .btn { border:1px solid rgba(15,23,42,0.18); }
-    .btn i { font-size:1.05rem; }
-    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
-    .btn:hover { transform:translateY(-1px); box-shadow:0 14px 26px rgba(15,23,42,0.12); }
-    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
-    .btn-primary,
-    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
-    .btn-primary:hover,
-    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
-    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
-    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
-    .btn-outline-light { background-image:var(--btn-grad-light); color:#0f172a; }
-    .btn-outline-light:hover { background-image:var(--btn-grad-light-hover); color:#0f172a; }
-    .btn-outline-info,
-    .btn-info { background-image:var(--btn-grad-info); color:#ffffff; box-shadow:0 12px 24px rgba(14,165,233,0.25); }
-    .btn-outline-info:hover,
-    .btn-info:hover { background-image:var(--btn-grad-info-hover); color:#ffffff; }
-    .btn-outline-danger,
-    .btn-danger { background-image:var(--btn-grad-danger); color:#ffffff; box-shadow:0 12px 24px rgba(220,38,38,0.25); }
-    .btn-outline-danger:hover,
-    .btn-danger:hover { background-image:var(--btn-grad-danger-hover); color:#ffffff; }
-    .btn-success { background-image:var(--btn-grad-success); color:#ffffff; box-shadow:0 12px 24px rgba(34,197,94,0.25); }
-    .btn-success:hover { background-image:var(--btn-grad-success-hover); color:#ffffff; }
-    .btn-link { background:none; box-shadow:none; color:#0f766e; }
-    .btn-link:hover { color:#0c615b; }
-    @media(max-width:992px){
-      .app-shell{ grid-template-columns:minmax(0,1fr);} 
-      .sidebar{
-        position:fixed;
-        top:0;
-        left:0;
-        height:100vh;
-        width:min(82vw,300px);
-        max-width:320px;
-        z-index:1050;
-        display:flex;
-        transform:translateX(-100%);
-        transition:transform 0.2s ease;
-        box-shadow:0 24px 48px rgba(15,23,42,0.12);
-      }
-      body.mobile-nav-open .sidebar{ transform:translateX(0); }
-      .mobile-nav-backdrop{
-        position:fixed;
-        inset:0;
-        background:rgba(15,23,42,0.35);
-        z-index:1040;
-      }
-      body.mobile-nav-open .mobile-nav-backdrop{ display:block; }
-      .mobile-nav-toggle{
-        display:inline-flex;
-        align-items:center;
-        gap:0.4rem;
-        border-radius:0.75rem;
-        border:0;
-        background-image:var(--btn-grad-accent);
-        color:#ffffff;
-        padding:0.45rem 0.85rem;
-        font-size:0.95rem;
-        margin-bottom:1rem;
-        box-shadow:0 12px 24px rgba(15,118,110,0.25);
-      }
-      .mobile-nav-toggle:focus{ outline:2px solid rgba(15,118,110,0.4); outline-offset:2px; }
-    }
+    :root { --accent:#0f766e; --line:#e2e8f0; --muted:#64748b; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#f8fafc; color:#17213b; font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:228px minmax(0,1fr); background:#fff; }
+    .sidebar { background:#111b3d; color:#fff; padding:1.2rem .85rem; display:flex; flex-direction:column; gap:.4rem; }
+    .sidebar .brand { padding:.5rem .8rem 1rem; color:#fff; font-weight:700; }
+    .sidebar a { color:#dce4ff; padding:.7rem .8rem; border-radius:.6rem; text-decoration:none; }
+    .sidebar a:hover,.sidebar a.active { color:#fff; background:#26366c; }
+    .main { min-width:0; padding:1.7rem; }
+    .page-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin:0 0 1.25rem; }
+    .page-header h1 { margin:.2rem 0; font-size:1.45rem; }
+    .page-header p { margin:0; color:var(--muted); }
+    .eyebrow { color:#64748b; text-transform:uppercase; letter-spacing:.08em; font-size:.72rem; }
+    .employee-directory-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:0 0 .85rem; }
+    .employee-heading { display:flex; align-items:center; gap:.8rem; min-width:0; }
+    .employee-heading-mark { width:42px; height:42px; display:grid; place-items:center; flex:none; border:1px solid #dbe7ff; border-radius:13px; color:#2563eb; background:linear-gradient(145deg,#eff6ff,#e5efff); font-size:1.15rem; }
+    .employee-heading-copy { min-width:0; }
+    .employee-heading-copy .eyebrow { margin-bottom:.08rem; }
+    .employee-heading-copy h1 { margin:0; font-size:1.3rem; font-weight:720; letter-spacing:-.035em; }
+    .employee-heading-copy p { margin:.12rem 0 0; color:#718096; font-size:.8rem; }
+    .employee-count-pill { display:inline-flex; align-items:center; gap:.35rem; margin-left:.45rem; padding:.25rem .55rem; border:1px solid #e1e8f2; border-radius:999px; color:#52617a; background:#fff; font-size:.73rem; font-weight:650; white-space:nowrap; }
+    .employee-directory-header > .btn { min-height:38px; padding:.48rem .8rem; white-space:nowrap; }
+    .employee-status-tabs { display:flex; gap:1.35rem; align-items:center; min-height:43px; padding:0 .45rem; margin:0 0 .8rem; border-bottom:1px solid #e2e8f0; overflow-x:auto; }
+    .employee-status-tab { position:relative; display:inline-flex; align-items:center; gap:.42rem; flex:none; height:43px; padding:.3rem .1rem; color:#68758a; font-size:.89rem; font-weight:600; text-decoration:none; white-space:nowrap; }
+    .employee-status-tab:hover { color:#2563eb; text-decoration:none; }
+    .employee-status-tab.active { color:#1877f2; }
+    .employee-status-tab.active::after { position:absolute; right:0; bottom:-1px; left:0; height:3px; content:""; border-radius:3px 3px 0 0; background:#1877f2; }
+    .employee-status-tab-count { color:#9aa5b5; font-size:.72rem; font-weight:600; }
+    .employee-status-button { min-width:92px; min-height:32px; padding:.34rem .68rem; border:1px solid transparent; border-radius:8px; font-size:.76rem; font-weight:700; cursor:pointer; }
+    .employee-status-button.is-active { color:#087443; border-color:#a7e5c2; background:#e8f8ef; }
+    .employee-status-button.is-passive { color:#b42318; border-color:#f0c2bd; background:#fff0ee; }
+    .employee-status-button:hover { filter:brightness(.97); }
+    .employee-contract-link { display:inline-flex; align-items:center; gap:.35rem; color:#2563eb; font-size:.78rem; font-weight:650; text-decoration:none; white-space:nowrap; }
+    .employee-contract-link:hover { color:#1d4ed8; text-decoration:underline; }
+    .btn { border-radius:.7rem; font-size:.9rem; }
+    .btn-primary { border-color:#1877f2; background:#1877f2; }
+    .summary-grid { display:flex; flex-wrap:wrap; gap:.45rem; margin-bottom:.75rem; }
+    .summary-card { display:flex; align-items:center; gap:.4rem; min-height:32px; padding:.34rem .62rem; border:1px solid #e5eaf2; border-radius:999px; background:#fff; }
+    .summary-card span { color:#718096; font-size:.73rem; }
+    .summary-card strong { color:#263854; font-size:.78rem; font-weight:700; }
+    .employee-filter-toolbar { display:flex; align-items:center; gap:.45rem; flex-wrap:wrap; margin:0 0 .8rem; padding:.48rem; border:1px solid #e2e8f0; border-radius:13px; background:#fff; box-shadow:0 5px 16px rgba(20,38,67,.045); }
+    .employee-search-box { position:relative; display:flex; align-items:center; flex:1 1 220px; min-width:180px; }
+    .employee-search-box > i { position:absolute; left:.72rem; color:#8190a6; pointer-events:none; }
+    .employee-search-box .form-control { height:36px; padding-left:2.15rem; border:1px solid #e7ecf3; border-radius:9px; background:#f9fbfd; box-shadow:none; font-size:.83rem; }
+    .employee-filter-toolbar .form-select,.employee-filter-toolbar .form-control { height:36px; border:1px solid #e7ecf3; border-radius:9px; background-color:#fff; box-shadow:none; font-size:.81rem; }
+    .employee-filter-toolbar .employee-quick-filter { flex:0 1 165px; min-width:125px; }
+    .employee-filter-toolbar .employee-branch-filter { flex:0 1 125px; min-width:105px; }
+    .employee-advanced-filter { position:relative; }
+    .employee-advanced-filter > summary { display:inline-flex; align-items:center; gap:.4rem; min-height:36px; padding:.42rem .68rem; border:1px solid #e7ecf3; border-radius:9px; color:#52617a; background:#fff; cursor:pointer; font-size:.81rem; font-weight:600; list-style:none; white-space:nowrap; }
+    .employee-advanced-filter > summary::-webkit-details-marker { display:none; }
+    .employee-advanced-filter[open] > summary { color:#1d4ed8; border-color:#b9cffb; background:#f5f8ff; }
+    .employee-advanced-panel { position:absolute; top:calc(100% + 8px); right:0; z-index:20; display:grid; grid-template-columns:repeat(2,minmax(160px,1fr)); gap:.65rem; width:min(390px,calc(100vw - 32px)); padding:.85rem; border:1px solid #e0e7f1; border-radius:12px; background:#fff; box-shadow:0 16px 40px rgba(19,35,60,.16); }
+    .employee-advanced-panel label { display:grid; gap:.25rem; color:#69778c; font-size:.7rem; font-weight:650; }
+    .employee-filter-toolbar .btn { min-height:36px; padding:.42rem .68rem; font-size:.8rem; }
+    .employee-filter-clear { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border:1px solid #e7ecf3; border-radius:9px; color:#77849a; background:#fff; text-decoration:none; }
+    .employee-filter-clear:hover { color:#b42318; border-color:#f2c9c5; background:#fff8f7; }
+    .table-card { overflow:hidden; border:1px solid var(--line); border-radius:.85rem; background:#fff; }
+    .table-wrap { overflow:auto; }
+    .employee-table { min-width:780px; margin:0; }
+    .employee-table thead th { padding:.8rem; color:#64748b; background:#f8fafc; font-size:.75rem; text-transform:uppercase; white-space:nowrap; }
+    .employee-table td { padding:.75rem .8rem; vertical-align:middle; }
+    .employee-link { color:#17213b; font-weight:600; text-decoration:none; }
+    .employee-link:hover { color:#1877f2; text-decoration:underline; }
+    .employee-row-clickable { cursor:pointer; }
+    .employee-row-clickable:focus-visible { outline:3px solid rgba(37,99,235,.35); outline-offset:-3px; }
+    .employee-meta { display:flex; flex-direction:column; min-width:0; }
+    .employee-meta small { color:var(--muted); }
+    .employee-directory-cell { display:flex; align-items:center; gap:.8rem; min-width:250px; }
+    .employee-directory-cell .employee-meta { gap:.12rem; }
+    .employee-directory-cell .employee-link { color:#202124; font-size:1rem; font-weight:700; line-height:1.3; }
+    .employee-directory-title { color:#30343b; font-size:.9rem; line-height:1.35; }
+    .employee-directory-email { color:#68798d!important; font-size:.85rem; line-height:1.35; overflow-wrap:anywhere; }
+    .employee-photo { width:54px; height:54px; flex:none; border:1px solid var(--line); border-radius:50%; object-fit:cover; }
+    .employee-initial { display:grid; place-items:center; color:#1877f2; background:#e3f3ff; font-weight:700; }
+    .employee-status { display:inline-block; padding:.22rem .6rem; border-radius:999px; color:#087443; background:#d1fae5; font-size:.75rem; font-weight:700; }
+    .employee-status.inactive { color:#596273; background:#e9edf2; }
+    .empty-state { display:flex; align-items:center; flex-direction:column; gap:.35rem; padding:3rem 1rem; color:var(--muted); }
+    .empty-state i { font-size:2rem; color:#94a3b8; }
+    .credential-notice { padding:1rem; border:1px solid #bfdbfe; border-radius:.8rem; background:#eff6ff; margin-bottom:1rem; }
+    .employee-modal-backdrop { display:none; position:fixed; inset:0; z-index:1100; align-items:center; justify-content:center; padding:1rem; background:rgba(15,23,42,.48); }
+    .employee-modal-backdrop.is-open { display:flex; }
+    body.employee-modal-open { overflow:hidden; }
+    .employee-modal { display:flex; flex-direction:column; width:min(800px,100%); max-height:92vh; overflow:hidden; border-radius:1rem; background:#fff; box-shadow:0 28px 90px rgba(15,23,42,.28); }
+    .employee-modal-header { display:flex; justify-content:space-between; align-items:center; flex:none; padding:1rem 1.25rem; border-bottom:1px solid var(--line); }
+    .employee-modal-header h2 { margin:0; font-size:1.2rem; }
+    .employee-modal-header button { border:0; background:none; color:#64748b; font-size:1.6rem; }
+    #employee-form { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+    .employee-modal-body { overflow-y:auto; padding:1rem 1.25rem; }
+    .employee-form-section { padding:1rem; margin-bottom:.8rem; border:1px solid #edf0f5; border-radius:.8rem; }
+    .employee-form-section h3 { margin:0 0 .9rem; font-size:.95rem; font-weight:600; }
+    .employee-form-section .form-label { margin-bottom:.35rem; color:#596273; font-size:.82rem; }
+    .employee-form-section .form-control,.employee-form-section .form-select { min-height:2.6rem; border-color:#dce3ec; border-radius:.6rem; font-size:.9rem; }
+    .employee-platform-access-card { padding:.85rem; border:1px solid #dce7f7; border-radius:.75rem; background:#f8fbff; }
+    .employee-platform-access-card .form-check-label { color:#23324b; font-weight:650; }
+    .employee-function-picker { position:relative; }
+    .employee-function-toggle { display:flex; width:100%; justify-content:space-between; align-items:center; min-height:42px; border:1px solid #dce3ec; border-radius:.65rem; background:#fff; padding:.55rem .75rem; color:#263449; text-align:left; }
+    .employee-function-menu { position:absolute; z-index:20; inset:calc(100% + .35rem) 0 auto; max-height:260px; overflow:auto; padding:.45rem; border:1px solid #dce3ec; border-radius:.7rem; background:#fff; box-shadow:0 12px 30px #14233724; }
+    .employee-function-menu[hidden] { display:none; }
+    .employee-function-option-row { display:flex; gap:.6rem; align-items:center; padding:.5rem .55rem; border-radius:.45rem; cursor:pointer; }
+    .employee-function-option-row:hover { background:#f1f7f7; }
+    .employee-access-options { display:flex; flex-wrap:wrap; gap:.5rem; }
+    .employee-access-options label { display:flex; align-items:center; gap:.35rem; padding:.4rem .55rem; border:1px solid #dce3ec; border-radius:.5rem; }
+    .employee-function-menu-divider { margin:.45rem 0; border-top:1px solid #e5eaf0; }
+    .employee-function-menu-heading { padding:.35rem .55rem; color:#758197; font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    .employee-platform-settings { display:grid; gap:.75rem; margin-top:.85rem; padding-top:.85rem; border-top:1px solid #e3ebf6; }
+    .employee-platform-settings[hidden] { display:none; }
+    .employee-send-credentials { justify-self:start; min-height:38px; }
+    .employee-modal-footer { display:flex; flex:none; justify-content:flex-end; align-items:center; gap:.55rem; padding:.8rem 1.25rem; border-top:1px solid var(--line); }
+    .employee-modal-footer .me-auto { margin-right:auto; }
+    .pagination-bar { display:flex; justify-content:space-between; align-items:center; gap:.6rem; padding:.8rem; }
+    @media(max-width:850px) { .app-shell { grid-template-columns:1fr; } .sidebar { display:none; } .main { padding:1rem; } }
+    @media(max-width:700px) { .employee-directory-header { align-items:flex-start; } .employee-heading { align-items:flex-start; } .employee-count-pill { margin-left:0; } .employee-filter-toolbar { align-items:stretch; } .employee-search-box { flex-basis:100%; } .employee-filter-toolbar .employee-quick-filter,.employee-filter-toolbar .employee-branch-filter { flex:1 1 calc(50% - .5rem); } .employee-advanced-filter { flex:1 1 auto; } .employee-advanced-filter > summary { width:100%; justify-content:center; } .employee-filter-toolbar > .btn-primary { flex:1 1 auto; } .employee-advanced-panel { left:0; right:auto; grid-template-columns:1fr; } }
+    @media(max-width:600px) { .employee-directory-header { gap:.5rem; } .employee-heading-mark { width:36px; height:36px; border-radius:11px; } .employee-heading-copy h1 { font-size:1.15rem; } .employee-directory-header > .btn { padding:.42rem .6rem; font-size:.78rem; } .employee-modal-backdrop { padding:.35rem; } .employee-modal { max-height:96vh; border-radius:.75rem; } .employee-modal-header,.employee-modal-body,.employee-modal-footer { padding:.75rem; } .employee-modal-footer { flex-wrap:wrap; } .employee-modal-footer .me-auto { width:100%; } }
   </style>
 </head>
 <body>
   <div class="app-shell">
-    <aside id="admin-sidebar" class="sidebar">
-      <div class="sidebar-section-title">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">{{ i18n.overview }}</span></a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">{{ i18n.manage_employees }}</span></a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">{{ i18n.manage_sites }}</span></a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">{{ i18n.profile }}</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">{{ i18n.assign_coverage }}</span></a>
-      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a> #}
-      <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">{{ i18n.crawler }}</span></a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">{{ i18n.invoices }}</span></a>
-      <div class="sidebar-section-title">{{ i18n.account }}</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">{{ i18n.log_out }}</span></a>
-      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
-    </aside>
-    <main class="main-shell">
-      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menü</button>
-      <div id="toast-container" class="toast-container"></div>
-      <script>
-        window._toastQueue = window._toastQueue || [];
-        window.showToast = window.showToast || function(message, type = 'info', title = '') {
-          window._toastQueue.push({ message, type, title });
-        };
-      </script>
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          <script>
-            const fireToasts = function() {
-              {% for category, message in messages %}
-                window.showToast('{{ message | replace("'", "\\'") }}', '{{ 'success' if category=='success' else 'error' if category=='warning' else 'info' }}');
-              {% endfor %}
-            };
-            if (document.readyState === 'loading') {
-              document.addEventListener('DOMContentLoaded', fireToasts);
-            } else {
-              fireToasts();
-            }
-          </script>
-        {% endif %}
-      {% endwith %}
-
-      <header class="mb-4">
-        <div class="badge-soft mb-2">{{ i18n.team_directory }}</div>
-        <h1 class="h4 text-dark mb-1">{{ i18n.manage_employees }}</h1>
-        <p class="text-secondary mb-0">
-          {% if filtered_employees %}
-            {{ i18n.currently_shown }} {{ page_employees }} {{ i18n.of }} {{ filtered_employees }}
-          {% else %}
-            {{ i18n.no_matching_employees }}
-          {% endif %}
-          · {{ total_employees }} {{ i18n.total_employees }} · {{ today_shifts }} {{ i18n.scheduled_today }}
-        </p>
-      </header>
-      <div class="mb-3 d-flex justify-content-end">
-        <a href="{{ url_for('admin_profiles', tab='employees') }}" class="btn btn-sm btn-outline-primary">{{ i18n.open_employee_profiles }}</a>
-      </div>
-
-      <section class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Mitarbeiter gesamt</div>
-          <div class="stat-value">{{ total_employees }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Aktuell angezeigt</div>
-          <div class="stat-value">{{ page_employees }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Heute eingeplant</div>
-          <div class="stat-value">{{ today_shifts }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Diese Woche ohne Einsatz</div>
-          <div class="stat-value">{{ unassigned_employees }}</div>
-        </div>
+    {% include "partials/admin_sidebar.html" %}
+    <main class="main">
+      <header class="employee-directory-header"><div class="employee-heading"><span class="employee-heading-mark"><i class="bi bi-people-fill"></i></span><div class="employee-heading-copy"><div class="eyebrow">Team directory</div><h1>Employee database</h1><p>Manage staff across both branch offices <span class="employee-count-pill"><i class="bi bi-person-lines-fill"></i>{{ filtered_employees }} / {{ total_employees }}</span></p></div></div>{% if not is_sales_manager %}<button class="btn btn-primary" type="button" id="open-employee-create"><i class="bi bi-person-plus"></i><span>Add employee</span></button>{% endif %}</header>
+      <nav class="employee-status-tabs" aria-label="Filter employees by status">{% for status_key, status_label in [('all','All'),('active','Active'),('passive','Passive')] %}<a class="employee-status-tab {{ 'active' if status_filter == status_key else '' }}" href="{{ url_for('admin_employees', status_filter=status_key, q=search_q or None, staff_type_filter=staff_type_filter or None, branch_filter=branch_filter or None, work_type=work_type_filter or None, role=role_filter or None) }}">{{ status_label }}<span class="employee-status-tab-count">{{ status_counts.get(status_key, 0) }}</span></a>{% endfor %}</nav>
+      <section class="summary-grid"><div class="summary-card"><span>All employees</span><strong>{{ total_employees }}</strong></div><div class="summary-card"><span>Shown on this page</span><strong>{{ page_employees }}</strong></div><div class="summary-card"><span>Scheduled today</span><strong>{{ today_shifts }}</strong></div><div class="summary-card"><span>Cleaners without shifts this week</span><strong>{{ unassigned_employees }}</strong></div></section>
+      {% if credential_snippets and not is_sales_manager %}<section class="credential-notice"><strong>New employee sign-in details</strong>{% for emp_id, credential in credential_snippets.items() %}<div class="mt-2">Employee #{{ emp_id }} &middot; Login code: <strong>{{ credential.code or '-' }}</strong> &middot; PIN: <strong>{{ credential.pin or '-' }}</strong></div>{% endfor %}<small class="d-block mt-2">Save these details before leaving this page.</small></section>{% endif %}
+      <form method="get" class="employee-filter-toolbar" role="search">
+        <div class="employee-search-box"><i class="bi bi-search" aria-hidden="true"></i><label class="visually-hidden" for="employee-search">Search employees</label><input class="form-control" id="employee-search" name="q" value="{{ search_q or '' }}" placeholder="Search name, role, email, phone, or city"></div>
+        <label class="visually-hidden" for="employee-staff-type-filter">Functions</label><select class="form-select employee-quick-filter" id="employee-staff-type-filter" name="staff_type_filter"><option value="">All functions</option>{% for staff_type in employee_staff_types %}<option value="{{ staff_type }}" {% if staff_type_filter == staff_type %}selected{% endif %}>{{ staff_type }}</option>{% endfor %}</select>
+        <label class="visually-hidden" for="employee-branch-filter">Branch</label><select class="form-select employee-branch-filter" id="employee-branch-filter" name="branch_filter"><option value="">All branches</option><option value="Wien" {% if branch_filter == 'Wien' %}selected{% endif %}>Wien</option><option value="Graz" {% if branch_filter == 'Graz' %}selected{% endif %}>Graz</option></select>
+        <details class="employee-advanced-filter" {% if work_type_filter or role_filter %}open{% endif %}><summary><i class="bi bi-sliders"></i><span>More filters</span><i class="bi bi-chevron-down small"></i></summary><div class="employee-advanced-panel"><label for="employee-work-type-filter">Work type<select class="form-select" id="employee-work-type-filter" name="work_type"><option value="">All work types</option>{% for work_type in employee_work_types %}<option value="{{ work_type }}" {% if work_type_filter == work_type %}selected{% endif %}>{{ work_type }}</option>{% endfor %}</select></label><label for="employee-role-filter">Role<input class="form-control" id="employee-role-filter" name="role" value="{{ role_filter or '' }}" placeholder="Filter by role"></label></div></details>
+        {% if search_q or work_type_filter or role_filter or staff_type_filter or branch_filter %}<a class="employee-filter-clear" href="{{ url_for('admin_employees') }}" aria-label="Clear filters" title="Clear filters"><i class="bi bi-x-lg"></i></a>{% endif %}<button class="btn btn-primary" type="submit"><i class="bi bi-search"></i><span>Search</span></button>
+      </form>
+      <section class="table-card"><div class="table-wrap"><table class="table table-hover employee-table"><thead><tr><th>Employee</th><th>Phone number</th><th>Role</th>{% if not is_site_manager and not is_sales_manager %}<th>Contract</th>{% endif %}{% if show_shifts_column %}<th>Shifts</th>{% endif %}<th>Status</th>{% if not is_sales_manager %}<th class="text-end">Actions</th>{% endif %}</tr></thead><tbody>
+      {% for emp in employees %}<tr class="employee-row-clickable" data-row-url="{{ url_for('admin_employee_detail', employee_id=emp.id) }}" tabindex="0" role="link" aria-label="Open employee page for {{ emp.name|e }}">
+        <td><div class="employee-directory-cell">{% if emp.profile_image_path %}<img class="employee-photo" src="{{ url_for('static', filename=emp.profile_image_path) }}" alt="">{% else %}<span class="employee-photo employee-initial">{{ emp.name[:1]|upper }}</span>{% endif %}<div class="employee-meta"><a class="employee-link" href="{{ url_for('admin_employee_detail', employee_id=emp.id) }}">{{ emp.name }}</a><span class="employee-directory-title">{{ employee_function_map[emp.id]|join(', ') }}</span><small class="employee-directory-email">{{ emp.login_email or 'No email added' }}</small></div></div></td>
+        <td><div class="employee-meta"><span>{{ emp.profile_phone or '-' }}</span><small>{{ emp.profile_city or emp.profile_address or 'No contact details' }}</small></div></td><td>{{ emp.role or '-' }}</td>
+        {% if not is_site_manager and not is_sales_manager %}<td>{% if emp.profile_contract_start_date or emp.profile_contract_end_date %}<a class="employee-contract-link" href="{{ url_for('admin_employee_docx', employee_id=emp.id) }}"><i class="bi bi-download"></i><span>Download</span></a>{% else %}<span class="text-secondary">-</span>{% endif %}</td>{% endif %}
+        {% if show_shifts_column %}<td>{% if 'Cleaner' in employee_function_map[emp.id] %}{{ shift_counts.get(emp.id, 0) }}{% else %}<span class="text-secondary">-</span>{% endif %}</td>{% endif %}<td>{% if not is_sales_manager %}<form method="post" class="employee-status-form"><input type="hidden" name="action" value="set_status"><input type="hidden" name="id" value="{{ emp.id }}"><input type="hidden" name="worker_status" value="{{ 'passive' if emp.worker_status == 'active' else 'active' }}"><input type="hidden" name="redirect_status" value="{{ status_filter }}"><input type="hidden" name="redirect_q" value="{{ search_q }}"><input type="hidden" name="redirect_page" value="{{ page }}"><input type="hidden" name="redirect_work_type" value="{{ work_type_filter }}"><input type="hidden" name="redirect_role" value="{{ role_filter }}"><input type="hidden" name="redirect_staff_type" value="{{ staff_type_filter }}"><input type="hidden" name="redirect_branch" value="{{ branch_filter }}"><button class="employee-status-button {{ 'is-active' if emp.worker_status == 'active' else 'is-passive' }}" type="submit">{{ 'Active' if emp.worker_status == 'active' else 'Passive' }}</button></form>{% else %}<span class="employee-status {{ 'inactive' if emp.worker_status != 'active' else '' }}">{{ emp.worker_status|capitalize }}</span>{% endif %}</td>
+        {% if not is_sales_manager %}<td class="text-end"><div class="d-inline-flex gap-1"><button type="button" class="btn btn-sm btn-outline-secondary edit-employee-button"
+          data-id="{{ emp.id }}" data-name="{{ emp.name|e }}" data-role="{{ emp.role or ''|e }}" data-active="{{ '1' if emp.is_active != 0 else '0' }}" data-worker-status="{{ emp.worker_status or 'active' }}" data-login-email="{{ emp.login_email or ''|e }}"
+          data-phone="{{ emp.profile_phone or ''|e }}"
+          data-address="{{ emp.profile_address or ''|e }}" data-zip="{{ emp.profile_zip_code or ''|e }}" data-city="{{ emp.profile_city or ''|e }}"
+          data-start="{{ '' if is_site_manager else emp.profile_contract_start_date or ''|e }}" data-end="{{ '' if is_site_manager else emp.profile_contract_end_date or ''|e }}"
+          data-rate="{{ '' if is_site_manager else emp.profile_euros_per_hour or ''|e }}" data-hours="{{ emp.profile_working_hours or ''|e }}"
+          data-work-type="{{ emp.profile_work_type or ''|e }}" data-group-type="{{ '' if is_site_manager else emp.profile_group_type or ''|e }}" data-group-number="{{ '' if is_site_manager else emp.profile_group_number or ''|e }}" data-access-role="{{ emp.access_role or 'employee' }}" data-staff-type="{{ emp.staff_type or 'Cleaner'|e }}" data-staff-functions="{{ employee_function_map[emp.id]|join('|')|e }}" data-branch="{{ emp.branch or 'Wien'|e }}" data-platform-access="{{ '1' if emp.has_platform_access else '0' }}"
+          data-image="{{ emp.profile_image_path or ''|e }}"><i class="bi bi-pencil-square me-1"></i>Edit</button><form method="post" onsubmit="return confirm(document.documentElement.lang==='de'?'Mitarbeiter wirklich l'+String.fromCharCode(246)+'schen?':'Delete this employee?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="{{ emp.id }}"><input type="hidden" name="redirect_page" value="{{ page }}"><input type="hidden" name="redirect_q" value="{{ search_q }}"><button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Delete employee" title="Delete employee"><i class="bi bi-trash"></i></button></form></div></td>
+        {% else %}<td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin_employee_detail', employee_id=emp.id) }}"><i class="bi bi-eye me-1"></i>View</a></td>{% endif %}
+      </tr>{% else %}<tr><td colspan="{{ employee_column_count }}"><div class="empty-state"><i class="bi bi-people"></i><strong>No employees found</strong><span>Adjust your search or add an employee.</span>{% if not is_sales_manager %}<button type="button" class="btn btn-primary mt-2" id="open-employee-create-empty">Add employee</button>{% endif %}</div></td></tr>{% endfor %}
+      </tbody></table></div>
+      {% if total_pages > 1 %}<div class="pagination-bar border-top"><span class="text-secondary small">Page {{ page }} of {{ total_pages }}</span><div class="d-flex gap-2">{% if has_prev %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=prev_page, q=search_q or None, work_type=work_type_filter or None, role=role_filter or None, staff_type_filter=staff_type_filter or None, branch_filter=branch_filter or None) }}">Previous</a>{% endif %}{% if has_next %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=next_page, q=search_q or None, work_type=work_type_filter or None, role=role_filter or None, staff_type_filter=staff_type_filter or None, branch_filter=branch_filter or None) }}">Next</a>{% endif %}</div></div>{% endif %}
       </section>
-
-      <section class="card-surface mb-4">
-        <form method="get" class="row g-2 align-items-end">
-          <div class="col-sm-8">
-            <label class="form-label" for="employee_search">{{ i18n.employee_search_label }}</label>
-            <div class="input-group input-group-sm">
-              <input type="text" class="form-control" id="employee_search" name="q" value="{{ search_q or '' }}" placeholder="{{ i18n.search_placeholder }}">
-              <button class="btn btn-outline-primary" type="submit" title="{{ i18n.employee_search_label }}"><i class="bi bi-search"></i></button>
-            </div>
-          </div>
-          <div class="col-sm-4 d-flex align-items-start justify-content-end">
-            <a href="{{ url_for('admin_employees') }}" class="btn btn-sm btn-outline-secondary w-100" title="{{ i18n.reset_filters }}"><i class="bi bi-x-circle"></i> {{ i18n.reset_filters }}</a>
-          </div>
-        </form>
-      </section>
-
-      <div class="row g-3">
-        <div class="col-12 col-lg-4">
-          <div class="card-surface mb-3">
-            <h2 class="h6 text-uppercase text-secondary mb-3">Mitarbeiter hinzufügen</h2>
-            <form method="post" enctype="multipart/form-data" class="row g-3">
-              <input type="hidden" name="action" value="create">
-              <div class="col-12">
-                <label class="form-label" for="new_employee_name">Name</label>
-                <input type="text" class="form-control form-control-sm" id="new_employee_name" name="name" required>
-              </div>
-              <div class="col-12">
-                <label class="form-label" for="new_employee_role">Rolle</label>
-                <input type="text" class="form-control form-control-sm" id="new_employee_role" name="role" value="Reinigungskraft">
-              </div>
-              <div class="col-12">
-                <label class="form-label" for="new_employee_profile_image">Profilbild (optional)</label>
-                <input type="file" class="form-control form-control-sm" id="new_employee_profile_image" name="profile_image" accept="image/*">
-              </div>
-              <div class="col-12">
-                <label class="form-label" for="new_employee_is_active">Status</label>
-                <select class="form-select form-select-sm" id="new_employee_is_active" name="is_active">
-                  <option value="1" selected>Aktiv</option>
-                  <option value="0">Inaktiv</option>
-                </select>
-              </div>
-              <div class="col-12">
-                <button type="submit" class="btn btn-sm btn-primary w-100" title="Mitarbeiter hinzufügen"><i class="bi bi-person-plus"></i></button>
-              </div>
-            </form>
-          </div>
-        </div>
-        <div class="col-12 col-lg-8">
-            {% if employees %}
-              <div class="vstack gap-3">
-                {% for emp in employees %}
-                  <div class="little-card p-3">
-                    <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
-                      <input type="hidden" name="id" value="{{ emp.id }}">
-                      <input type="hidden" name="redirect_page" value="{{ page }}">
-                      {% if search_q %}
-                        <input type="hidden" name="redirect_q" value="{{ search_q }}">
-                      {% endif %}
-                      <div class="col-md-5 col-12">
-                        <label class="form-label">Name</label>
-                        <input type="text" class="form-control form-control-sm" name="name" value="{{ emp.name }}" required>
-                      </div>
-                      <div class="col-md-5 col-12">
-                        <label class="form-label">Rolle</label>
-                        <input type="text" class="form-control form-control-sm" name="role" value="{{ emp.role or '' }}">
-                      </div>
-                      <div class="col-md-2 col-12">
-                        <label class="form-label">Status</label>
-                        <select class="form-select form-select-sm" name="is_active">
-                          <option value="1" {% if emp.is_active != 0 %}selected{% endif %}>Aktiv</option>
-                          <option value="0" {% if emp.is_active == 0 %}selected{% endif %}>Inaktiv</option>
-                        </select>
-                      </div>
-                      <div class="col-md-3 col-12">
-                        <label class="form-label">PLZ</label>
-                        <input type="text" class="form-control form-control-sm" name="profile_zip_code" value="{{ emp.profile_zip_code or '' }}">
-                      </div>
-                      <div class="col-md-3 col-12">
-                        <label class="form-label">Stadt</label>
-                        <input type="text" class="form-control form-control-sm" name="profile_city" value="{{ emp.profile_city or '' }}">
-                      </div>
-                      <div class="col-md-3 col-12">
-                        <label class="form-label">Beginndatum</label>
-                        <input type="text" class="form-control form-control-sm js-contract-date" name="profile_contract_start_date" value="{{ emp.profile_contract_start_date or '' }}" placeholder="YYYY-MM-DD">
-                      </div>
-                      <div class="col-md-3 col-12">
-                        <label class="form-label">Enddatum</label>
-                        <input type="text" class="form-control form-control-sm js-contract-date" name="profile_contract_end_date" value="{{ emp.profile_contract_end_date or '' }}" placeholder="YYYY-MM-DD">
-                      </div>
-                      <div class="col-md-4 col-12">
-                        <label class="form-label">Beschäftigungsart</label>
-                        <input type="text" class="form-control form-control-sm" name="profile_employment_type" value="{{ emp.profile_employment_type or 'Reinigungskraft' }}">
-                      </div>
-                      <div class="col-md-3 col-12">
-                        <label class="form-label">Euro/Std</label>
-                        <input type="text" class="form-control form-control-sm" name="profile_euros_per_hour" value="{{ emp.profile_euros_per_hour or '12,37' }}" placeholder="12,37">
-                      </div>
-                      <div class="col-md-3 col-12">
-                        <label class="form-label">Arbeitsstunden</label>
-                        <input type="text" class="form-control form-control-sm" name="profile_working_hours" value="{{ emp.profile_working_hours or '3' }}" placeholder="3">
-                      </div>
-                      <div class="col-md-3 col-12">
-                        <label class="form-label">Arbeitszeitmodell</label>
-                        <select class="form-select form-select-sm" name="profile_work_type">
-                          <option value="Teilzeit" {% if (emp.profile_work_type or 'Teilzeit') == 'Teilzeit' %}selected{% endif %}>Teilzeit</option>
-                          <option value="Vollzeit" {% if (emp.profile_work_type or '') == 'Vollzeit' %}selected{% endif %}>Vollzeit</option>
-                        </select>
-                      </div>
-                      <div class="col-md-12 col-12">
-                        <label class="form-label">Profilbild</label>
-                        {% if emp.profile_image_path %}
-                          <div class="mb-2">
-                            <img src="{{ url_for('static', filename=emp.profile_image_path) }}" alt="Profilbild von {{ emp.name }}" style="max-width:96px; border-radius:6px;">
-                          </div>
-                        {% endif %}
-                        <input type="file" class="form-control form-control-sm" name="profile_image" accept="image/*">
-                      </div>
-                      <div class="col-md-4 col-12">
-                        <label class="form-label">Gruppen</label>
-                        <div class="input-group input-group-sm">
-                          <select class="form-select" name="profile_group_type">
-                            <option value="Lohngruppe" {% if (emp.profile_group_type or 'Lohngruppe') == 'Lohngruppe' %}selected{% endif %}>Lohngruppe</option>
-                            <option value="Verwendungsgruppe" {% if (emp.profile_group_type or '') == 'Verwendungsgruppe' %}selected{% endif %}>Verwendungsgruppe</option>
-                          </select>
-                          <input type="number" min="1" class="form-control" name="profile_group_number" value="{{ emp.profile_group_number or '6' }}" placeholder="6">
-                        </div>
-                      </div>
-                      <div class="col-md-2 col-12 employee-action-buttons">
-                        <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Speichern"><i class="bi bi-check2"></i></button>
-                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('{{ emp.name }} löschen?')" title="Löschen"><i class="bi bi-trash"></i></button>
-                        <a href="{{ url_for('admin_employee_docx', employee_id=emp.id) }}" class="btn btn-sm btn-outline-primary" title="Mitarbeiterdokument herunterladen"><i class="bi bi-file-earmark-word"></i></a>
-                      </div>
-                    </form>
-                    <div class="small text-secondary mt-2">Geplante Schichten: <span class="text-primary">{{ shift_counts.get(emp.id, 0) }}</span></div>
-
-                    {% set snippet = (credential_snippets|default({})).get(emp.id|string) %}
-                    {% set code_display = snippet.code if snippet and snippet.code else (emp.login_code or 'Ausstehend') %}
-                    {% set pin_display = snippet.pin if snippet and snippet.pin else (emp.login_pin_plain or None) %}
-
-                    <div class="credential-box mt-3">
-                      <div class="credential-grid">
-                        <div>
-                          <div class="credential-label">Anmeldecode</div>
-                          <div class="credential-value">{{ code_display }}</div>
-                        </div>
-                        <div>
-                          <div class="credential-label">PIN</div>
-                          <div class="credential-value">
-                            {% if pin_display %}
-                              {{ pin_display }}
-                            {% elif emp.login_pin_hash %}
-                              PIN vorhanden — einmal „PIN teilen“ klicken, damit sie wieder angezeigt wird
-                            {% else %}
-                              Wird erstellt…
-                            {% endif %}
-                          </div>
-                        </div>
-                        <div>
-                          <div class="credential-label">Anmelde-E-Mail</div>
-                          <div class="credential-value">{{ emp.login_email or 'Nicht gesetzt' }}</div>
-                        </div>
-                      </div>
-                      {% if pin_display and snippet and snippet.pin %}
-                        <div class="credential-note mt-2">Neue PIN erstellt — bitte zeitnah mit {{ emp.name }} teilen.</div>
-                      {% endif %}
-                    </div>
-
-                    <div class="credential-actions mt-3">
-                      <form method="post" class="d-inline">
-                        <input type="hidden" name="action" value="credentials_share">
-                        <input type="hidden" name="id" value="{{ emp.id }}">
-                        {% if search_q %}
-                          <input type="hidden" name="redirect_q" value="{{ search_q }}">
-                        {% endif %}
-                        <input type="hidden" name="redirect_page" value="{{ page }}">
-                        <button type="submit" class="btn btn-sm btn-outline-info">{% if emp.login_pin_plain %}PIN teilen{% else %}Neue PIN erzeugen und teilen{% endif %}</button>
-                      </form>
-                      {% if pin_display %}
-                        {% set share_text = 'Anmeldecode: ' ~ code_display ~ ' · PIN: ' ~ pin_display %}
-                        <button type="button" class="btn btn-sm btn-outline-light cred-copy-btn" data-credentials="{{ share_text }}">Details kopieren</button>
-                      {% endif %}
-                      <button type="button" class="btn btn-sm btn-outline-secondary cred-edit-btn" data-edit-target="cred-edit-{{ emp.id }}" aria-expanded="false">Bearbeiten</button>
-                    </div>
-
-                    <div class="credential-edit d-none mt-3" id="cred-edit-{{ emp.id }}">
-                      <form method="post" class="row g-2 align-items-end">
-                        <input type="hidden" name="action" value="credentials_update">
-                        <input type="hidden" name="id" value="{{ emp.id }}">
-                        {% if search_q %}
-                          <input type="hidden" name="redirect_q" value="{{ search_q }}">
-                        {% endif %}
-                        <input type="hidden" name="redirect_page" value="{{ page }}">
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Anmelde-E-Mail</label>
-                          <input type="email" class="form-control form-control-sm" name="login_email" value="{{ emp.login_email or '' }}" placeholder="Optionale E-Mail">
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Anmeldecode</label>
-                          <input type="text" class="form-control form-control-sm" name="login_code" value="{{ code_display }}" required>
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Neue PIN (4 Ziffern)</label>
-                          <input type="text" class="form-control form-control-sm" name="login_pin" pattern="\d{4}" placeholder="Leer lassen zum Beibehalten">
-                        </div>
-                        <div class="col-12 d-flex justify-content-end gap-2">
-                          <button type="submit" class="btn btn-sm btn-success">Zugangsdaten speichern</button>
-                        </div>
-                      </form>
-                    </div>
-
-                    {% set shift_block = employee_shift_groups.get(emp.id, {}) %}
-                    {% set future_jobs = shift_block.get('upcoming', []) %}
-                    {% set past_jobs = shift_block.get('history', []) %}
-                    <div class="assignment-section mt-3">
-                      <details class="assignment-collapse">
-                        <summary>
-                          <span>Kommende Einsätze</span>
-                          <span class="assignment-count">{{ future_jobs|length }}</span>
-                        </summary>
-                        {% if future_jobs %}
-                          <ul class="assignment-list">
-                            {% for job in future_jobs %}
-                              <li>
-                                <div class="assignment-primary">{{ job.site_name }}</div>
-                                <div class="assignment-meta">{{ job.day_label }} · {{ job.time_window }}</div>
-                                <div class="assignment-status">{{ job.status_label }}</div>
-                              </li>
-                            {% endfor %}
-                          </ul>
-                        {% else %}
-                          <div class="placeholder px-3 pb-3">Noch keine kommenden Einsätze.</div>
-                        {% endif %}
-                      </details>
-                      <details class="assignment-collapse">
-                        <summary>
-                          <span>Vergangene Einsätze</span>
-                          <span class="assignment-count">{{ past_jobs|length }}</span>
-                        </summary>
-                        {% if past_jobs %}
-                          <ul class="assignment-list">
-                            {% for job in past_jobs %}
-                              <li>
-                                <div class="assignment-primary">{{ job.site_name }}</div>
-                                <div class="assignment-meta">{{ job.day_label }} · {{ job.time_window }}</div>
-                                <div class="assignment-status">{{ job.status_label }}</div>
-                              </li>
-                            {% endfor %}
-                          </ul>
-                        {% else %}
-                          <div class="placeholder px-3 pb-3">Noch keine abgeschlossenen Einsätze.</div>
-                        {% endif %}
-                      </details>
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-              {% if total_pages > 1 %}
-                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-4">
-                  <span class="text-secondary small">Seite {{ page }} von {{ total_pages }}</span>
-                  <div class="btn-group" role="group" aria-label="Mitarbeiter-Seitennavigation">
-                    {% if has_prev %}
-                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=prev_page, q=search_q or None, free='1' if free_filter else None, free_day=free_day or None, free_week_start=free_week_start or None) }}">Zurück</a>
-                    {% else %}
-                      <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Zurück</span>
-                    {% endif %}
-                    {% for page_num in range(1, total_pages + 1) %}
-                      {% if page_num == page %}
-                        <span class="btn btn-sm btn-primary disabled" aria-current="page">{{ page_num }}</span>
-                      {% else %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=page_num, q=search_q or None, free='1' if free_filter else None, free_day=free_day or None, free_week_start=free_week_start or None) }}">{{ page_num }}</a>
-                      {% endif %}
-                    {% endfor %}
-                    {% if has_next %}
-                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_employees', page=next_page, q=search_q or None, free='1' if free_filter else None, free_day=free_day or None, free_week_start=free_week_start or None) }}">Weiter</a>
-                    {% else %}
-                      <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Weiter</span>
-                    {% endif %}
-                  </div>
-                </div>
-              {% endif %}
-            {% else %}
-            <div class="card-surface">
-              <p class="placeholder mb-0">Keine Mitarbeiter passen zu diesem Filter. Bitte Suche erweitern.</p>
-            </div>
-          {% endif %}
-        </div>
-      </div>
     </main>
   </div>
-    <script>
-      document.getElementById('year').textContent = new Date().getFullYear();
-
-      // Modern Toast Notification System
-      window.showToast = function(message, type = 'info', title = '') {
-        const container = document.getElementById('toast-container');
-        if (!container) return;
-
-        const icons = {
-          success: '✓',
-          error: '✕',
-          warning: '!',
-          info: 'ℹ'
-        };
-
-        const titles = {
-          success: 'Erfolg',
-          error: 'Fehler',
-          warning: 'Warnung',
-          info: 'Information'
-        };
-
-        const finalTitle = title || titles[type] || 'Nachricht';
-        const icon = icons[type] || 'ℹ';
-
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.innerHTML = `
-          <div class="toast-icon">${icon}</div>
-          <div class="toast-content">
-            <div class="toast-title">${finalTitle}</div>
-            <div class="toast-message">${message}</div>
-          </div>
-          <button type="button" class="toast-close" aria-label="Schließen">×</button>
-          <div class="toast-progress"></div>
-        `;
-
-        container.appendChild(toast);
-
-        const closeBtn = toast.querySelector('.toast-close');
-        closeBtn.addEventListener('click', () => {
-          toast.style.animation = 'slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) reverse';
-          setTimeout(() => {
-            if (toast.parentElement) toast.remove();
-          }, 300);
-        });
-
-        setTimeout(() => {
-          if (toast.parentElement) {
-            toast.style.animation = 'slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) reverse';
-            setTimeout(() => {
-              if (toast.parentElement) toast.remove();
-            }, 300);
-          }
-        }, 5000);
+  {% if not is_sales_manager %}<div class="employee-modal-backdrop" id="employee-modal" aria-hidden="true"><section class="employee-modal" role="dialog" aria-modal="true" aria-labelledby="employee-modal-title">
+    <header class="employee-modal-header"><h2 id="employee-modal-title">Add employee</h2><button type="button" id="close-employee-modal" aria-label="Close">&times;</button></header>
+    <form method="post" enctype="multipart/form-data" id="employee-form"><input type="hidden" name="action" id="employee-action" value="create"><input type="hidden" name="id" id="employee-id"><input type="hidden" name="return_to" value="{{ request.args.get('return_to', '') }}"><input type="hidden" name="redirect_q" value="{{ search_q }}"><input type="hidden" name="redirect_page" value="{{ page }}"><input type="hidden" name="redirect_work_type" value="{{ work_type_filter }}"><input type="hidden" name="redirect_role" value="{{ role_filter }}"><input type="hidden" name="redirect_staff_type" value="{{ staff_type_filter }}"><input type="hidden" name="redirect_branch" value="{{ branch_filter }}"><input type="hidden" name="redirect_status" value="{{ status_filter }}">
+      <div class="employee-modal-body">
+        <section class="employee-form-section"><h3>Employee</h3><div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="employee-name">Full name *</label><input class="form-control" id="employee-name" name="name" required></div>
+          <div class="col-md-6"><label class="form-label" for="employee-role">Role / job title</label><input class="form-control" id="employee-role" name="role" placeholder="e.g. Team lead"><div class="form-text">The employee’s specific job title.</div></div>
+          <div class="col-md-6"><label class="form-label" for="employee-branch">Branch office</label><select class="form-select" id="employee-branch" name="branch"><option value="Wien">Wien</option><option value="Graz">Graz</option></select></div>
+          <div class="col-md-6"><label class="form-label" for="employee-status">Employee status</label><select class="form-select" id="employee-status" name="worker_status"><option value="active">Active</option><option value="passive">Passive</option></select></div>
+          <div class="col-md-6"><label class="form-label" for="employee-photo">Profile photo</label><input class="form-control" type="file" id="employee-photo" name="profile_image" accept="image/png,image/jpeg,image/gif,image/webp,image/heic"></div>
+          <div class="col-12" id="employee-existing-photo-wrap" hidden><img id="employee-existing-photo" class="employee-photo" alt="Employee profile photo"></div>
+        </div></section>
+        <section class="employee-form-section"><h3>Contact details</h3><div class="row g-3">
+          <div class="col-md-4"><label class="form-label" for="employee-phone">Phone</label><input class="form-control" type="tel" id="employee-phone" name="profile_phone"></div>
+          <div class="col-md-4"><label class="form-label" for="employee-address">Street address</label><input class="form-control" id="employee-address" name="profile_address"></div>
+          <div class="col-md-2"><label class="form-label" for="employee-zip">Postal code</label><input class="form-control" id="employee-zip" name="profile_zip_code"></div>
+          <div class="col-md-2"><label class="form-label" for="employee-city">City</label><input class="form-control" id="employee-city" name="profile_city"></div>
+        </div></section>
+        <section class="employee-form-section"><h3>Employment and contract</h3><div class="row g-3">
+          <div class="col-md-4"><label class="form-label" for="employee-work-type">Work type</label><select class="form-select" id="employee-work-type" name="profile_work_type"><option value="Teilzeit">Part-time</option><option value="Vollzeit">Full-time</option><option value="Intern">Intern</option></select></div>
+          {% if not is_site_manager %}<div class="col-md-4"><label class="form-label" for="employee-rate">Hourly pay</label><input class="form-control" id="employee-rate" name="profile_euros_per_hour" inputmode="decimal"></div>{% endif %}
+          <div class="col-md-4"><label class="form-label" for="employee-hours">Weekly hours</label><input class="form-control" id="employee-hours" name="profile_working_hours"></div>
+          {% if not is_site_manager %}<div class="col-md-4"><label class="form-label" for="employee-contract-start">Contract start</label><input class="form-control" type="date" id="employee-contract-start" name="profile_contract_start_date"></div>
+          <div class="col-md-4"><label class="form-label" for="employee-contract-end">Contract end</label><input class="form-control" type="date" id="employee-contract-end" name="profile_contract_end_date"></div>
+          <div class="col-md-6"><label class="form-label" for="employee-group-type">Pay group type</label><select class="form-select" id="employee-group-type" name="profile_group_type"><option value="Lohngruppe">Pay group</option><option value="Verwendungsgruppe">Usage group</option></select></div>
+          <div class="col-md-6"><label class="form-label" for="employee-group-number">Group number</label><input class="form-control" id="employee-group-number" name="profile_group_number"></div>{% endif %}
+        </div></section>
+        <section class="employee-form-section"><h3>Platform access</h3><div class="employee-platform-access-card">
+          <label class="form-label" for="employee-functions-toggle">Functions</label>
+          <div class="employee-function-picker"><button class="employee-function-toggle" type="button" id="employee-functions-toggle" aria-expanded="false" aria-controls="employee-functions-menu"><span id="employee-functions-summary">Cleaner</span><i class="bi bi-chevron-down"></i></button>
+            <div class="employee-function-menu" id="employee-functions-menu" hidden>{% for function in employee_staff_types %}<label class="employee-function-option-row"><input class="form-check-input employee-function-option" type="checkbox" value="{{ function }}" {% if function == 'Cleaner' %}checked{% endif %}><span>{{ function }}</span></label>{% endfor %}{% if is_main_admin %}<div class="employee-function-menu-divider"></div><div class="employee-function-menu-heading">System access</div><div class="employee-access-options" role="radiogroup" aria-label="System access">{% for role_value, role_label in [('none','No system access'),('employee','Cleaner'),('site_manager','Site manager'),('sales_manager','Sales manager'),('admin','Admin')] %}<label><input class="form-check-input employee-access-option" type="radio" name="employee_access_picker" value="{{ role_value }}" {% if role_value == 'none' %}checked{% endif %}><span>{{ role_label }}</span></label>{% endfor %}</div>{% endif %}</div>
+          </div><input type="hidden" name="staff_functions" id="employee-staff-functions" value='["Cleaner"]'><input type="hidden" name="staff_type" id="employee-staff-type" value="Cleaner"><input type="hidden" name="access_role" id="employee-access-role" value="employee">
+          <div class="form-text">Choose every function this person performs. A person can have more than one.</div>
+          {% if is_main_admin %}<div class="employee-platform-settings" id="employee-platform-settings"><div><label class="form-label" for="employee-login-email">Employee email</label><input class="form-control" type="email" id="employee-login-email" name="login_email" autocomplete="email" placeholder="name@example.com"><div class="form-text">Used for sign-in and credential delivery.</div></div><div class="form-check"><input class="form-check-input" type="checkbox" id="employee-platform-access" name="has_platform_access" value="1"><label class="form-check-label" for="employee-platform-access">Enable platform access and create sign-in details</label></div><button class="btn btn-primary employee-send-credentials" id="send-employee-credentials" type="submit" name="send_credentials_email" value="1"><i class="bi bi-send-fill"></i><span>Send sign-in details by email</span></button></div>{% else %}<div class="form-text mt-2">Platform access must be enabled by an administrator before an employee can sign in. Other functions are stored on the employee record.</div>{% endif %}
+        </div></section>
+      </div>
+      <footer class="employee-modal-footer"><a class="btn btn-outline-secondary me-auto" href="{{ url_for('admin_employees') }}">Employee database</a><button type="button" class="btn btn-outline-secondary" id="cancel-employee-modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><span id="employee-submit-label">Create employee</span></button></footer>
+    </form>
+  </section></div>
+  <script>
+    (() => {
+      const modal=document.getElementById('employee-modal'), form=document.getElementById('employee-form'), german=document.documentElement.lang==='de';
+      const set=(id,value)=>{const el=document.getElementById(id);if(!el)return;if(el.type==='checkbox')el.checked=Boolean(value);else el.value=value??'';};
+      const platformAccess=document.getElementById('employee-platform-access'), platformSettings=document.getElementById('employee-platform-settings');
+      const functionToggle=document.getElementById('employee-functions-toggle'), functionMenu=document.getElementById('employee-functions-menu');
+      const functionOptions=[...document.querySelectorAll('.employee-function-option')], accessOptions=[...document.querySelectorAll('.employee-access-option')];
+      const syncFunctionAccess=()=>{
+        let selected=functionOptions.filter(option=>option.checked).map(option=>option.value);
+        if(!selected.length&&functionOptions.length){functionOptions[0].checked=true;selected=[functionOptions[0].value];}
+        document.getElementById('employee-staff-functions').value=JSON.stringify(selected);
+        document.getElementById('employee-staff-type').value=selected[0]||'Cleaner';
+        const selectedAccess=accessOptions.find(option=>option.checked);
+        const access=selectedAccess?.value||'none';
+        document.getElementById('employee-access-role').value=access==='none'?'employee':access;
+        if(platformAccess)platformAccess.checked=access!=='none';
+        const accessLabel=selectedAccess?.parentElement.querySelector('span')?.textContent||'No system access';
+        document.getElementById('employee-functions-summary').textContent=[...selected, accessLabel].join(', ');
       };
-      if (window._toastQueue && Array.isArray(window._toastQueue) && window._toastQueue.length) {
-        window._toastQueue.forEach(({ message, type, title }) => window.showToast(message, type, title));
-        window._toastQueue = [];
-      }
-
-      // Form submission handlers for employee management
-      document.addEventListener('DOMContentLoaded', function() {
-        const forms = document.querySelectorAll('form');
-        forms.forEach(form => {
-          if (form.method.toLowerCase() === 'post') {
-            form.addEventListener('submit', function(e) {
-              const actionBtn = document.activeElement;
-              const action = actionBtn.name === 'action' ? actionBtn.value : (form.querySelector('input[name="action"]')?.value || 'unknown');
-
-              // Map actions to user-friendly messages
-              const messages = {
-                create: { success: 'Mitarbeiter erfolgreich hinzugefügt', error: 'Fehler beim Hinzufügen des Mitarbeiters' },
-                update: { success: 'Mitarbeiter erfolgreich aktualisiert', error: 'Fehler beim Aktualisieren des Mitarbeiters' },
-                delete: { success: 'Mitarbeiter erfolgreich gelöscht', error: 'Fehler beim Löschen des Mitarbeiters' },
-                credentials_share: { success: 'Anmeldedaten aktualisiert', error: 'Fehler beim Aktualisieren der Anmeldedaten' },
-                credentials_update: { success: 'Anmeldedaten gespeichert', error: 'Fehler beim Speichern der Anmeldedaten' }
-              };
-
-              const msg = messages[action] || messages['update'];
-              // Note: The actual success/error will be shown via flashed messages
-              // This just logs the action; the server will handle the response
-            });
-          }
-        });
-      });
-
-      (function() {
-        const body = document.body;
-        const toggle = document.getElementById('mobile-nav-toggle');
-        const sidebar = document.getElementById('admin-sidebar');
-        const backdrop = document.getElementById('mobile-nav-backdrop');
-        if (!toggle || !sidebar || !backdrop) {
-          return;
-        }
-        const closeNav = () => {
-          body.classList.remove('mobile-nav-open');
-          toggle.setAttribute('aria-expanded', 'false');
-        };
-        const openNav = () => {
-          body.classList.add('mobile-nav-open');
-          toggle.setAttribute('aria-expanded', 'true');
-        };
-        toggle.addEventListener('click', () => {
-          if (body.classList.contains('mobile-nav-open')) {
-            closeNav();
-          } else {
-            openNav();
-          }
-        });
-        backdrop.addEventListener('click', closeNav);
-        sidebar.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeNav));
-      })();
-      document.querySelectorAll('.cred-copy-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const payload = btn.dataset.credentials;
-          if (!payload) {
-            return;
-          }
-          const original = btn.textContent;
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(payload).then(() => {
-              btn.textContent = 'Kopiert!';
-              setTimeout(() => { btn.textContent = original; }, 1800);
-            }).catch(() => {
-              window.prompt('Zugangsdaten kopieren:', payload);
-            });
-          } else {
-            window.prompt('Zugangsdaten kopieren:', payload);
-          }
-        });
-      });
-      document.querySelectorAll('.cred-edit-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const targetId = btn.dataset.editTarget;
-          const target = document.getElementById(targetId);
-          if (!target) {
-            return;
-          }
-          const isHidden = target.classList.contains('d-none');
-          if (isHidden) {
-            target.classList.remove('d-none');
-            btn.setAttribute('aria-expanded', 'true');
-          } else {
-            target.classList.add('d-none');
-            btn.setAttribute('aria-expanded', 'false');
-          }
-        });
-      });
-    </script>
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+      const syncPlatformSettings=()=>{
+        if(platformSettings&&platformAccess){platformSettings.querySelectorAll('input,select,button').forEach(el=>{if(el!==platformAccess)el.disabled=!platformAccess.checked;});}
+      };
+      const setFunctionAccess=(functions,role)=>{
+        const selected=Array.isArray(functions)&&functions.length?functions:['Cleaner'];
+        functionOptions.forEach(option=>{option.checked=selected.includes(option.value);});
+        const normalizedRole=role||'employee';
+        accessOptions.forEach(option=>{option.checked=option.value===normalizedRole;});
+        syncFunctionAccess();
+      };
+      const chooseAccess=role=>{
+        accessOptions.forEach(option=>{option.checked=option.value===role;});
+        if(platformAccess)platformAccess.checked=role!=='none';
+        syncFunctionAccess();syncPlatformSettings();
+      };
+      const open=(data=null)=>{
+        form.reset(); document.getElementById('employee-modal-title').textContent=german?(data?'Mitarbeiter bearbeiten':'Mitarbeiter hinzuf'+String.fromCharCode(252)+'gen'):(data?'Edit employee':'Add employee');
+        document.getElementById('employee-submit-label').textContent=german?(data?String.fromCharCode(196)+'nderungen speichern':'Mitarbeiter anlegen'):(data?'Save changes':'Create employee');
+        set('employee-action',data?'update':'create'); document.getElementById('employee-existing-photo-wrap').hidden=true;
+        if(data){set('employee-id',data.id);set('employee-name',data.name);set('employee-role',data.role);set('employee-status',data.workerStatus||'active');set('employee-phone',data.phone);set('employee-address',data.address);set('employee-zip',data.zip);set('employee-city',data.city);set('employee-contract-start',data.start);set('employee-contract-end',data.end);set('employee-rate',data.rate);set('employee-hours',data.hours);set('employee-work-type',data.workType);set('employee-group-type',data.groupType);set('employee-group-number',data.groupNumber);set('employee-login-email',data.loginEmail);set('employee-branch',data.branch||'Wien');set('employee-platform-access',data.platformAccess==='1');const existingFunctions=Array.isArray(data.staffFunctions)?data.staffFunctions:(data.staffFunctions||data.staffType||'Cleaner').toString().split('|').filter(Boolean);setFunctionAccess(existingFunctions,data.platformAccess==='1'?(data.accessRole||'employee'):'none');if(data.image){document.getElementById('employee-existing-photo-wrap').hidden=false;document.getElementById('employee-existing-photo').src='/static/'+data.image;}}
+        else{set('employee-id','');set('employee-status','active');set('employee-work-type','Teilzeit');set('employee-group-type','Lohngruppe');set('employee-branch','Wien');set('employee-platform-access',false);setFunctionAccess(['Cleaner'],'none');}
+        if(functionMenu){functionMenu.hidden=true;functionToggle?.setAttribute('aria-expanded','false');}
+        syncPlatformSettings();modal.classList.add('is-open');modal.setAttribute('aria-hidden','false');document.body.classList.add('employee-modal-open');setTimeout(()=>document.getElementById('employee-name').focus(),40);
+      };
+      const close=()=>{
+        if(!modal)return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden','true');
+        document.body.classList.remove('employee-modal-open');
+        if(functionMenu){functionMenu.hidden=true;functionToggle?.setAttribute('aria-expanded','false');}
+        document.getElementById('open-employee-create')?.focus();
+      };
+      functionOptions.forEach(option=>option.addEventListener('change',()=>{
+        const managerFunction=option.checked&&option.value==='Site manager'?'site_manager':option.checked&&option.value==='Sales manager'?'sales_manager':null;
+        if(managerFunction&&accessOptions.some(accessOption=>accessOption.value===managerFunction))chooseAccess(managerFunction);else syncFunctionAccess();
+      }));accessOptions.forEach(option=>option.addEventListener('change',()=>chooseAccess(option.value)));
+      functionToggle?.addEventListener('click',()=>{functionMenu.hidden=!functionMenu.hidden;functionToggle.setAttribute('aria-expanded',String(!functionMenu.hidden));});
+      document.addEventListener('click',event=>{if(functionMenu&&!functionMenu.hidden&&!event.target.closest('.employee-function-picker')){functionMenu.hidden=true;functionToggle?.setAttribute('aria-expanded','false');}});
+      document.getElementById('open-employee-create').addEventListener('click',()=>open());document.getElementById('open-employee-create-empty')?.addEventListener('click',()=>open());
+      document.querySelectorAll('.edit-employee-button').forEach(button=>button.addEventListener('click',()=>open(button.dataset)));
+      platformAccess?.addEventListener('change',()=>{if(!platformAccess.checked)chooseAccess('none');else if(!accessOptions.some(option=>option.checked&&option.value!=='none'))chooseAccess('employee');syncPlatformSettings();});
+      document.getElementById('close-employee-modal').addEventListener('click',close);document.getElementById('cancel-employee-modal').addEventListener('click',close);modal.addEventListener('click',event=>{if(event.target===modal)close();});document.addEventListener('keydown',event=>{if(event.key==='Escape'&&modal.classList.contains('is-open'))close();});
+      const employeeToEdit={{ employee_to_edit_data|tojson }};const openCreateRequested={{ 'true' if request.args.get('create') == '1' else 'false' }};if(employeeToEdit)open(employeeToEdit);else if(openCreateRequested)open();
+    })();
+  </script>{% endif %}
   <script>
-    if (window.flatpickr) {
-      flatpickr('.js-contract-date', {
-        dateFormat: 'Y-m-d',
-        locale: {
-          firstDayOfWeek: 1,
-        },
-        static: false,
-        disableMobile: false,
+    document.querySelectorAll('.employee-row-clickable').forEach((row)=>{
+      row.addEventListener('click',(event)=>{
+        if(event.target.closest('a,button,input,select,textarea,label,form,[role="button"]')) return;
+        window.location.assign(row.dataset.rowUrl);
       });
-    }
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
+      row.addEventListener('keydown',(event)=>{
+        if((event.key==='Enter'||event.key===' ')&&event.target===row){event.preventDefault();window.location.assign(row.dataset.rowUrl);}
       });
-    }
+    });
   </script>
 </body>
 </html>
@@ -1122,7 +711,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
 
 ADMIN_SITES_TEMPLATE = """
 <!doctype html>
-<html lang="en">
+<html lang="{{ current_lang }}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -1221,6 +810,92 @@ ADMIN_SITES_TEMPLATE = """
       padding:0.35rem 0.55rem;
       border-radius:0.6rem;
     }
+    .client-search-bar { display:flex; align-items:center; gap:.65rem; padding:.6rem .75rem; border:1px solid #dbe3ef; border-radius:.85rem; background:#fff; box-shadow:0 5px 16px rgba(15,23,42,.04); }
+    .client-search-bar > i { color:#64748b; }
+    .client-search-bar .form-control { border:0; box-shadow:none; min-width:120px; }
+    .client-table { min-width:850px; font-size:.9rem; }
+    .client-table thead th { padding:.9rem .8rem; white-space:nowrap; }
+    .client-table tbody td { padding:.8rem; }
+    .client-main { display:flex; flex-direction:column; min-width:0; }
+    .client-main strong, .client-main span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:250px; }
+    .client-main small { color:#64748b; }
+    .client-detail-link { color:#0f172a; text-decoration:none; }
+    .client-detail-link:hover { color:#2563eb; text-decoration:underline; }
+    .client-logo { width:40px; height:40px; border-radius:10px; object-fit:cover; border:1px solid #e2e8f0; }
+    .client-logo-placeholder { display:inline-flex; align-items:center; justify-content:center; background:#eff6ff; color:#2563eb; font-weight:700; }
+    .status-pill { display:inline-flex; border-radius:999px; padding:.24rem .65rem; font-size:.75rem; font-weight:600; }
+    .status-pill.is-active { color:#047857; background:#d1fae5; }
+    .status-pill.is-inactive { color:#64748b; background:#e2e8f0; }
+    .shift-count { display:inline-flex; min-width:1.8rem; justify-content:center; border-radius:999px; padding:.15rem .5rem; background:#eff6ff; color:#1d4ed8; font-weight:600; }
+    .empty-clients { display:flex; align-items:center; flex-direction:column; gap:.35rem; color:#64748b; }
+    .empty-clients i { font-size:2rem; color:#94a3b8; }
+    .empty-clients strong { color:#0f172a; }
+    .client-modal-backdrop { display:none; position:fixed; inset:0; z-index:1100; align-items:center; justify-content:center; padding:1rem; background:rgba(15,23,42,.48); }
+    .client-modal-backdrop.is-open { display:flex; }
+    body.client-modal-open { overflow:hidden; }
+    .client-modal { display:flex; flex-direction:column; width:min(760px,100%); max-height:min(92vh,900px); overflow:hidden; border-radius:1rem; background:#fff; box-shadow:0 28px 90px rgba(15,23,42,.28); }
+    .client-modal-header { display:flex; align-items:center; justify-content:space-between; flex:none; padding:1rem 1.25rem; border-bottom:1px solid #e8edf4; }
+    .client-modal-header h2 { margin:0; font-size:1.2rem; font-weight:600; }
+    .client-modal-close { border:0; background:none; color:#64748b; font-size:1.6rem; line-height:1; }
+    #client-form { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+    .client-modal-body { padding:1rem 1.25rem; overflow-y:auto; overscroll-behavior:contain; }
+    .client-form-section { padding:1rem; margin-bottom:.8rem; border:1px solid #edf0f5; border-radius:.8rem; background:#fff; }
+    .client-form-section h3 { margin:0 0 .9rem; font-size:.95rem; font-weight:600; color:#334155; }
+    .client-form-section .form-label { margin-bottom:.35rem; text-transform:none; letter-spacing:0; font-size:.82rem; }
+    .client-form-section .form-control, .client-form-section .form-select { min-height:2.65rem; border:1px solid #dce3ec; border-radius:.65rem; font-size:.9rem; }
+    .client-form-section textarea.form-control { min-height:6rem; }
+    .client-modal-footer { flex:none; display:flex; align-items:center; justify-content:flex-end; gap:.55rem; padding:.8rem 1.25rem; border-top:1px solid #e8edf4; background:#fff; }
+    .client-modal-footer .btn { min-height:2.55rem; font-size:.88rem; }
+    :root { --accent:#014D4E; --btn-grad-accent:linear-gradient(135deg,#014D4E 0%,#087f7d 100%); --btn-grad-accent-hover:linear-gradient(135deg,#013f40 0%,#066967 100%); }
+    body { background:#f5f7fa; color:#1d2d44; font-size:14px; }
+    .main-shell { min-width:0; padding:clamp(1rem,2vw,1.6rem); background:#f5f7fa; }
+    .badge-soft { color:#014D4E; background:#e8f3f2; border-color:#cce1df; }
+    .stats-grid { gap:.75rem; margin-bottom:.9rem; }
+    .stat-card { padding:.85rem 1rem; border-color:#e6eaf0; border-radius:13px; box-shadow:0 3px 12px rgba(25,39,61,.035); }
+    .stat-label { color:#77849a; }
+    .stat-value { color:#1d2d44; font-size:1.35rem; }
+    .site-status-tabs { display:flex; gap:1.15rem; overflow-x:auto; margin:0 0 .85rem; padding:0 .15rem; border-bottom:1px solid #e5e9ef; white-space:nowrap; }
+    .site-status-tab { display:inline-flex; align-items:center; gap:.45rem; padding:.55rem .1rem .65rem; border-bottom:3px solid transparent; color:#667287; text-decoration:none; font-weight:600; }
+    .site-status-tab span { color:#8792a4; font-size:.75rem; }
+    .site-status-tab.active { color:#014D4E; border-color:#014D4E; }
+    .site-status-tab.active span { color:#014D4E; }
+    .client-search-bar { gap:.45rem; padding:.45rem .55rem; border-color:#e5e9ef; border-radius:12px; box-shadow:0 3px 12px rgba(25,39,61,.035); }
+    .client-search-bar .form-control { height:36px; font-size:.85rem; }
+    .client-table { min-width:760px; font-size:.86rem; }
+    .client-table thead th { padding:.7rem .75rem; color:#77849a; background:#f8fafb; font-size:.7rem; }
+    .client-table tbody td { padding:.65rem .75rem; border-color:#edf0f4; }
+    .site-row-clickable { cursor:pointer; }
+    .site-row-clickable:hover { background:#f7fbfa; }
+    .site-row-clickable:focus-visible { outline:3px solid rgba(1,77,78,.22); outline-offset:-3px; }
+    .client-logo { width:42px; height:42px; border-radius:12px; }
+    .client-logo-placeholder { color:#014D4E; background:#e8f3f2; }
+    .client-detail-link:hover { color:#014D4E; }
+    .card-surface { border-color:#e6eaf0; border-radius:14px; box-shadow:0 4px 14px rgba(25,39,61,.04); }
+    .site-status-form { margin:0; }
+    .site-status-button { min-width:76px; padding:.3rem .6rem; border:0; border-radius:999px; font-size:.75rem; font-weight:700; }
+    .site-status-button.is-active { color:#fff; background:#16865f; }
+    .site-status-button.is-inactive { color:#fff; background:#dc4545; }
+    .site-status-button:hover { filter:brightness(.94); }
+    .btn { min-height:40px; padding:.48rem .8rem; border-radius:10px; font-size:.85rem; box-shadow:0 2px 7px rgba(25,39,61,.06); }
+    .btn-sm { min-height:34px; padding:.35rem .6rem; border-radius:9px; font-size:.78rem; }
+    .btn-primary,.btn-outline-primary { color:#fff; border-color:#014D4E; background-image:linear-gradient(135deg,#014D4E,#087f7d); box-shadow:0 4px 10px rgba(1,77,78,.17); }
+    .btn-primary:hover,.btn-outline-primary:hover { color:#fff; background-image:linear-gradient(135deg,#013f40,#066967); }
+    @media(max-width:650px) { .main-shell { padding:.75rem; } .site-status-tabs { gap:.85rem; } .stats-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:992px) { .sidebar-collapse-toggle { display:none; } }
+    @media(max-width:650px) { .client-modal-backdrop { padding:.4rem; } .client-modal { max-height:96vh; border-radius:.8rem; } .client-modal-header,.client-modal-body,.client-modal-footer { padding:.75rem; } .client-modal-footer { flex-wrap:wrap; } .client-modal-footer .me-auto { margin-right:0!important; width:100%; } .client-search-bar { flex-wrap:wrap; } .client-search-bar .form-control { flex:1 1 70%; } }
+
+    @media(min-width:993px) {
+      body.sidebar-collapsed .app-shell { grid-template-columns:72px minmax(0,1fr); }
+      body.sidebar-collapsed .sidebar { width:72px; padding:1.1rem .6rem; gap:1rem; }
+      body.sidebar-collapsed .sidebar-section-title,
+      body.sidebar-collapsed .nav-text,
+      body.sidebar-collapsed .sidebar-footer { display:none; }
+      body.sidebar-collapsed .nav-pill { justify-content:center; padding:.55rem .35rem; }
+      body.sidebar-collapsed .sidebar-collapse-toggle { align-self:center; }
+    }
+    .sidebar-collapse-toggle { display:flex; align-items:center; justify-content:center; align-self:flex-end; width:34px; height:34px; border:1px solid #dbe3ef; border-radius:.65rem; color:#334155; background:#fff; }
+    .sidebar-collapse-toggle:hover { color:#0f766e; border-color:#99f6e4; background:#f0fdfa; }
+    .sidebar-collapse-toggle:focus-visible { outline:3px solid rgba(14,165,233,.3); outline-offset:2px; }
     .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-bottom:1.5rem; }
     .stat-card { border-radius:0.85rem; border:1px solid #e2e8f0; background:#ffffff; padding:1rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
     .stat-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#475569; margin-bottom:0.35rem; }
@@ -1228,7 +903,7 @@ ADMIN_SITES_TEMPLATE = """
     .mobile-nav-toggle { display:none; }
     .mobile-nav-backdrop { display:none; }
     @media(max-width:992px){
-      .app-shell{ grid-template-columns:minmax(0,1fr);} 
+      .app-shell{ grid-template-columns:minmax(0,1fr);}
       .sidebar{
         position:fixed;
         top:0;
@@ -1269,22 +944,9 @@ ADMIN_SITES_TEMPLATE = """
 </head>
 <body>
   <div class="app-shell">
-    <aside id="admin-sidebar" class="sidebar">
-      <div class="sidebar-section-title">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">⚙ <span class="nav-text">Übersicht</span></a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">👥 <span class="nav-text">Mitarbeiter verwalten</span></a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">🏢 <span class="nav-text">Standorte verwalten</span></a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">🪪 <span class="nav-text">Profile</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">🗓 <span class="nav-text">Einsätze zuweisen</span></a>
-      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">📇 <span class="nav-text">Lead-Center</span></a> #}
-      <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">◎ <span class="nav-text">Crawler</span></a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">📄 <span class="nav-text">Rechnungen</span></a>
-      <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Abmelden</span></a>
-      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
-    </aside>
+    {% include "partials/admin_sidebar.html" %}
     <main class="main-shell">
-      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menü</button>
+      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar"><i class="bi bi-list" aria-hidden="true"></i> Menu</button>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="mb-3">
@@ -1296,226 +958,172 @@ ADMIN_SITES_TEMPLATE = """
           </div>
         {% endif %}
       {% endwith %}
-      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+      <header class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
         <div>
-          <div class="badge-soft mb-2">Standortübersicht</div>
-          <h1 class="h3 mb-1 text-dark">Kundenstandorte verwalten</h1>
-          <p class="text-secondary mb-0">
-            {% if filtered_sites %}
-              Zeigt {{ page_sites }} von {{ filtered_sites }} Treffern
-            {% else %}
-              Keine Standorte entsprechen den aktuellen Filtern
-            {% endif %}
-            · {{ total_sites }} Standorte gesamt
-          </p>
+          <div class="badge-soft mb-2">Client database</div>
+          <h1 class="h3 mb-1 text-dark">Manage clients</h1>
+          <p class="text-secondary mb-0">{{ filtered_sites }} clients shown &middot; {{ total_sites }} total &middot; {{ inactive_sites }} inactive</p>
         </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <a href="{{ url_for('admin_profiles', tab='clients') }}" class="btn btn-sm btn-outline-primary">Kundenprofile</a>
-          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Zurück zur Übersicht</a>
-          <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-primary">Plan öffnen</a>
-        </div>
-      </div>
-      <section class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Standorte gesamt</div>
-          <div class="stat-value">{{ total_sites }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Aktive Standorte mit Einsätzen diese Woche</div>
-          <div class="stat-value">{{ covered_sites }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Unzugewiesene aktive Standorte</div>
-          <div class="stat-value">{{ unassigned_active_sites }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Inaktive Kunden</div>
-          <div class="stat-value">{{ inactive_sites }}</div>
-        </div>
+        <button type="button" class="btn btn-primary" id="open-client-create"><i class="bi bi-plus-circle me-1"></i> Add client</button>
+      </header>
+      <section class="stats-grid" aria-label="Client summary">
+        <div class="stat-card"><div class="stat-label">All clients</div><div class="stat-value">{{ total_sites }}</div></div>
+        <div class="stat-card"><div class="stat-label">Active clients</div><div class="stat-value">{{ active_sites_total }}</div></div>
+        <div class="stat-card"><div class="stat-label">With shifts this week</div><div class="stat-value">{{ covered_sites }}</div></div>
+        <div class="stat-card"><div class="stat-label">Without shifts this week</div><div class="stat-value">{{ unassigned_active_sites }}</div></div>
       </section>
-      <form method="get" class="row g-2 align-items-end mb-4">
-        <div class="col-sm-8">
-          <label class="form-label" for="site_search">Standorte suchen</label>
-          <div class="input-group input-group-sm">
-            <input type="text" class="form-control" id="site_search" name="q" value="{{ search_q or '' }}" placeholder="Nach Name oder Adresse suchen">
-              <button class="btn btn-outline-primary" type="submit" title="Suchen"><i class="bi bi-search"></i></button>
-          </div>
-        </div>
-        <div class="col-sm-4">
-          <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-clear-sites w-100" title="Filter zurücksetzen"><i class="bi bi-x-circle"></i></a>
-        </div>
+      <nav class="site-status-tabs" aria-label="Filter sites by status">{% for status_key, status_label in [('all','All sites'),('active','Active'),('inactive','Inactive')] %}<a class="site-status-tab {{ 'active' if status_filter == status_key else '' }}" href="{{ url_for('admin_sites', status_filter=status_key, q=search_q or None) }}">{{ status_label }}{% if status_key == 'all' %}<span>{{ total_sites }}</span>{% elif status_key == 'active' %}<span>{{ active_sites_total }}</span>{% else %}<span>{{ inactive_sites }}</span>{% endif %}</a>{% endfor %}</nav>
+      <form method="get" class="client-search-bar mb-3">
+        <input type="hidden" name="status_filter" value="{{ status_filter }}">
+        <label class="visually-hidden" for="site_search">Search clients</label>
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input type="search" class="form-control" id="site_search" name="q" value="{{ search_q or '' }}" placeholder="Search company, contact, email, phone, address or tax ID">
+        {% if search_q %}<a href="{{ url_for('admin_sites', status_filter=status_filter if status_filter != 'all' else None) }}" class="btn btn-outline-secondary" aria-label="Clear search"><i class="bi bi-x-lg"></i></a>{% endif %}
+        <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>Search</button>
       </form>
-      <div class="row g-3">
-        <div class="col-12 col-lg-4">
-          <div class="card-surface mb-3">
-            <h2 class="h6 text-uppercase text-secondary mb-3">Standort hinzufügen</h2>
-            <form method="post" class="row g-3">
-              <input type="hidden" name="entity" value="site">
-              <input type="hidden" name="action" value="create">
-              <div class="col-12">
-                <label class="form-label" for="new_site_name">Standortname</label>
-                <input type="text" class="form-control form-control-sm" id="new_site_name" name="name" required>
-              </div>
-              <div class="col-12">
-                <label class="form-label" for="new_site_address">Adresse</label>
-                <input type="text" class="form-control form-control-sm" id="new_site_address" name="address" placeholder="Straße, Stadt" required>
-              </div>
-              <div class="col-12">
-                <label class="form-label" for="new_site_hourly_rate">Stundensatz (€)</label>
-                <input type="number" class="form-control form-control-sm" id="new_site_hourly_rate" name="hourly_rate" step="0.01" min="0" value="50.00" required>
-              </div>
-              <div class="col-12">
-                <label class="form-label" for="new_site_is_active">Status</label>
-                <select class="form-select form-select-sm" id="new_site_is_active" name="is_active">
-                  <option value="1" selected>Aktiv</option>
-                  <option value="0">Inaktiv</option>
-                </select>
-              </div>
-              <div class="col-12">
-                <a href="{{ url_for('admin_profiles', tab='clients') }}" class="btn btn-sm btn-outline-secondary w-100">Kundenprofilfelder verwalten</a>
-              </div>
-              <div class="col-12">
-                <button type="submit" class="btn btn-sm btn-primary w-100" title="Standort hinzufügen"><i class="bi bi-building-add"></i></button>
-              </div>
-            </form>
-          </div>
-        </div>
-        <div class="col-12 col-lg-8">
-          {% if sites %}
-            <div class="card-surface mb-3">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2 class="h6 text-uppercase text-secondary mb-0">Sammelbearbeitung</h2>
-                <button form="bulk-site-update" type="submit" class="btn btn-sm btn-success">Alle speichern</button>
-              </div>
-              <form id="bulk-site-update" method="post" class="table-responsive" style="max-height:260px;">
-                <input type="hidden" name="entity" value="site_bulk">
-                <input type="hidden" name="action" value="bulk_update">
-                {% if search_q %}
-                  <input type="hidden" name="redirect_q" value="{{ search_q }}">
-                {% endif %}
-                <input type="hidden" name="redirect_page" value="{{ page }}">
-                <table class="table table-sm table-striped align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th scope="col">Name</th>
-                      <th scope="col">Adresse</th>
-                      <th scope="col">Stundensatz</th>
-                      <th scope="col">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for site in sites %}
-                      <tr>
-                        <td>
-                          <input type="hidden" name="site_id" value="{{ site.id }}">
-                          <input type="text" class="form-control form-control-sm" name="site_name" value="{{ site.name }}" required>
-                        </td>
-                        <td>
-                          <input type="text" class="form-control form-control-sm" name="site_address" value="{{ site.address or '' }}" required>
-                        </td>
-                        <td>
-                          <input type="number" class="form-control form-control-sm" name="site_hourly_rate" value="{{ '%.2f'|format(site.hourly_rate or 0) }}" step="0.01" min="0" required>
-                        </td>
-                        <td>
-                          <select class="form-select form-select-sm" name="site_is_active">
-                            <option value="1" {% if site.is_active != 0 %}selected{% endif %}>Aktiv</option>
-                            <option value="0" {% if site.is_active == 0 %}selected{% endif %}>Inaktiv</option>
-                          </select>
-                        </td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </form>
-            </div>
-            <div class="vstack gap-3">
+      <section class="card-surface p-0 overflow-hidden">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle client-table mb-0">
+            <thead><tr><th>Client</th><th>Contact</th><th>Service address</th>{% if not is_site_manager %}<th>Rate</th>{% endif %}<th>Shifts</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+            <tbody>
               {% for site in sites %}
-                <form method="post" class="little-card p-3">
-                  <input type="hidden" name="entity" value="site">
-                  <input type="hidden" name="id" value="{{ site.id }}">
-                  {% if search_q %}
-                    <input type="hidden" name="redirect_q" value="{{ search_q }}">
-                  {% endif %}
-                  <input type="hidden" name="redirect_page" value="{{ page }}">
-                  <div class="row g-2 align-items-end">
-                    <div class="col-md-4 col-12">
-                      <label class="form-label">Name</label>
-                      <input type="text" name="name" value="{{ site.name }}" class="form-control form-control-sm" required>
-                    </div>
-                    <div class="col-md-4 col-12">
-                      <label class="form-label">Adresse</label>
-                      <input type="text" name="address" value="{{ site.address or '' }}" class="form-control form-control-sm" required>
-                    </div>
-                    <div class="col-md-2 col-12">
-                      <label class="form-label">Stundensatz (€)</label>
-                      <input type="number" name="hourly_rate" value="{{ '%.2f'|format(site.hourly_rate or 0) }}" class="form-control form-control-sm" step="0.01" min="0" required>
-                    </div>
-                    <div class="col-md-2 col-12">
-                      <label class="form-label">Status</label>
-                      <select name="is_active" class="form-select form-select-sm">
-                        <option value="1" {% if site.is_active != 0 %}selected{% endif %}>Aktiv</option>
-                        <option value="0" {% if site.is_active == 0 %}selected{% endif %}>Inaktiv</option>
-                      </select>
-                    </div>
-                    <div class="col-md-2 col-12">
-                      <div class="d-grid gap-2 site-row-actions">
-                        <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Speichern"><i class="bi bi-check2"></i></button>
-                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('{{ site.name }} löschen?')" title="Löschen"><i class="bi bi-trash"></i></button>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="small text-secondary mt-2">Geplante Einsätze: <span class="text-primary">{{ shift_counts.get(site.id, 0) }}</span></div>
-                </form>
-              {% endfor %}
-            </div>
-            {% if total_pages > 1 %}
-              <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-4">
-                <span class="text-secondary small">Seite {{ page }} von {{ total_pages }}</span>
-                <div class="btn-group" role="group" aria-label="Standort-Seitennavigation">
-                  {% if has_prev %}
-                    {% if search_q %}
-                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=prev_page, q=search_q) }}">Zurück</a>
-                    {% else %}
-                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=prev_page) }}">Zurück</a>
-                    {% endif %}
-                  {% else %}
-                    <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Zurück</span>
-                  {% endif %}
-                  {% for page_num in range(1, total_pages + 1) %}
-                    {% if page_num == page %}
-                      <span class="btn btn-sm btn-primary disabled" aria-current="page">{{ page_num }}</span>
-                    {% else %}
-                      {% if search_q %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=page_num, q=search_q) }}">{{ page_num }}</a>
-                      {% else %}
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=page_num) }}">{{ page_num }}</a>
-                      {% endif %}
-                    {% endif %}
-                  {% endfor %}
-                  {% if has_next %}
-                    {% if search_q %}
-                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=next_page, q=search_q) }}">Weiter</a>
-                    {% else %}
-                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=next_page) }}">Weiter</a>
-                    {% endif %}
-                  {% else %}
-                    <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Weiter</span>
-                  {% endif %}
-                </div>
-              </div>
-            {% endif %}
-          {% else %}
-            <div class="card-surface">
-              <p class="placeholder mb-0">Keine Standorte entsprechen diesem Filter. Fügen Sie Standorte hinzu oder passen Sie Ihre Suche an.</p>
-            </div>
-          {% endif %}
+              <tr class="site-row-clickable" data-row-url="{{ url_for('admin_site_detail', site_id=site.id) }}" tabindex="0" role="link" aria-label="Open site {{ (site.profile_company_name or site.name)|e }}">
+                <td><div class="d-flex align-items-center gap-2">
+                  {% if site.profile_image_path %}<img class="client-logo" src="{{ url_for('static', filename=site.profile_image_path) }}" alt="">
+                  {% else %}<span class="client-logo client-logo-placeholder">{{ (site.profile_company_name or site.name)[:1]|upper }}</span>{% endif %}
+                  <div class="client-main"><a class="client-detail-link" href="{{ url_for('admin_site_detail', site_id=site.id) }}"><strong>{{ site.profile_company_name or site.name }}</strong></a><small>{{ site.name }}</small></div>
+                </div></td>
+                <td><div class="client-main"><span>{{ site.profile_contact_name or site.contact_name or '?' }}</span><small>{{ site.profile_contact_email or site.contact_email or 'No email' }}</small></div></td>
+                <td>{{ site.address or '?' }}</td>
+                {% if not is_site_manager %}<td>{{ '%.2f'|format(site.profile_default_hourly_rate or site.hourly_rate or 0) }} ?</td>{% endif %}
+                <td><span class="shift-count">{{ shift_counts.get(site.id, 0) }}</span></td>
+                <td><form method="post" class="site-status-form"><input type="hidden" name="entity" value="site"><input type="hidden" name="action" value="set_status"><input type="hidden" name="id" value="{{ site.id }}"><input type="hidden" name="is_active" value="{{ '0' if site.is_active != 0 else '1' }}"><input type="hidden" name="redirect_q" value="{{ search_q }}"><input type="hidden" name="redirect_page" value="{{ page }}"><input type="hidden" name="redirect_status" value="{{ status_filter }}"><button class="site-status-button {{ 'is-active' if site.is_active != 0 else 'is-inactive' }}" type="submit"><i class="bi {{ 'bi-check-circle-fill' if site.is_active != 0 else 'bi-pause-circle-fill' }} me-1"></i>{{ 'Active' if site.is_active != 0 else 'Inactive' }}</button></form></td>
+                <td class="text-end"><div class="d-inline-flex flex-wrap gap-1">{% if not is_sales_manager %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('ops.admin_inspection_areas', site_id=site.id) }}"><i class="bi bi-clipboard-check me-1"></i>Inspection areas</a>{% endif %}<button type="button" class="btn btn-sm btn-outline-secondary edit-client-button"
+                  data-id="{{ site.id }}" data-name="{{ site.name|e }}" data-address="{{ site.address or ''|e }}"
+                  data-rate="{{ site.hourly_rate or 0 if not is_site_manager else '' }}" data-default-rate="{{ site.profile_default_hourly_rate or '' if not is_site_manager else '' }}"
+                  data-active="{{ '1' if site.is_active != 0 else '0' }}" data-company="{{ site.profile_company_name or ''|e }}"
+                  data-contact="{{ site.profile_contact_name or site.contact_name or ''|e }}" data-email="{{ site.profile_contact_email or site.contact_email or ''|e }}"
+                  data-phone="{{ site.profile_phone or ''|e }}" data-billing="{{ site.profile_billing_address or ''|e if not is_site_manager else '' }}"
+                  data-vat="{{ site.profile_vat_id or ''|e if not is_site_manager else '' }}" data-customer-id="{{ site.profile_tax_id or ''|e if not is_site_manager else '' }}"
+                  data-notes="{{ site.profile_notes or ''|e }}" data-contract-start="{{ site.contract_start_date or ''|e if not is_site_manager else '' }}"
+                  data-contract-end="{{ site.contract_end_date or ''|e if not is_site_manager else '' }}" data-contract-partner="{{ site.contract_partner_name or ''|e if not is_site_manager else '' }}" data-contract-contact="{{ site.contract_contact_details or ''|e if not is_site_manager else '' }}" data-manager-id="{{ site.manager_employee_id or '' if is_main_admin else '' }}" data-logo="{{ site.profile_image_path or ''|e }}">
+                  <i class="bi bi-pencil-square me-1"></i>Edit client
+                </button></div></td>
+              </tr>
+              {% else %}<tr><td colspan="{{ 6 if is_site_manager else 7 }}" class="text-center py-5"><div class="empty-clients"><i class="bi bi-buildings"></i><strong>No clients found</strong><span>Adjust your search or add a client to the database.</span><button type="button" class="btn btn-primary mt-2" id="open-client-create-empty">Add client</button></div></td></tr>{% endfor %}
+            </tbody>
+          </table>
         </div>
+        {% if total_pages > 1 %}<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border-top"><span class="text-secondary small">Page {{ page }} of {{ total_pages }}</span><div class="d-flex gap-2">{% if has_prev %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=prev_page, q=search_q or None, status_filter=status_filter if status_filter != 'all' else None) }}">Previous</a>{% endif %}{% if has_next %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=next_page, q=search_q or None, status_filter=status_filter if status_filter != 'all' else None) }}">Next</a>{% endif %}</div></div>{% endif %}
+      </section>
+      <div class="client-modal-backdrop" id="client-modal" aria-hidden="true">
+        <section class="client-modal" role="dialog" aria-modal="true" aria-labelledby="client-modal-title">
+          <header class="client-modal-header"><h2 id="client-modal-title">Add client</h2><button type="button" class="client-modal-close" id="close-client-modal" aria-label="Close">&times;</button></header>
+          <form method="post" enctype="multipart/form-data" id="client-form">
+            <input type="hidden" name="entity" value="site"><input type="hidden" name="action" id="client-action" value="create"><input type="hidden" name="id" id="client-id">
+            <input type="hidden" name="redirect_q" value="{{ search_q }}"><input type="hidden" name="redirect_page" value="{{ page }}">
+            <div class="client-modal-body">
+              <section class="client-form-section"><h3>Client</h3><div class="row g-3">
+                <div class="col-md-6"><label class="form-label" for="client-company">Company / client name <span class="text-danger">*</span></label><input class="form-control" id="client-company" name="profile_company_name" required></div>
+                <div class="col-md-6"><label class="form-label" for="client-location">Service location name</label><input class="form-control" id="client-location" name="name" placeholder="Defaults to company name"></div>
+                <div class="col-12"><label class="form-label" for="client-address">Service address</label><input class="form-control" id="client-address" name="address" autocomplete="street-address"></div>
+                {% if is_main_admin %}<div class="col-md-6"><label class="form-label" for="client-manager">Assigned site manager</label><select class="form-select" id="client-manager" name="manager_employee_id"><option value="">Unassigned</option>{% for manager in site_managers %}<option value="{{ manager.id }}">{{ manager.name }}</option>{% endfor %}</select></div>{% endif %}
+                <div class="col-md-6"><label class="form-label" for="client-logo">Logo / attachment</label><input class="form-control" type="file" id="client-logo" name="site_profile_image" accept="image/png,image/jpeg,image/gif,image/webp,image/heic"><small class="text-secondary">Upload a client logo or image.</small></div>
+                <div class="col-md-6" id="existing-logo-wrap" hidden><label class="form-label d-block">Current logo</label><img id="existing-client-logo" class="client-logo" alt="Client logo"></div>
+              </div></section>
+              <section class="client-form-section"><h3>Contact</h3><div class="row g-3">
+                <div class="col-md-4"><label class="form-label" for="client-contact">Contact person</label><input class="form-control" id="client-contact" name="profile_contact_name" autocomplete="name"></div>
+                <div class="col-md-4"><label class="form-label" for="client-email">Email</label><input class="form-control" type="email" id="client-email" name="profile_contact_email" autocomplete="email"></div>
+                <div class="col-md-4"><label class="form-label" for="client-phone">Phone</label><input class="form-control" type="tel" id="client-phone" name="profile_phone" autocomplete="tel"></div>
+              </div></section>
+              {% if not is_site_manager %}<section class="client-form-section"><h3>Billing and service</h3><div class="row g-3">
+                <div class="col-12"><label class="form-label" for="client-billing">Billing address</label><input class="form-control" id="client-billing" name="profile_billing_address" autocomplete="billing street-address"></div>
+                <div class="col-md-4"><label class="form-label" for="client-vat">VAT ID</label><input class="form-control" id="client-vat" name="profile_vat_id"></div>
+                <div class="col-md-4"><label class="form-label" for="client-customer-id">Customer / tax ID</label><input class="form-control" id="client-customer-id" name="profile_tax_id"></div>
+                <div class="col-md-4"><label class="form-label" for="client-rate">Hourly rate (?)</label><input class="form-control" type="number" min="0" step="0.01" id="client-rate" name="profile_default_hourly_rate"></div>
+                <div class="col-md-6"><label class="form-label" for="client-contract-start">Contract start</label><input class="form-control" type="date" id="client-contract-start" name="contract_start_date"></div>
+                <div class="col-md-6"><label class="form-label" for="client-contract-end">Contract end</label><input class="form-control" type="date" id="client-contract-end" name="contract_end_date"></div>
+                <div class="col-md-6"><label class="form-label" for="client-contract-partner">Contract partner</label><input class="form-control" id="client-contract-partner" name="contract_partner_name"></div>
+                <div class="col-md-6"><label class="form-label" for="client-contract-contact">Contract contact details</label><input class="form-control" id="client-contract-contact" name="contract_contact_details" placeholder="Phone, fax, or email"></div>
+                <div class="col-md-6"><label class="form-label" for="client-active">Status</label><select class="form-select" id="client-active" name="is_active"><option value="1">Active</option><option value="0">Inactive</option></select></div>
+              </div></section>{% endif %}
+              <section class="client-form-section"><h3>Notes</h3><label class="visually-hidden" for="client-notes">Client notes</label><textarea class="form-control" rows="4" id="client-notes" name="profile_notes" placeholder="Add client details, access notes, or preferences"></textarea></section>
+            </div>
+            <footer class="client-modal-footer"><a class="btn btn-outline-secondary me-auto" href="{{ url_for('admin_sites') }}">Client database</a><button type="button" class="btn btn-outline-secondary" id="cancel-client-modal">Cancel</button>{% if not is_site_manager %}<button type="submit" name="profile_action" value="generate_contract" class="btn btn-outline-primary" id="client-contract-submit"><i class="bi bi-file-earmark-pdf me-1"></i>Save &amp; download contract</button>{% endif %}<button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i><span id="client-submit-label">Create client</span></button></footer>
+          </form>
+        </section>
       </div>
+      <script>
+        (() => {
+          const modal = document.getElementById('client-modal');
+          const form = document.getElementById('client-form');
+          const setValue = (id, value) => { const field = document.getElementById(id); if (field) field.value = value || ''; };
+          const open = (data = null) => {
+            form.reset();
+            document.getElementById('client-modal-title').textContent = isGerman ? (data ? 'Kunden bearbeiten' : 'Kunden hinzuf\\u00fcgen') : (data ? 'Edit client' : 'Add client');
+            document.getElementById('client-submit-label').textContent = isGerman ? (data ? '\\u00c4nderungen speichern' : 'Kunden anlegen') : (data ? 'Save changes' : 'Create client');
+            setValue('client-action', data ? 'update' : 'create');
+            document.getElementById('existing-logo-wrap').hidden = true;
+            if (data) {
+              setValue('client-id', data.id); setValue('client-company', data.company || data.name); setValue('client-location', data.name);
+              setValue('client-address', data.address); setValue('client-rate', data.defaultRate || data.rate);
+              setValue('client-active', data.active); setValue('client-contact', data.contact); setValue('client-email', data.email);
+              setValue('client-phone', data.phone); setValue('client-billing', data.billing); setValue('client-vat', data.vat);
+              setValue('client-customer-id', data.customerId); setValue('client-notes', data.notes); setValue('client-contract-partner', data.contractPartner); setValue('client-contract-contact', data.contractContact);
+              setValue('client-manager', data.managerId);
+              const asDateInput = value => /^\d{2}-\d{2}-\d{4}$/.test(value || '') ? `${value.slice(6,10)}-${value.slice(3,5)}-${value.slice(0,2)}` : (value || '');
+              setValue('client-contract-start', asDateInput(data.contractStart)); setValue('client-contract-end', asDateInput(data.contractEnd));
+              if (data.logo) { document.getElementById('existing-logo-wrap').hidden = false; document.getElementById('existing-client-logo').src = `/static/${data.logo}`; }
+            } else { setValue('client-id', ''); setValue('client-active', '1'); }
+            document.getElementById('client-contract-submit').hidden = !data;
+            modal.classList.add('is-open'); modal.setAttribute('aria-hidden', 'false'); document.body.classList.add('client-modal-open');
+            window.setTimeout(() => document.getElementById('client-company').focus(), 40);
+          };
+          const close = () => { modal.classList.remove('is-open'); modal.setAttribute('aria-hidden', 'true'); document.body.classList.remove('client-modal-open'); };
+          document.getElementById('open-client-create').addEventListener('click', () => open());
+          document.getElementById('open-client-create-empty')?.addEventListener('click', () => open());
+          document.querySelectorAll('.edit-client-button').forEach(button => button.addEventListener('click', () => open(button.dataset)));
+          document.getElementById('close-client-modal').addEventListener('click', close);
+          document.getElementById('cancel-client-modal').addEventListener('click', close);
+          modal.addEventListener('click', event => { if (event.target === modal) close(); });
+          document.addEventListener('keydown', event => { if (event.key === 'Escape' && modal.classList.contains('is-open')) close(); });
+          const clientToEdit = {{ client_to_edit_data|tojson }};
+          if (clientToEdit) open(clientToEdit);
+        })();
+      </script>
     </main>
   </div>
   <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
   <script>
+    document.querySelectorAll('.site-row-clickable').forEach((row) => {
+      row.addEventListener('click', (event) => {
+        if (event.target.closest('a,button,input,select,textarea,label,form,[role="button"]')) return;
+        window.location.assign(row.dataset.rowUrl);
+      });
+      row.addEventListener('keydown', (event) => {
+        if ((event.key === 'Enter' || event.key === ' ') && event.target === row) {
+          event.preventDefault();
+          window.location.assign(row.dataset.rowUrl);
+        }
+      });
+    });
     document.getElementById('year').textContent = new Date().getFullYear();
+    (function() {
+      const body = document.body;
+      const collapseButton = document.getElementById('desktop-sidebar-toggle');
+      const collapseIcon = collapseButton?.querySelector('i');
+      const stateKey = 'pm-admin-sidebar-collapsed';
+      const setCollapsed = (collapsed) => {
+        body.classList.toggle('sidebar-collapsed', collapsed);
+        collapseButton?.setAttribute('aria-expanded', String(!collapsed));
+        collapseButton?.setAttribute('aria-label', collapsed ? 'Expand navigation' : 'Collapse navigation');
+        collapseButton?.setAttribute('title', collapsed ? 'Expand navigation' : 'Collapse navigation');
+        if (collapseIcon) collapseIcon.className = collapsed ? 'bi bi-chevron-bar-right' : 'bi bi-chevron-bar-left';
+        try { localStorage.setItem(stateKey, collapsed ? '1' : '0'); } catch (_err) {}
+      };
+      try { setCollapsed(localStorage.getItem(stateKey) === '1'); } catch (_err) { setCollapsed(false); }
+      collapseButton?.addEventListener('click', () => setCollapsed(!body.classList.contains('sidebar-collapsed')));
+    })();
     (function() {
       const body = document.body;
       const toggle = document.getElementById('mobile-nav-toggle');
@@ -1555,9 +1163,491 @@ ADMIN_SITES_TEMPLATE = """
 </html>
 """
 
+EMPLOYEE_DETAIL_TEMPLATE = """
+<!doctype html>
+<html lang="{{ current_lang }}">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ employee.name }} - Employee profile</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --blue:#1877f2; --ink:#17213b; --muted:#667085; --line:#e5e8ee; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:#fff; font:14px/1.4 system-ui,-apple-system,Segoe UI,sans-serif; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:228px minmax(0,1fr); }
+    .app-sidebar { background:#111b3d; color:#fff; padding:1.2rem .85rem; display:flex; flex-direction:column; gap:.4rem; }
+    .app-sidebar a { color:#dce4ff; padding:.7rem .8rem; border-radius:.6rem; text-decoration:none; }
+    .app-sidebar a:hover,.app-sidebar a.active { color:#fff; background:#26366c; }
+    .app-sidebar .brand { padding:.5rem .8rem 1rem; color:#fff; font-weight:700; }
+    .main { min-width:0; }
+    .profile-header { display:flex; align-items:center; gap:1rem; min-height:82px; padding:1rem 1.5rem; border-bottom:1px solid var(--line); }
+    .profile-header .employee-mark { width:64px; height:64px; }
+    .profile-header .employee-identity { flex:0 1 auto; }
+    .employee-identity strong { display:block; font-size:1.25rem; font-weight:600; }
+    .profile-header-actions { display:flex; align-items:center; justify-content:flex-end; gap:.55rem; margin-left:auto; }
+    .profile-header-actions form { margin:0; }
+    .profile-header-actions .btn { min-width:48px; min-height:48px; border-radius:13px; font-size:.9rem; }
+    .profile-header-actions .btn-icon { width:48px; padding:.5rem; }
+    .profile-header-actions .btn-send-credentials { padding-inline:1rem; }
+    .profile-header-actions .btn-danger-icon { color:#596273; background:#fff; border-color:#e2e6ed; }
+    .profile-header-actions .btn-danger-icon:hover { color:#b42318; background:#fff6f5; border-color:#f0c7c3; }
+    .profile-header-actions .btn:disabled { opacity:.45; cursor:not-allowed; }
+    .employee-credentials-action { display:grid; justify-items:start; gap:.25rem; }
+    .employee-credentials-reason { max-width:240px; color:#775313; font-size:.68rem; line-height:1.3; }
+    .employee-credentials-reason a { color:#014D4E; font-weight:650; white-space:nowrap; }
+    .profile-header-actions a[aria-disabled="true"] { opacity:.42; pointer-events:none; }
+    .employee-mark { width:48px; height:48px; display:grid; place-items:center; flex:none; overflow:hidden; border:1px solid var(--line); border-radius:50%; color:#1479e8; background:#e3f3ff; font-size:1.15rem; font-weight:700; }
+    .employee-mark img { width:100%; height:100%; object-fit:cover; }
+    .employee-identity { min-width:0; flex:1; }
+    .employee-identity small { display:block; color:#6b7280; }
+    .profile-header .employee-identity strong { font-size:1.25rem; }
+    .status-pill { display:inline-flex; padding:.22rem .65rem; border-radius:.4rem; color:#087443; background:#d1fae5; font-size:.75rem; font-weight:700; }
+    .status-pill.inactive { color:#fff; background:#ef4444; }
+    .profile-actions { display:flex; align-items:center; gap:.5rem; }
+    .profile-actions a { text-decoration:none; }
+    .profile-tabs { display:flex; gap:.2rem; overflow-x:auto; padding:.55rem 1rem; border-bottom:1px solid var(--line); white-space:nowrap; scrollbar-width:thin; }
+    .profile-tabs a { padding:.6rem .8rem; border-radius:.55rem; color:#596273; font-weight:500; text-decoration:none; }
+    .profile-tabs a.active,.profile-tabs a:hover { color:#fff; background:var(--blue); }
+    .profile-content { display:grid; grid-template-columns:200px minmax(0,1fr); min-height:calc(100vh - 140px); }
+    .section-nav { position:sticky; top:56px; align-self:start; max-height:calc(100dvh - 72px); overflow-y:auto; padding:1rem; border-right:1px solid var(--line); display:flex; flex-direction:column; gap:.25rem; }
+    .section-nav a { padding:.65rem .75rem; border-radius:.55rem; color:#596273; text-decoration:none; }
+    .section-nav a:hover,.section-nav a.active { background:#f2f4f7; color:#17213b; }
+    .profile-sections { padding:1.25rem 2rem 3rem; min-width:0; }
+    .profile-section { scroll-margin-top:1rem; max-width:1000px; padding:1rem 0 1.5rem; border-bottom:1px solid var(--line); }
+    .employee-function-picker { position:relative; }
+    .employee-function-toggle { display:flex; width:100%; justify-content:space-between; align-items:center; min-height:42px; border:1px solid #dce3ec; border-radius:.65rem; background:#fff; padding:.55rem .75rem; color:#263449; text-align:left; }
+    .employee-function-menu { position:absolute; z-index:30; inset:calc(100% + .35rem) 0 auto; max-height:280px; overflow:auto; padding:.45rem; border:1px solid #dce3ec; border-radius:.7rem; background:#fff; box-shadow:0 12px 30px #14233724; }
+    .employee-function-menu[hidden] { display:none; }
+    .employee-function-option-row { display:flex; gap:.6rem; align-items:center; padding:.5rem .55rem; border-radius:.45rem; cursor:pointer; }
+    .employee-function-option-row:hover { background:#f1f7f7; }
+    .employee-function-menu-divider { margin:.45rem 0; border-top:1px solid #e5eaf0; }
+    .employee-function-menu-heading { padding:.35rem .55rem; color:#758197; font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    .employee-access-options { display:flex; flex-wrap:wrap; gap:.4rem; }
+    .employee-access-options label { display:flex; align-items:center; gap:.35rem; padding:.38rem .5rem; border:1px solid #dce3ec; border-radius:.5rem; }
+    .profile-section.employee-schedule-disclosure { max-width:none; padding:0; border:1px solid #e6eaf0; border-radius:14px; background:#fff; box-shadow:0 5px 16px rgba(25,39,61,.035); overflow:hidden; }
+    .employee-schedule-summary { display:flex; align-items:center; justify-content:space-between; gap:1rem; min-height:76px; padding:1.2rem 1.3rem; border:0; border-radius:0; background:#fff; cursor:pointer; list-style:none; }
+    .employee-schedule-summary::-webkit-details-marker { display:none; }
+    .employee-schedule-summary > span { display:grid; gap:.2rem; }
+    .employee-schedule-summary strong { color:#23314a; font-size:1rem; }
+    .employee-schedule-summary small { color:#758197; font-size:.82rem; font-weight:400; }
+    .employee-schedule-summary > i { color:#66748c; transition:transform .16s ease; }
+    .employee-schedule-disclosure[open] .employee-schedule-summary { border-bottom:1px solid #e6eaf0; }
+    .employee-schedule-disclosure[open] .employee-schedule-content { padding:1.2rem 1.3rem; }
+    .employee-schedule-disclosure[open] .employee-schedule-summary > i { transform:rotate(180deg); }
+    .employee-schedule-content { padding:1.2rem 1.3rem; }
+    .profile-section h2 { font-size:1rem; margin:0 0 .25rem; }
+    .section-description { color:var(--muted); margin:0 0 1rem; }
+    .field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+    .field { min-width:0; }
+    .field-label { display:block; margin-bottom:.35rem; color:#687385; font-size:.8rem; }
+    .field-value { min-height:42px; padding:.65rem .8rem; border:1px solid #e4e7ec; border-radius:.65rem; background:#fff; overflow-wrap:anywhere; }
+    .field-value.multiline { min-height:86px; white-space:pre-wrap; }
+    .data-card { padding:1rem; border:1px solid var(--line); border-radius:.8rem; background:#fff; }
+    .employee-document-upload { max-width:760px; margin-bottom:1rem; }
+    .employee-document-list { display:grid; gap:.65rem; }
+    .employee-document-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+    .employee-document-info { display:flex; align-items:center; gap:.75rem; min-width:0; }
+    .employee-document-info > i { display:grid; place-items:center; flex:none; width:40px; height:40px; border-radius:11px; color:#014D4E; background:#e8f3f2; font-size:1.15rem; }
+    .employee-document-info > div { display:grid; min-width:0; }
+    .employee-document-info strong { overflow-wrap:anywhere; }
+    .employee-document-info small { color:#758197; }
+    .data-table { width:100%; border-collapse:collapse; }
+    .data-table th,.data-table td { text-align:left; padding:.7rem .65rem; border-bottom:1px solid var(--line); vertical-align:top; }
+    .data-table th { color:#687385; font-size:.76rem; font-weight:600; }
+    .data-table a { color:var(--blue); text-decoration:none; }
+    .employee-week-toolbar { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin:.5rem 0 .8rem; }
+    .employee-week-toolbar .btn { min-height:40px; }
+    .employee-week-range { display:inline-flex; align-items:center; gap:.55rem; min-height:40px; padding:.45rem .8rem; border:1px solid #e1e5eb; border-radius:.7rem; color:#505c70; background:#f7f8fa; font-weight:600; }
+    .employee-calendar-scroll { overflow:auto; max-width:100%; border:1px solid #e1e5eb; border-radius:.8rem; background:#fff; }
+    .employee-calendar { min-width:790px; }
+    .employee-calendar-head,.employee-calendar-body { display:grid; grid-template-columns:72px repeat(7,minmax(0,1fr)); }
+    .employee-calendar-head { position:sticky; top:0; z-index:4; background:#fafafa; }
+    .employee-calendar-head > div { min-width:0; display:grid; place-content:center; min-height:62px; padding:.35rem .15rem; border-right:1px solid #e2e4e8; border-bottom:1px solid #dfe2e7; color:#81858d; text-align:center; font-size:.86rem; font-weight:650; }
+    .employee-calendar-head > div:first-child { background:#fafafa; }
+    .employee-calendar-head > div.is-today { color:#014D4E; background:#fff; }
+    .employee-calendar-head small { font-size:.8rem; font-weight:600; }
+    .employee-calendar-time-axis { display:grid; grid-template-rows:42px repeat(19,52px); background:#fff; }
+    .employee-calendar-time-axis > div { display:flex; align-items:flex-start; justify-content:flex-end; padding:.55rem .4rem 0 0; border-right:1px solid #e2e4e8; border-bottom:1px solid #e5e7eb; color:#92959b; font-size:.8rem; white-space:nowrap; }
+    .employee-calendar-time-axis > div:first-child { align-items:center; padding:0 .4rem 0 0; }
+    .employee-calendar-day-column { position:relative; height:1030px; min-width:0; border-right:1px solid #e2e4e8; background-color:#fff; background-image:linear-gradient(to bottom, transparent 41px, #e5e7eb 42px, transparent 43px); background-size:100% 52px; background-repeat:repeat-y; }
+    .employee-calendar-day-column.is-today { background-color:#fffbe2; }
+    .employee-calendar-all-day { height:42px; border-bottom:1px solid #dfe2e7; background:rgba(255,255,255,.4); }
+    .employee-calendar-event { position:absolute; right:3px; left:3px; z-index:2; min-height:44px; overflow:hidden; padding:.32rem .4rem; border:1px solid rgba(1,77,78,.22); border-left:3px solid #014D4E; border-radius:7px; color:#23304a; background:#f0f8f7; box-shadow:0 2px 5px rgba(20,35,55,.08); font-size:.72rem; line-height:1.25; }
+    .employee-calendar-event.is-all-day { min-height:0; padding:.18rem .3rem; font-size:.65rem; }
+    .employee-calendar-event.is-all-day time { display:none; }
+    .employee-calendar-event time { display:block; margin-bottom:.18rem; color:#7b8290; font-size:.67rem; white-space:nowrap; }
+    .employee-calendar-event strong,.employee-calendar-event small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .employee-calendar-event small { margin-top:.15rem; color:#687385; }
+    .empty-state { color:var(--muted); padding:1rem; border:1px dashed #cbd5e1; border-radius:.7rem; }
+    .credential-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.7rem; }
+    .credential-send-help { display:flex; align-items:flex-start; gap:.5rem; margin:-.35rem 0 1rem; padding:.7rem .8rem; border:1px solid #f1dfb4; border-radius:10px; color:#775313; background:#fff9e9; font-size:.82rem; }
+    .credential-fields label { display:block; margin-bottom:.3rem; font-size:.78rem; color:#64748b; }
+    .credential-fields input { width:100%; min-width:0; padding:.55rem .65rem; border:1px solid #dce3ec; border-radius:.55rem; }
+    .mobile-menu { display:none; }
+    @media(max-width:900px) { .app-shell { grid-template-columns:1fr; } .app-sidebar { display:none; } .profile-content { grid-template-columns:160px minmax(0,1fr); } .profile-sections { padding:1rem; } }
+    @media(max-width:900px) { .profile-header { padding:.75rem 1rem; } .profile-header-actions { gap:.35rem; } .profile-header-actions .btn-send-credentials span { display:none; } }
+    @media(max-width:620px) { .profile-header { padding:.7rem; flex-wrap:wrap; gap:.6rem; } .profile-header .employee-mark { width:48px; height:48px; } .employee-identity strong { font-size:1rem; } .profile-header-actions { width:100%; justify-content:space-between; } .profile-header-actions .btn { min-width:42px; min-height:42px; } .profile-header-actions .btn-icon { width:42px; } .profile-tabs { padding:.5rem; } .profile-content { grid-template-columns:1fr; } .section-nav { position:sticky; top:40px; z-index:40; align-self:start; max-height:none; flex-direction:row; overflow-x:auto; overflow-y:hidden; border-right:0; border-bottom:1px solid var(--line); background:#fff; padding:.4rem; white-space:nowrap; } .section-nav a { padding:.5rem .65rem; } .field-grid,.credential-fields { grid-template-columns:1fr; } .profile-sections { padding:.7rem .85rem 2rem; } .data-table { min-width:650px; } .table-wrap { overflow-x:auto; } .employee-document-row { align-items:flex-start; flex-direction:column; } }
+    /* Refined employee detail workspace */
+    .main { min-height:100vh; background:#f5f7fa; }
+    .profile-header { position:relative; gap:1rem; min-height:94px; padding:1rem 1.5rem; background:#fff; border-bottom:1px solid #e7ebf0; box-shadow:0 4px 16px rgba(22,35,57,.035); }
+    .profile-header .employee-mark { width:58px; height:58px; border:0; color:#014D4E; background:#e5f1ef; box-shadow:0 0 0 4px #f1f7f6; }
+    .profile-header .employee-identity { display:grid; gap:.2rem; }
+    .profile-header .employee-identity strong { color:#172a3b; font-size:1.18rem; font-weight:700; letter-spacing:-.025em; }
+    .profile-header .employee-identity small { color:#748197; font-size:.82rem; }
+    .profile-header .status-pill { padding:.3rem .7rem; border-radius:999px; color:#075e53; background:#e1f4ed; font-size:.74rem; letter-spacing:.01em; }
+    .profile-header .status-pill.inactive { color:#fff; background:#ef4444; }
+    .profile-header-actions { gap:.45rem; }
+    .profile-header-actions .btn { min-height:42px; min-width:42px; border-radius:11px; }
+    .profile-header-actions .btn-icon { width:42px; }
+    .profile-tabs { position:sticky; top:0; z-index:30; align-items:center; gap:.35rem; padding:.65rem 1.25rem; background:rgba(255,255,255,.97); border-bottom:1px solid #e7ebf0; box-shadow:0 3px 12px rgba(25,39,61,.045); }
+    .profile-tabs a { padding:.58rem .85rem; border-radius:9px; color:#667287; font-size:.84rem; font-weight:600; transition:background .15s,color .15s; }
+    .profile-tabs a.active,.profile-tabs a:hover { color:#014D4E; background:#e8f3f2; }
+    .profile-content { grid-template-columns:208px minmax(0,1fr); min-height:calc(100vh - 150px); background:#f5f7fa; }
+    .section-nav { top:58px; max-height:calc(100dvh - 78px); padding:.85rem .7rem; border-right:1px solid #e8ecf1; background:#f9fafc; }
+    .section-nav a { padding:.62rem .75rem; border-radius:9px; color:#667287; font-size:.84rem; font-weight:550; transition:background .15s,color .15s; }
+    .section-nav a:hover,.section-nav a.active { color:#014D4E; background:#e8f3f2; }
+    .profile-sections { display:grid; align-content:start; gap:.9rem; padding:1.1rem 1.35rem 2.5rem; }
+    .employee-inline-edit-form { display:grid; gap:.9rem; }
+    .profile-edit-input { min-height:44px; border-color:#e5e9ef; border-radius:9px; color:#26364d; background:#fbfcfd; }
+    .profile-edit-input:focus { border-color:#7fb5b3; background:#fff; box-shadow:0 0 0 .2rem rgba(1,77,78,.1); }
+    .employee-inline-save { display:flex; justify-content:flex-end; padding-top:1rem; border-top:1px solid #edf0f4; }
+    .profile-sections > [data-profile-panel][hidden], .section-nav[hidden] { display:none !important; }
+    .profile-section { width:100%; max-width:none; margin:0; padding:1.2rem 1.3rem; border:1px solid #e6eaf0; border-radius:14px; background:#fff; box-shadow:0 5px 16px rgba(25,39,61,.035); }
+    .profile-section h2 { margin:0 0 .3rem; color:#1d2d44; font-size:1.02rem; font-weight:700; letter-spacing:-.015em; }
+    .section-description { margin-bottom:1rem; color:#7a879a; font-size:.84rem; }
+    .field-grid { gap:.85rem; }
+    .field-label { color:#77849a; font-size:.76rem; font-weight:600; }
+    .field-value { min-height:44px; padding:.68rem .8rem; border-color:#e5e9ef; border-radius:9px; color:#26364d; background:#fbfcfd; }
+    .profile-section .data-card { border-color:#e6eaf0; border-radius:12px; }
+    .employee-document-row { box-shadow:0 2px 8px rgba(25,39,61,.025); }
+    .employee-schedule-summary { border-color:#e6eaf0; border-radius:12px; box-shadow:0 4px 14px rgba(25,39,61,.035); }
+    .employee-schedule-summary strong { color:#1d2d44; }
+    .employee-calendar-scroll { border-color:#e5e9ef; box-shadow:0 3px 12px rgba(25,39,61,.025); }
+    .employee-calendar-head > div { background:#f8fafb; }
+    .employee-calendar-event { box-shadow:0 2px 7px rgba(25,39,61,.08); }
+    .credential-fields input { min-height:40px; border-color:#e1e6ed; border-radius:9px; }
+    .profile-section .btn-outline-primary { color:#014D4E; border-color:#c7ddda; }
+    @media(max-width:900px) {
+      .profile-header { padding:.85rem 1rem; }
+      .profile-content { grid-template-columns:170px minmax(0,1fr); }
+      .profile-sections { padding:1rem; }
+    }
+    @media(max-width:620px) {
+      .profile-header { padding:.7rem .8rem; }
+      .profile-header .employee-mark { width:46px; height:46px; }
+      .profile-header .employee-identity strong { font-size:1rem; }
+      .profile-tabs { gap:.15rem; padding:.5rem; }
+      .profile-tabs a { padding:.5rem .6rem; font-size:.78rem; }
+      .profile-content { display:block; }
+      .section-nav { top:40px; padding:.35rem .45rem; border-right:0; border-bottom:1px solid #e6eaf0; background:rgba(255,255,255,.97); box-shadow:0 3px 10px rgba(25,39,61,.04); }
+      .section-nav a { padding:.48rem .6rem; font-size:.77rem; }
+      .profile-sections { gap:.7rem; padding:.8rem .65rem 1.5rem; }
+      .profile-section { padding:1rem; border-radius:12px; }
+      .profile-section.employee-schedule-disclosure { padding:0; }
+      .employee-schedule-summary { padding:1rem; }
+      .employee-schedule-disclosure[open] .employee-schedule-content { padding:1rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    {% include "partials/admin_sidebar.html" %}
+    <main class="main">
+      <header class="profile-header">{% if employee.profile_image_path %}<span class="employee-mark"><img src="{{ url_for('static', filename=employee.profile_image_path) }}" alt=""></span>{% else %}<span class="employee-mark">{{ employee.name[:1]|upper }}</span>{% endif %}<div class="employee-identity"><strong>{{ employee.name }}</strong><small>{{ employee_staff_functions|join(', ') }}</small></div><span class="status-pill {{ 'inactive' if (employee.worker_status or ('active' if employee.is_active else 'passive')) != 'active' else '' }}">{{ (employee.worker_status or ('active' if employee.is_active else 'passive'))|capitalize }}</span><div class="profile-header-actions">
+        {% if is_main_admin %}<div class="employee-credentials-action"><form method="post" action="{{ url_for('admin_employees') }}"><input type="hidden" name="action" value="credentials_email"><input type="hidden" name="id" value="{{ employee.id }}"><input type="hidden" name="return_to" value="{{ url_for('admin_employee_detail', employee_id=employee.id) }}"><button class="btn btn-outline-secondary btn-send-credentials" type="submit" {% if credential_email_reason %}disabled title="{{ credential_email_reason }}"{% endif %}><i class="bi bi-send-fill"></i><span>Send sign-in details</span></button></form>{% if credential_email_reason %}<small class="employee-credentials-reason">{{ credential_email_reason }} <a href="#account">Fix</a></small>{% endif %}</div>{% endif %}
+        {% if not is_sales_manager %}<form method="post" action="{{ url_for('admin_employees') }}" data-confirm="Delete {{ employee.name|e }}? This cannot be undone." onsubmit="return confirm(this.dataset.confirm);"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="{{ employee.id }}"><input type="hidden" name="return_to" value="{{ url_for('admin_employees') }}"><button class="btn btn-icon btn-danger-icon" type="submit" title="Delete employee" aria-label="Delete employee"><i class="bi bi-trash3"></i></button></form>{% endif %}
+        <a class="btn btn-icon btn-outline-secondary" href="{{ url_for('admin_employees') }}" title="Close employee" aria-label="Close employee"><i class="bi bi-x-lg"></i></a>
+      </div></header>
+      {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="px-3 pt-3">{% for category, message in messages %}<div class="alert alert-{{ 'success' if category == 'success' else 'warning' if category == 'warning' else 'info' }} py-2 mb-2">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+      <nav class="profile-tabs" aria-label="Employee pages"><a class="active" data-profile-tab="information" href="#information">Information</a>{% if is_cleaner %}<a data-profile-tab="schedule" href="#schedule">Schedule</a>{% endif %}{% if not is_site_manager and not is_sales_manager %}<a data-profile-tab="contract" href="#contract">Contract</a>{% endif %}{% if not is_sales_manager %}<a data-profile-tab="documents" href="#documents">Documents</a>{% endif %}</nav>
+      <div class="profile-content">
+        <nav class="section-nav" aria-label="Employee information sections"><a class="active" href="#general">General</a><a href="#contacts">Contacts</a><a href="#employment">Employment</a>{% if not is_site_manager and not is_sales_manager %}<a href="#contract">Contract</a>{% endif %}{% if not is_sales_manager %}<a href="#account">Platform access</a>{% endif %}{% if is_cleaner %}<a href="#schedule">Schedule</a><a href="#other">Activity</a>{% endif %}{% if not is_sales_manager %}<a href="#documents">Documents</a>{% endif %}</nav>
+        <div class="profile-sections">
+          <form method="post" enctype="multipart/form-data" action="{{ url_for('admin_employee_detail', employee_id=employee.id) }}" class="employee-inline-edit-form" data-profile-panel="information"><input type="hidden" name="action" value="update_profile">
+          <section class="profile-section" id="information"><div id="general"><h2>General</h2><p class="section-description">Edit fields here, then save your changes below.</p></div><div class="field-grid"><label class="field"><span class="field-label">Full name</span><input class="form-control profile-edit-input" name="name" value="{{ employee.name|e }}" required></label><label class="field"><span class="field-label">Role</span><input class="form-control profile-edit-input" name="role" value="{{ (employee.role or '')|e }}"></label><label class="field"><span class="field-label">Status</span><select class="form-select profile-edit-input" name="worker_status"><option value="active" {% if employee.worker_status == 'active' or not employee.worker_status and employee.is_active %}selected{% endif %}>Active</option><option value="passive" {% if employee.worker_status == 'passive' or not employee.worker_status and not employee.is_active %}selected{% endif %}>Passive</option></select></label><div class="field"><span class="field-label">Employee record ID</span><div class="field-value">#{{ employee.id }}</div></div><label class="field"><span class="field-label">Profile photo</span><input class="form-control profile-edit-input" type="file" name="profile_image" accept="image/png,image/jpeg,image/gif,image/webp"></label></div></section>
+          <section class="profile-section" id="contacts"><h2>Contacts</h2><p class="section-description">Update personal contact details.</p><div class="field-grid"><div class="field"><span class="field-label">Login email</span><div class="field-value">{% if not is_sales_manager and employee.login_email %}<a href="mailto:{{ employee.login_email }}">{{ employee.login_email }}</a>{% else %}-{% endif %}</div><small class="text-secondary">Manage sign-in email in Account access.</small></div><label class="field"><span class="field-label">Phone</span><input class="form-control profile-edit-input" type="tel" name="profile_phone" value="{{ (employee.profile_phone or '')|e }}"></label><label class="field"><span class="field-label">Address</span><input class="form-control profile-edit-input" name="profile_address" value="{{ (employee.profile_address or '')|e }}"></label><label class="field"><span class="field-label">Postal code</span><input class="form-control profile-edit-input" name="profile_zip_code" value="{{ (employee.profile_zip_code or '')|e }}"></label><label class="field"><span class="field-label">City</span><input class="form-control profile-edit-input" name="profile_city" value="{{ (employee.profile_city or '')|e }}"></label></div></section>
+          <section class="profile-section" id="employment"><h2>Employment</h2><p class="section-description">Update department, branch, and work information.</p><div class="field-grid"><label class="field"><span class="field-label">Branch office</span><select class="form-select profile-edit-input" name="branch"><option value="Wien" {% if (employee.branch or 'Wien') == 'Wien' %}selected{% endif %}>Wien</option><option value="Graz" {% if employee.branch == 'Graz' %}selected{% endif %}>Graz</option></select></label><label class="field"><span class="field-label">Work type</span><select class="form-select profile-edit-input" name="profile_work_type"><option value="Teilzeit" {% if employee.profile_work_type == 'Teilzeit' %}selected{% endif %}>Part-time</option><option value="Vollzeit" {% if employee.profile_work_type == 'Vollzeit' %}selected{% endif %}>Full-time</option><option value="Intern" {% if employee.profile_work_type in ['Geringfügige','Intern'] %}selected{% endif %}>Intern</option></select></label><label class="field"><span class="field-label">Weekly hours</span><input class="form-control profile-edit-input" name="profile_working_hours" value="{{ (employee.profile_working_hours or '')|e }}"></label>{% if is_main_admin %}<label class="field"><span class="field-label">Hourly pay</span><input class="form-control profile-edit-input" name="profile_euros_per_hour" inputmode="decimal" value="{{ (employee.profile_euros_per_hour or '')|e }}"></label><label class="field"><span class="field-label">Pay group type</span><select class="form-select profile-edit-input" name="profile_group_type"><option value="Lohngruppe" {% if employee.profile_group_type == 'Lohngruppe' %}selected{% endif %}>Pay group</option><option value="Verwendungsgruppe" {% if employee.profile_group_type == 'Verwendungsgruppe' %}selected{% endif %}>Usage group</option></select></label><label class="field"><span class="field-label">Group number</span><input class="form-control profile-edit-input" name="profile_group_number" value="{{ (employee.profile_group_number or '')|e }}"></label>{% endif %}</div><div class="employee-inline-save"><button class="btn btn-primary" type="submit"><i class="bi bi-check2 me-1"></i>Save profile</button></div></section>
+          </form>
+          {% if not is_site_manager and not is_sales_manager %}<section class="profile-section" id="contract" data-profile-panel="contract"><h2>Contract</h2><p class="section-description">Update the contract period and download the employee contract.</p>{% if is_main_admin %}<form method="post" action="{{ url_for('admin_employee_detail', employee_id=employee.id) }}" class="employee-inline-edit-form"><input type="hidden" name="action" value="update_contract"><div class="field-grid"><label class="field"><span class="field-label">Contract start</span><input class="form-control profile-edit-input" type="date" name="profile_contract_start_date" value="{{ (employee.profile_contract_start_date or '')|e }}"></label><label class="field"><span class="field-label">Contract end</span><input class="form-control profile-edit-input" type="date" name="profile_contract_end_date" value="{{ (employee.profile_contract_end_date or '')|e }}"></label></div><div class="employee-inline-save"><button class="btn btn-primary" type="submit"><i class="bi bi-check2 me-1"></i>Save contract dates</button></div></form>{% else %}<div class="field-grid"><div class="field"><span class="field-label">Contract start</span><div class="field-value">{{ employee.profile_contract_start_date or '-' }}</div></div><div class="field"><span class="field-label">Contract end</span><div class="field-value">{{ employee.profile_contract_end_date or '-' }}</div></div></div>{% endif %}<a class="btn btn-outline-primary mt-3" href="{{ url_for('admin_employee_docx', employee_id=employee.id) }}"><i class="bi bi-file-earmark-word me-1"></i>Download employee contract</a><p class="small text-secondary mt-2 mb-0">This uses the existing employee contract template.</p></section>{% endif %}
+          {% if not is_sales_manager %}<section class="profile-section" id="account" data-profile-panel="information"><h2>Platform access</h2><p class="section-description">Functions and sign-in permissions for this employee.</p>
+            <form method="post" action="{{ url_for('admin_employee_detail', employee_id=employee.id) }}" class="employee-inline-edit-form data-card mb-3"><input type="hidden" name="action" value="update_staff_access"><label class="field-label" for="detail-functions-toggle">Functions</label><div class="employee-function-picker"><button class="employee-function-toggle" type="button" id="detail-functions-toggle" aria-expanded="false" aria-controls="detail-functions-menu"><span id="detail-functions-summary">{{ employee_staff_functions|join(', ') }}</span><i class="bi bi-chevron-down"></i></button><div class="employee-function-menu" id="detail-functions-menu" hidden>{% for function in employee_staff_types %}<label class="employee-function-option-row"><input class="form-check-input detail-function-option" type="checkbox" value="{{ function }}" {% if function in employee_staff_functions %}checked{% endif %}><span>{{ function }}</span></label>{% endfor %}{% if is_main_admin %}<div class="employee-function-menu-divider"></div><div class="employee-function-menu-heading">System access</div><div class="employee-access-options" role="radiogroup" aria-label="System access">{% for role_value, role_label in [('none','No system access'),('employee','Cleaner'),('site_manager','Site manager'),('sales_manager','Sales manager'),('admin','Admin')] %}<label><input class="form-check-input detail-access-option" type="radio" name="detail_access_picker" value="{{ role_value }}" {% if role_value == 'none' and not employee.has_platform_access or role_value == employee.access_role and employee.has_platform_access %}checked{% endif %}><span>{{ role_label }}</span></label>{% endfor %}</div>{% endif %}</div></div><input type="hidden" name="staff_functions" id="detail-staff-functions" value='{{ employee_staff_functions|tojson }}'><input type="hidden" name="staff_type" value="{{ employee.staff_type or 'Cleaner' }}"><input type="hidden" name="access_role" id="detail-access-role" value="{{ employee.access_role or 'employee' }}"><p class="small text-secondary mt-2">Select all functions this person performs. Multiple functions are supported.</p>{% if is_main_admin %}<div class="field-grid mt-3"><label class="field"><span class="field-label">Login email</span><input class="form-control" type="email" name="login_email" value="{{ employee.login_email or '' }}"></label><label class="field"><span class="field-label">Platform sign-in</span><span><input type="checkbox" id="detail-platform-access" name="has_platform_access" value="1" {% if employee.has_platform_access %}checked{% endif %}> Enabled</span></label></div>{% endif %}<div class="employee-inline-save"><button class="btn btn-primary" type="submit"><i class="bi bi-check2 me-1"></i>Save platform access</button></div></form>
+            {% if is_main_admin %}{% if credential_email_reason %}<div class="credential-send-help"><i class="bi bi-info-circle"></i><span>{{ credential_email_reason }}</span></div>{% endif %}<div class="field-grid mb-3"><div class="field"><span class="field-label">Login code</span><div class="field-value">{{ employee.login_code or '-' }}</div></div><div class="field"><span class="field-label">Current PIN</span><div class="field-value">{{ employee.login_pin_plain or '-' }}</div></div></div>
+            <form method="post" action="{{ url_for('admin_employees') }}" class="data-card mb-3"><input type="hidden" name="action" value="credentials_update"><input type="hidden" name="id" value="{{ employee.id }}"><input type="hidden" name="return_to" value="{{ url_for('admin_employee_detail', employee_id=employee.id) }}"><div class="credential-fields"><div><label for="login-email">Login email</label><input id="login-email" type="email" name="login_email" value="{{ employee.login_email or '' }}"></div><div><label for="login-code">Login code</label><input id="login-code" name="login_code" value="{{ employee.login_code or '' }}" required></div><div><label for="login-pin">New 4-digit PIN</label><input id="login-pin" name="login_pin" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="Leave blank to keep current"></div></div><button class="btn btn-sm btn-outline-primary mt-3" type="submit">Save sign-in details</button></form>
+            <form method="post" action="{{ url_for('admin_employees') }}"><input type="hidden" name="action" value="credentials_share"><input type="hidden" name="id" value="{{ employee.id }}"><input type="hidden" name="return_to" value="{{ url_for('admin_employee_detail', employee_id=employee.id) }}"><button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-share me-1"></i>Prepare sign-in details to share</button></form>
+          {% endif %}</section>{% endif %}
+          {% if is_cleaner %}<section class="profile-section" id="other" data-profile-panel="information"><h2>Activity</h2><p class="section-description">Employee shift activity.</p><div class="field"><span class="field-label">Total shifts</span><div class="field-value">{{ shift_count }}</div></div></section>{% endif %}
+          {% if not is_sales_manager %}<section class="profile-section" id="documents" data-profile-panel="documents"><h2>Documents</h2><p class="section-description">Upload and keep employee-related documents in one place.</p><form method="post" enctype="multipart/form-data" class="data-card employee-document-upload"><label class="form-label" for="employee-document-file">Choose a document</label><input class="form-control" type="file" id="employee-document-file" name="employee_document" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" required><button class="btn btn-primary mt-3" type="submit"><i class="bi bi-upload me-1"></i>Upload document</button></form><div class="employee-document-list">{% for document in documents %}<div class="data-card employee-document-row"><div class="employee-document-info"><i class="bi bi-file-earmark-text"></i><div><strong>{{ document.original_filename }}</strong><small>Uploaded {{ document.uploaded_at.strftime('%d.%m.%Y') }}</small></div></div><a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin_employee_document_download', employee_id=employee.id, document_id=document.id) }}"><i class="bi bi-download"></i><span>Download</span></a><form method="post" onsubmit="return confirm('Delete this employee document?')"><input type="hidden" name="action" value="delete_employee_document"><input type="hidden" name="document_id" value="{{ document.id }}"><button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Delete employee document" title="Delete document"><i class="bi bi-trash3"></i><span>Delete</span></button></form></div>{% else %}<div class="empty-state">No employee documents have been uploaded yet.</div>{% endfor %}</div></section>{% endif %}
+          {% if is_cleaner %}<details class="profile-section employee-schedule-disclosure" id="schedule" data-profile-panel="schedule"><summary class="employee-schedule-summary"><span><strong>Schedule</strong><small>Weekly shifts in a calendar view.</small></span><i class="bi bi-chevron-down"></i></summary><div class="employee-schedule-content"><div class="employee-week-toolbar"><a class="btn btn-outline-secondary" href="{{ previous_week_url }}" aria-label="Previous week" title="Previous week"><i class="bi bi-chevron-left"></i></a><a class="btn btn-outline-secondary" href="{{ current_week_url }}">Today</a><a class="btn btn-outline-secondary" href="{{ next_week_url }}" aria-label="Next week" title="Next week"><i class="bi bi-chevron-right"></i></a><span class="employee-week-range"><i class="bi bi-calendar3"></i>{{ schedule_week_range }}</span></div><div class="employee-calendar-scroll"><div class="employee-calendar"><div class="employee-calendar-head"><div></div>{% for day in schedule_days %}<div class="{{ 'is-today' if day.is_today else '' }}"><span>{{ day.weekday }}</span><small>{{ day.day_label }}</small></div>{% endfor %}</div><div class="employee-calendar-body"><div class="employee-calendar-time-axis"><div>All day</div>{% for hour in schedule_hour_rows %}<div>{{ '%02d'|format(hour) }}:00</div>{% endfor %}</div>{% for day in schedule_days %}<div class="employee-calendar-day-column {{ 'is-today' if day.is_today else '' }}"><div class="employee-calendar-all-day"></div>{% for hour in schedule_hour_rows %}<div></div>{% endfor %}{% for event in day.events %}<article class="employee-calendar-event {{ 'is-all-day' if event.all_day else '' }}" style="top:{{ event.top_px }}px;height:{{ event.height_px }}px" title="{{ event.site_name }} · {{ event.time_window }}"><time>{{ event.time_window }}</time><strong>{{ event.site_name }}</strong>{% if event.instructions %}<small>{{ event.instructions }}</small>{% endif %}</article>{% endfor %}</div>{% endfor %}</div></div></div>{% if not shifts %}<div class="small text-secondary mt-2">No shifts scheduled this week.</div>{% endif %}</div></details>{% endif %}
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>
+    (() => {
+      const toggle=document.getElementById('detail-functions-toggle');
+      const menu=document.getElementById('detail-functions-menu');
+      if(!toggle||!menu)return;
+      const options=[...menu.querySelectorAll('.detail-function-option')];
+      const hidden=document.getElementById('detail-staff-functions');
+      const summary=document.getElementById('detail-functions-summary');
+      const accessOptions=[...menu.querySelectorAll('.detail-access-option')];
+      const accessHidden=document.getElementById('detail-access-role');
+      const platformAccess=document.getElementById('detail-platform-access');
+      const sync=()=>{
+        let selected=options.filter(option=>option.checked).map(option=>option.value);
+        if(!selected.length){options[0].checked=true;selected=[options[0].value];}
+        hidden.value=JSON.stringify(selected);
+        const access=accessOptions.find(option=>option.checked);
+        if(access&&accessHidden)accessHidden.value=access.value==='none'?'employee':access.value;
+        if(platformAccess&&access)platformAccess.checked=access.value!=='none';
+        summary.textContent=[...selected,access?.parentElement.querySelector('span').textContent||'No system access'].join(', ');
+      };
+      const chooseAccess=role=>{accessOptions.forEach(option=>{option.checked=option.value===role;});sync();};
+      toggle.addEventListener('click',()=>{menu.hidden=!menu.hidden;toggle.setAttribute('aria-expanded',String(!menu.hidden));});
+      options.forEach(option=>option.addEventListener('change',()=>{
+        const managerFunction=option.checked&&option.value==='Site manager'?'site_manager':option.checked&&option.value==='Sales manager'?'sales_manager':null;
+        if(managerFunction&&accessOptions.some(accessOption=>accessOption.value===managerFunction))chooseAccess(managerFunction);else sync();
+      }));accessOptions.forEach(option=>option.addEventListener('change',()=>chooseAccess(option.value)));
+      platformAccess?.addEventListener('change',()=>chooseAccess(platformAccess.checked?'employee':'none'));sync();
+      document.addEventListener('click',event=>{if(!event.target.closest('#account .employee-function-picker')){menu.hidden=true;toggle.setAttribute('aria-expanded','false');}});
+    })();
+  </script>
+  <script>
+    (() => {
+      const tabs = Array.from(document.querySelectorAll('.profile-tabs [data-profile-tab]'));
+      const panels = Array.from(document.querySelectorAll('[data-profile-panel]'));
+      const sectionNav = document.querySelector('.section-nav');
+      const schedule = document.getElementById('schedule');
+      if (!tabs.length || !panels.length) return;
+      const panelForHash = (hash) => {
+        const target = hash ? document.getElementById(decodeURIComponent(hash.slice(1))) : null;
+        return target?.closest('[data-profile-panel]') || document.getElementById('information');
+      };
+      const activate = (panelName, hash, shouldScroll) => {
+        tabs.forEach((tab) => {
+          const active = tab.dataset.profileTab === panelName;
+          tab.classList.toggle('active', active);
+          tab.setAttribute('aria-current', active ? 'page' : 'false');
+        });
+        panels.forEach((panel) => { panel.hidden = panel.dataset.profilePanel !== panelName; });
+        if (sectionNav && panelName !== 'information') {
+          sectionNav.querySelectorAll('a').forEach((link) => link.classList.toggle('active', link.getAttribute('href') === `#${panelName}`));
+        }
+        if (schedule) schedule.open = panelName === 'schedule';
+        if (hash) history.replaceState(null, '', hash);
+        const target = hash ? document.getElementById(decodeURIComponent(hash.slice(1))) : null;
+        if (shouldScroll && target) requestAnimationFrame(() => target.scrollIntoView({ behavior:'smooth', block:'start' }));
+      };
+      tabs.forEach((tab) => tab.addEventListener('click', (event) => {
+        event.preventDefault();
+        activate(tab.dataset.profileTab, tab.getAttribute('href'), true);
+      }));
+      sectionNav?.querySelectorAll('a[href^="#"]').forEach((link) => link.addEventListener('click', (event) => {
+        const panel = panelForHash(link.getAttribute('href'));
+        const panelName = panel?.dataset.profilePanel || 'information';
+        event.preventDefault();
+        activate(panelName, link.getAttribute('href'), true);
+        sectionNav.querySelectorAll('a').forEach((item) => item.classList.toggle('active', item === link));
+      }));
+      const initialPanel = panelForHash(window.location.hash);
+      activate(initialPanel?.dataset.profilePanel || 'information', window.location.hash || '#information', false);
+      if (sectionNav && window.location.hash) {
+        const currentLink = Array.from(sectionNav.querySelectorAll('a')).find((link) => link.getAttribute('href') === window.location.hash);
+        if (currentLink) sectionNav.querySelectorAll('a').forEach((item) => item.classList.toggle('active', item === currentLink));
+      }
+      window.addEventListener('hashchange', () => {
+        const panel = panelForHash(window.location.hash);
+        activate(panel?.dataset.profilePanel || 'information', window.location.hash, false);
+      });
+    })();
+  </script>
+</body>
+</html>
+"""
+
+CLIENT_DETAIL_TEMPLATE = """
+<!doctype html>
+<html lang="{{ current_lang }}">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Elf's Plan &mdash; {{ site.profile_company_name or site.name }} &middot; Client profile</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --blue:#1877f2; --ink:#17213b; --muted:#667085; --line:#e5e8ee; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:#fff; font:14px/1.4 system-ui,-apple-system,Segoe UI,sans-serif; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:228px minmax(0,1fr); }
+    .app-sidebar { background:#111b3d; color:#fff; padding:1.2rem .85rem; display:flex; flex-direction:column; gap:.4rem; }
+    .app-sidebar a { color:#dce4ff; padding:.7rem .8rem; border-radius:.6rem; text-decoration:none; }
+    .app-sidebar a:hover,.app-sidebar a.active { color:#fff; background:#26366c; }
+    .app-sidebar .brand { padding:.5rem .8rem 1rem; color:#fff; font-weight:700; }
+    .main { min-width:0; }
+    .profile-header { display:flex; align-items:center; gap:1rem; min-height:82px; padding:1rem 1.5rem; border-bottom:1px solid var(--line); }
+    .client-mark { width:48px; height:48px; border-radius:50%; object-fit:cover; display:grid; place-items:center; background:#e3f3ff; color:#1479e8; font-size:1.3rem; flex:none; }
+    .client-mark.placeholder { font-size:1.2rem; }
+    .client-identity { min-width:0; flex:1; }
+    .client-identity small { display:block; color:#6b7280; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .client-identity strong { font-size:1rem; }
+    .status-pill { display:inline-flex; padding:.22rem .65rem; border-radius:.4rem; color:#087443; background:#d1fae5; font-size:.75rem; font-weight:700; }
+    .status-pill.inactive { color:#596273; background:#e9edf2; }
+    .profile-actions { display:flex; align-items:center; gap:.5rem; }
+    .profile-actions a { text-decoration:none; }
+    .profile-tabs { display:flex; gap:.2rem; overflow-x:auto; padding:.55rem 1rem; border-bottom:1px solid var(--line); white-space:nowrap; scrollbar-width:thin; }
+    .profile-tabs a { padding:.6rem .8rem; border-radius:.55rem; color:#596273; font-weight:500; text-decoration:none; }
+    .profile-tabs a.active,.profile-tabs a:hover { color:#fff; background:var(--blue); }
+    .profile-content { display:grid; grid-template-columns:200px minmax(0,1fr); min-height:calc(100vh - 140px); }
+    .section-nav { padding:1rem; border-right:1px solid var(--line); display:flex; flex-direction:column; gap:.25rem; }
+    .section-nav a { padding:.65rem .75rem; border-radius:.55rem; color:#596273; text-decoration:none; }
+    .section-nav a:hover,.section-nav a.active { background:#f2f4f7; color:#17213b; }
+    .profile-sections { padding:1.25rem 2rem 3rem; min-width:0; }
+    .profile-section { scroll-margin-top:1rem; max-width:1000px; padding:1rem 0 1.5rem; border-bottom:1px solid var(--line); }
+    .profile-section h2 { font-size:1rem; margin:0 0 .25rem; }
+    .section-description { color:var(--muted); margin:0 0 1rem; }
+    .field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+    .field { min-width:0; }
+    .field-label { display:block; margin-bottom:.35rem; color:#687385; font-size:.8rem; }
+    .field-value { min-height:42px; padding:.65rem .8rem; border:1px solid #e4e7ec; border-radius:.65rem; background:#fff; overflow-wrap:anywhere; }
+    .field-value.multiline { min-height:86px; white-space:pre-wrap; }
+    .profile-card { padding:1rem; border:1px solid var(--line); border-radius:.8rem; background:#fff; }
+    .client-logo-large { display:block; max-width:220px; max-height:110px; object-fit:contain; object-position:left center; }
+    .data-table { width:100%; border-collapse:collapse; }
+    .data-table th,.data-table td { text-align:left; padding:.7rem .65rem; border-bottom:1px solid var(--line); vertical-align:top; }
+    .data-table th { color:#687385; font-size:.76rem; font-weight:600; }
+    .data-table a { color:var(--blue); text-decoration:none; }
+    .empty-state { color:var(--muted); padding:1rem; border:1px dashed #cbd5e1; border-radius:.7rem; }
+    .mobile-menu { display:none; }
+    .main { background:#f5f7fa; }
+    .profile-header { position:sticky; top:40px; z-index:25; min-height:76px; padding:.8rem clamp(.8rem,2vw,1.5rem); background:rgba(255,255,255,.97); box-shadow:0 3px 12px rgba(25,39,61,.045); }
+    .client-mark { width:52px; height:52px; border-radius:15px; border:1px solid #e5e9ef; color:#014D4E; background:#e8f3f2; }
+    .client-identity small { color:#758197; }
+    .client-identity strong { color:#1d2d44; font-size:1.12rem; }
+    .status-pill { padding:.32rem .7rem; border-radius:999px; color:#075e53; background:#e1f4ed; }
+    .status-pill.inactive { color:#fff; background:#ef4444; }
+    .profile-actions .btn { min-height:40px; border-radius:10px; font-size:.84rem; }
+    .profile-tabs { position:sticky; top:116px; z-index:24; gap:.35rem; padding:.6rem 1.25rem; background:rgba(255,255,255,.97); border-bottom:1px solid #e7ebf0; box-shadow:0 3px 12px rgba(25,39,61,.035); }
+    .profile-tabs a { padding:.56rem .82rem; border-radius:9px; color:#667287; font-size:.84rem; font-weight:600; }
+    .profile-tabs a.active,.profile-tabs a:hover { color:#014D4E; background:#e8f3f2; }
+    .profile-content { grid-template-columns:208px minmax(0,1fr); background:#f5f7fa; }
+    .section-nav { position:sticky; top:168px; align-self:start; max-height:calc(100dvh - 180px); overflow:auto; padding:.85rem .7rem; border-right:1px solid #e8ecf1; background:#f9fafc; }
+    .section-nav a { padding:.62rem .75rem; border-radius:9px; color:#667287; font-size:.84rem; font-weight:550; }
+    .section-nav a:hover,.section-nav a.active { color:#014D4E; background:#e8f3f2; }
+    .profile-sections { display:grid; align-content:start; gap:.9rem; padding:1.1rem 1.35rem 2.5rem; }
+    .profile-section { width:100%; max-width:none; margin:0; padding:1.2rem 1.3rem; border:1px solid #e6eaf0; border-radius:14px; background:#fff; box-shadow:0 5px 16px rgba(25,39,61,.035); }
+    .profile-section h2 { margin:0 0 .3rem; color:#1d2d44; font-size:1.02rem; font-weight:700; letter-spacing:-.015em; }
+    .section-description { margin-bottom:1rem; color:#7a879a; font-size:.84rem; }
+    .field-label { color:#77849a; font-size:.76rem; font-weight:600; }
+    .field-value { border-color:#e5e9ef; border-radius:9px; color:#26364d; background:#fbfcfd; }
+    .site-inline-edit-form { display:grid; gap:.9rem; }
+    .site-edit-input { min-height:44px; border-color:#e5e9ef; border-radius:9px; color:#26364d; background:#fbfcfd; font-size:.9rem; }
+    .site-edit-input:focus { border-color:#7fb5b3; background:#fff; box-shadow:0 0 0 .2rem rgba(1,77,78,.1); }
+    .site-inline-save { display:flex; justify-content:flex-end; padding-top:1rem; border-top:1px solid #edf0f4; }
+    .site-contract-action { display:flex; justify-content:flex-start; margin-top:1rem; }
+    .site-inline-save .btn,.profile-actions .btn-primary { color:#fff; background:#014D4E; border-color:#014D4E; }
+    .site-inline-save .btn:hover,.profile-actions .btn-primary:hover { color:#fff; background:#013f40; }
+    .data-table { min-width:600px; }
+    @media(max-width:900px) { .profile-content { grid-template-columns:160px minmax(0,1fr); } .profile-sections { padding:1rem; } }
+    @media(max-width:620px) { .profile-header { top:40px; padding:.7rem .8rem; flex-wrap:wrap; } .profile-actions { width:100%; } .profile-tabs { top:126px; padding:.5rem; } .profile-content { display:block; } .section-nav { top:174px; max-height:none; flex-direction:row; overflow-x:auto; overflow-y:hidden; border-right:0; border-bottom:1px solid #e6eaf0; background:rgba(255,255,255,.97); white-space:nowrap; } .profile-sections { gap:.7rem; padding:.8rem .65rem 1.5rem; } .profile-section { padding:1rem; border-radius:12px; } }
+    @media(max-width:900px) { .app-shell { grid-template-columns:1fr; } .app-sidebar { display:none; } .profile-content { grid-template-columns:160px minmax(0,1fr); } .profile-sections { padding:1rem; } }
+    @media(max-width:620px) { .profile-header { padding:.8rem; flex-wrap:wrap; } .profile-actions { width:100%; } .profile-tabs { padding:.5rem; } .profile-content { grid-template-columns:1fr; } .section-nav { position:sticky; top:0; z-index:4; flex-direction:row; overflow-x:auto; border-right:0; border-bottom:1px solid var(--line); background:#fff; padding:.4rem; white-space:nowrap; } .section-nav a { padding:.5rem .65rem; } .field-grid { grid-template-columns:1fr; } .profile-sections { padding:.7rem .85rem 2rem; } .data-table { min-width:650px; } .table-wrap { overflow-x:auto; } }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    {% include "partials/admin_sidebar.html" %}
+    <main class="main">
+      <header class="profile-header">
+        {% if site.profile_image_path %}<img class="client-mark" src="{{ url_for('static', filename=site.profile_image_path) }}" alt="Client logo">{% else %}<span class="client-mark placeholder"><i class="bi bi-building" aria-hidden="true"></i></span>{% endif %}
+        <div class="client-identity"><small>{{ site.profile_company_name or site.name }}</small><strong>{{ site.name }}</strong></div>
+        <span class="status-pill {{ 'inactive' if site.is_active == 0 else '' }}">{{ 'Inactive' if site.is_active == 0 else 'Active' }}</span>
+        <div class="profile-actions">{% if not is_sales_manager %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('ops.admin_inspection_areas', site_id=site.id) }}"><i class="bi bi-clipboard-check me-1"></i>Inspection areas</a>{% endif %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites') }}"><i class="bi bi-buildings me-1"></i>Sites</a></div>
+      </header>
+      {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="px-3 pt-3">{% for category, message in messages %}<div class="alert alert-{{ 'success' if category == 'success' else 'warning' if category == 'warning' else 'info' }} py-2 mb-2">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+      <nav class="profile-tabs" aria-label="Client pages"><a class="active" href="#information">Information</a><a href="#schedule">Schedule</a>{% if not is_sales_manager %}<a href="{{ url_for('ops.admin_inspection_areas', site_id=site.id) }}">Inspection areas</a>{% endif %}{% if not is_site_manager %}<a href="#invoices">Invoices</a>{% endif %}<a href="#documents">Documents</a></nav>
+      <div class="profile-content">
+        <nav class="section-nav" aria-label="Site sections"><a class="active" href="#general"><i class="bi bi-building me-2"></i>General</a><a href="#contacts"><i class="bi bi-person-lines-fill me-2"></i>Contacts</a>{% if not is_site_manager %}<a href="#contract"><i class="bi bi-file-earmark-text me-2"></i>Contract</a>{% endif %}<a href="#other"><i class="bi bi-card-text me-2"></i>Other</a><a href="#schedule"><i class="bi bi-calendar-week me-2"></i>Schedule</a>{% if not is_sales_manager %}<a href="{{ url_for('ops.admin_inspection_areas', site_id=site.id) }}"><i class="bi bi-clipboard-check me-2"></i>Inspection areas</a>{% endif %}{% if not is_site_manager %}<a href="#invoices"><i class="bi bi-receipt me-2"></i>Invoices</a>{% endif %}<a href="#documents"><i class="bi bi-folder2 me-2"></i>Documents</a></nav>
+        <div class="profile-sections">
+          <form method="post" enctype="multipart/form-data" action="{{ url_for('admin_site_detail', site_id=site.id) }}" id="site-profile-form" class="site-inline-edit-form">
+            <input type="hidden" name="action" value="update_site_profile">
+            <section class="profile-section" id="information">
+              <div id="general"><h2>General</h2><p class="section-description">Site identity, service address, status, and assigned manager.</p></div>
+              <div class="field-grid">
+                <label class="field"><span class="field-label">Company / client name</span><input class="form-control site-edit-input" name="profile_company_name" value="{{ (site.profile_company_name or site.name or '')|e }}" required></label>
+                <label class="field"><span class="field-label">Service location name</span><input class="form-control site-edit-input" name="name" value="{{ (site.name or '')|e }}" required></label>
+                <label class="field"><span class="field-label">Service address</span><input class="form-control site-edit-input" name="address" value="{{ (site.address or '')|e }}"></label>
+                <label class="field"><span class="field-label">Status</span><select class="form-select site-edit-input" name="is_active"><option value="1" {% if site.is_active != 0 %}selected{% endif %}>Active</option><option value="0" {% if site.is_active == 0 %}selected{% endif %}>Inactive</option></select></label>
+                {% if not is_site_manager %}<label class="field"><span class="field-label">Hourly rate (EUR)</span><input class="form-control site-edit-input" type="number" min="0" step="0.01" name="profile_default_hourly_rate" value="{{ site.profile_default_hourly_rate or site.hourly_rate or '' }}"></label>{% endif %}
+                {% if is_main_admin %}<label class="field"><span class="field-label">Assigned site manager</span><select class="form-select site-edit-input" name="manager_employee_id"><option value="">Unassigned</option>{% for manager in site_managers %}<option value="{{ manager.id }}" {% if site.manager_employee_id == manager.id %}selected{% endif %}>{{ manager.name }}</option>{% endfor %}</select></label>{% endif %}
+                <div class="field"><span class="field-label">Shifts on record</span><div class="field-value">{{ shift_count }}</div></div>
+                <label class="field"><span class="field-label">Site logo</span><input class="form-control site-edit-input" type="file" name="site_profile_image" accept="image/png,image/jpeg,image/gif,image/webp,image/heic"></label>
+              </div>
+            </section>
+            <section class="profile-section" id="contacts">
+              <h2>Contacts</h2><p class="section-description">Primary site contact and billing information.</p>
+              <div class="field-grid">
+                <label class="field"><span class="field-label">Contact person</span><input class="form-control site-edit-input" name="profile_contact_name" value="{{ (site.profile_contact_name or site.contact_name or '')|e }}"></label>
+                <label class="field"><span class="field-label">Email</span><input class="form-control site-edit-input" type="email" name="profile_contact_email" value="{{ (site.profile_contact_email or site.contact_email or '')|e }}"></label>
+                <label class="field"><span class="field-label">Phone</span><input class="form-control site-edit-input" type="tel" name="profile_phone" value="{{ (site.profile_phone or '')|e }}"></label>
+                {% if not is_site_manager %}<label class="field"><span class="field-label">Billing address</span><input class="form-control site-edit-input" name="profile_billing_address" value="{{ (site.profile_billing_address or '')|e }}"></label>
+                <label class="field"><span class="field-label">VAT ID</span><input class="form-control site-edit-input" name="profile_vat_id" value="{{ (site.profile_vat_id or '')|e }}"></label>
+                <label class="field"><span class="field-label">Customer / tax ID</span><input class="form-control site-edit-input" name="profile_tax_id" value="{{ (site.profile_tax_id or '')|e }}"></label>{% endif %}
+              </div>
+            </section>
+            {% if not is_site_manager %}<section class="profile-section" id="contract">
+              <h2>Contract</h2><p class="section-description">Contract partner, contact, and term details.</p>
+              <div class="field-grid">
+                <label class="field"><span class="field-label">Contract partner</span><input class="form-control site-edit-input" name="contract_partner_name" value="{{ (site.contract_partner_name or '')|e }}"></label>
+                <label class="field"><span class="field-label">Contract contact details</span><input class="form-control site-edit-input" name="contract_contact_details" value="{{ (site.contract_contact_details or '')|e }}"></label>
+                <label class="field"><span class="field-label">Contract start</span><input class="form-control site-edit-input" type="date" name="contract_start_date" value="{{ contract_start_input }}"></label>
+                <label class="field"><span class="field-label">Contract end</span><input class="form-control site-edit-input" type="date" name="contract_end_date" value="{{ contract_end_input }}"></label>
+              </div>
+              {% if is_main_admin %}<div class="site-contract-action"><button class="btn btn-outline-primary" type="submit" name="profile_action" value="generate_contract"><i class="bi bi-file-earmark-pdf me-1"></i>Save &amp; download contract</button></div>{% endif %}
+            </section>{% endif %}
+            <section class="profile-section" id="other">
+              <h2>Other</h2><p class="section-description">Keep access instructions and internal site notes up to date.</p>
+              <label class="field"><span class="field-label">Notes</span><textarea class="form-control site-edit-input" name="profile_notes" rows="4">{{ site.profile_notes or '' }}</textarea></label>
+              <div class="field-grid mt-3"><div class="field"><span class="field-label">Site record</span><div class="field-value">#{{ site.id }}</div></div></div>
+              <div class="site-inline-save"><button class="btn btn-primary" type="submit"><i class="bi bi-check2 me-1"></i>Save site</button></div>
+            </section>
+          </form>
+          <section class="profile-section" id="schedule">
+            <h2>Schedule</h2><p class="section-description">Recent shifts scheduled for this client location.</p>
+            {% if shifts %}<div class="table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Time</th><th>Employee</th><th>Notes</th></tr></thead><tbody>{% for shift in shifts %}<tr><td>{{ shift.day.strftime('%d.%m.%Y') }}</td><td>{{ shift.start_time.strftime('%H:%M') }} &rarr; {{ shift.end_time.strftime('%H:%M') }}</td><td>{{ shift.employee.name if shift.employee else 'Open shift' }}</td><td>{{ shift.instructions or '?' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state">No shifts have been scheduled for this client yet.</div>{% endif %}
+          </section>
+          {% if not is_site_manager %}<section class="profile-section" id="invoices">
+            <h2>Invoices</h2><p class="section-description">Recent invoices linked to this client.</p>
+            {% if invoices %}<div class="table-wrap"><table class="data-table"><thead><tr><th>Invoice</th><th>Issued</th><th>Due</th><th>Amount</th><th>Status</th></tr></thead><tbody>{% for invoice in invoices %}<tr><td><a href="{{ url_for('admin_invoices') }}">{{ invoice.invoice_number }}</a></td><td>{{ invoice.issued_date.strftime('%d.%m.%Y') if invoice.issued_date else '?' }}</td><td>{{ invoice.due_date.strftime('%d.%m.%Y') if invoice.due_date else '?' }}</td><td>{{ '%.2f'|format(invoice.total_amount or invoice.subtotal or 0) }} ?</td><td>{{ invoice.status|title }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state">No invoices have been created for this client yet.</div>{% endif %}
+          </section>{% endif %}
+          <section class="profile-section" id="documents">
+            <h2>Documents</h2><p class="section-description">Client image and contract tools.</p>
+            {% if site.profile_image_path %}<div class="profile-card"><span class="field-label">Client logo</span><img class="client-logo-large" src="{{ url_for('static', filename=site.profile_image_path) }}" alt="Client logo"></div>{% else %}<div class="empty-state">No client logo or document has been added.</div>{% endif %}
+            <a class="btn btn-sm btn-outline-primary mt-3" href="#general"><i class="bi bi-pencil-square me-1"></i>Update site logo</a>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>
+    (() => {
+      const tabs = Array.from(document.querySelectorAll('.profile-tabs a[href^="#"]'));
+      const sections = Array.from(document.querySelectorAll('.section-nav a[href^="#"]'));
+      const activate = (hash) => {
+        if (!hash) return;
+        tabs.forEach((tab) => tab.classList.toggle('active', tab.getAttribute('href') === hash || (hash === '#general' && tab.getAttribute('href') === '#information')));
+        sections.forEach((link) => link.classList.toggle('active', link.getAttribute('href') === hash));
+      };
+      tabs.concat(sections).forEach((link) => link.addEventListener('click', () => activate(link.getAttribute('href'))));
+      if (window.location.hash) activate(window.location.hash);
+    })();
+  </script>
+</body>
+</html>
+"""
+
 INVOICE_LIST_TEMPLATE = """
 <!doctype html>
-<html lang="en">
+<html lang="{{ current_lang|default('de') }}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -1670,23 +1760,9 @@ INVOICE_LIST_TEMPLATE = """
 </head>
 <body>
   <div class="app-shell">
-    <aside id="admin-sidebar" class="sidebar">
-      <div class="sidebar-section-title">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
-      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a> #}
-      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
-      <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
-      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
-    </aside>
+    {% include "partials/admin_sidebar.html" %}
     <main class="main-shell">
-      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
-      {% with messages = get_flashed_messages(with_categories=true) %}
+{% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="mb-3">
             {% for category, message in messages %}
@@ -1955,7 +2031,7 @@ INCOME_REPORT_TEMPLATE = """
     .site-breakdown table { font-size:0.95rem; }
     .site-breakdown th { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#475569; background:#f1f5f9; }
     @media(max-width:992px){
-      .app-shell{ grid-template-columns:minmax(0,1fr);} 
+      .app-shell{ grid-template-columns:minmax(0,1fr);}
       .sidebar{
         position:fixed;
         top:0;
@@ -1996,22 +2072,9 @@ INCOME_REPORT_TEMPLATE = """
 </head>
 <body>
   <div class="app-shell">
-    <aside id="admin-sidebar" class="sidebar">
-      <div class="sidebar-section-title">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
-      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a> #}
-      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
-      <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
-      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
-    </aside>
+{% include "partials/admin_sidebar.html" %}
     <main class="main-shell">
-      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
+
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="mb-3">
@@ -2189,7 +2252,7 @@ INCOME_REPORT_TEMPLATE = """
     .site-breakdown table { font-size:0.95rem; }
     .site-breakdown th { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#475569; background:#f1f5f9; }
     @media(max-width:992px){
-      .app-shell{ grid-template-columns:minmax(0,1fr);} 
+      .app-shell{ grid-template-columns:minmax(0,1fr);}
       .sidebar{
         position:fixed;
         top:0;
@@ -2230,22 +2293,9 @@ INCOME_REPORT_TEMPLATE = """
 </head>
 <body>
   <div class="app-shell">
-    <aside id="admin-sidebar" class="sidebar">
-      <div class="sidebar-section-title">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
-      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a> #}
-      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
-      <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
-      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
-    </aside>
+{% include "partials/admin_sidebar.html" %}
     <main class="main-shell">
-      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
+
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="mb-3">
@@ -2429,7 +2479,7 @@ INVOICE_FORM_TEMPLATE = """
     .btn-link { background:none; box-shadow:none; color:#0f766e; }
     .btn-link:hover { color:#0c615b; }
     @media(max-width:992px){
-      .app-shell{ grid-template-columns:minmax(0,1fr);} 
+      .app-shell{ grid-template-columns:minmax(0,1fr);}
       .sidebar{
         position:fixed;
         top:0;
@@ -2470,22 +2520,9 @@ INVOICE_FORM_TEMPLATE = """
 </head>
 <body>
   <div class="app-shell">
-    <aside id="admin-sidebar" class="sidebar">
-      <div class="sidebar-section-title">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
-      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a> #}
-      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
-      <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
-      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
-    </aside>
+{% include "partials/admin_sidebar.html" %}
     <main class="main-shell">
-      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
+
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="mb-3">
@@ -2529,12 +2566,12 @@ INVOICE_FORM_TEMPLATE = """
                 <label for="site_company_name" class="form-label fw-bold">Company Name</label>
                 <input type="text" id="site_company_name" name="site_company_name" class="form-control" placeholder="e.g., ACME GmbH">
               </div>
-              
+
               <div class="mb-3">
                 <label for="site_contact_name" class="form-label fw-bold">Contact Name</label>
                 <input type="text" id="site_contact_name" name="site_contact_name" class="form-control" placeholder="e.g., John Smith">
               </div>
-              
+
               <div class="mb-3">
                 <label for="site_contact_email" class="form-label fw-bold">Contact Email</label>
                 <input type="email" id="site_contact_email" name="site_contact_email" class="form-control" placeholder="contact@site.com">
@@ -2555,7 +2592,7 @@ INVOICE_FORM_TEMPLATE = """
                 <label for="site_billing_address" class="form-label fw-bold">Billing Address</label>
                 <input type="text" id="site_billing_address" name="site_billing_address" class="form-control" placeholder="Street, ZIP, City">
               </div>
-              
+
               <div class="row">
                 <div class="col-md-6 mb-3">
                   <label for="invoice_month" class="form-label fw-bold">Invoice Month *</label>
@@ -2567,7 +2604,7 @@ INVOICE_FORM_TEMPLATE = """
                   <div class="form-text">Hourly rate is pulled from the site profile.</div>
                 </div>
               </div>
-              
+
               <div class="row">
                 <div class="col-md-6 mb-3">
                   <label for="tax_rate" class="form-label fw-bold">Tax Rate (%)</label>
@@ -2578,12 +2615,12 @@ INVOICE_FORM_TEMPLATE = """
                   <input type="number" id="days_until_due" name="days_until_due" value="30" class="form-control" required>
                 </div>
               </div>
-              
+
               <div class="mb-3">
                 <label for="notes" class="form-label fw-bold">Notes</label>
                 <textarea id="notes" name="notes" class="form-control" rows="4" placeholder="Additional notes or payment terms..."></textarea>
               </div>
-              
+
               <div class="mt-4">
                 <button type="submit" class="btn btn-primary" title="Create invoice"><i class="bi bi-file-earmark-plus"></i></button>
                 <a href="/admin/invoices" class="btn btn-outline-secondary" title="Cancel"><i class="bi bi-x-circle"></i></a>
@@ -2918,7 +2955,7 @@ INVOICE_VIEW_TEMPLATE = """
     .btn-link { background:none; box-shadow:none; color:#0f766e; }
     .btn-link:hover { color:#0c615b; }
     @media(max-width:992px){
-      .app-shell{ grid-template-columns:minmax(0,1fr);} 
+      .app-shell{ grid-template-columns:minmax(0,1fr);}
       .sidebar{
         position:fixed;
         top:0;
@@ -2959,22 +2996,9 @@ INVOICE_VIEW_TEMPLATE = """
 </head>
 <body>
   <div class="app-shell">
-    <aside id="admin-sidebar" class="sidebar">
-      <div class="sidebar-section-title">Navigation</div>
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ <span class="nav-text">Overview</span></a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 <span class="nav-text">Manage employees</span></a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 <span class="nav-text">Manage sites</span></a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill">🪪 <span class="nav-text">Profiles</span></a>
-      <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill">🗓 <span class="nav-text">Assign coverage</span></a>
-      {# <a href="{{ url_for('leads_dashboard') }}" class="nav-pill">📇 <span class="nav-text">Lead-Center</span></a> #}
-      <a href="{{ url_for('index') }}" class="nav-pill">◎ <span class="nav-text">Crawler</span></a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill active">📄 <span class="nav-text">Invoices</span></a>
-      <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
-      <div class="mt-auto small text-muted">© <span id="year"></span> Putzelf Marketing</div>
-    </aside>
+{% include "partials/admin_sidebar.html" %}
     <main class="main-shell">
-      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
+
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="mb-3">
@@ -3149,122 +3173,110 @@ LOGIN_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing — Login</title>
+  <meta name="theme-color" content="#014D4E" />
+  <title>Elf's Plan - {{ ui.login_title }}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    :root {
-      --accent: #0f766e;
-      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
-      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
-      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
-      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
-    }
-    body {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #f1f5f9;
-      color: #0f172a;
-      font-size: 1.05rem;
-    }
-    .login-card {
-      width: min(440px, 95vw);
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
-      border-radius: 16px;
-      padding: 2rem;
-    }
-    .brand {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.45rem;
-      margin-bottom: 1rem;
-    }
-    .brand-logo {
-      width: 44px; height: 44px;
-      border-radius: 12px;
-      background: linear-gradient(135deg,#0f766e,#0ea5e9);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-    .brand-logo img { max-width: 78%; max-height: 78%; object-fit: contain; }
-    .brand-title { font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; font-size: 0.95rem; color:#0f172a; }
-    .brand-sub { font-size: 0.82rem; color: #64748b; }
-    .small-note { font-size:0.85rem; color:#64748b; }
-    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); transition:transform 0.15s ease, box-shadow 0.15s ease; }
-    .btn:hover { transform:translateY(-1px); box-shadow:0 18px 34px rgba(15,118,110,0.32); background-image:var(--btn-grad-accent-hover); }
-    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
-    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
+    :root { --login-teal:#014D4E; --login-deep:#073b40; --login-ink:#17233b; --login-muted:#718096; --login-line:#e1e8ec; }
+    * { box-sizing:border-box; }
+    .ep-global-topbar { position:fixed; top:0; left:0; }
+    body { min-height:100vh; min-height:100dvh; margin:0; padding:76px 24px 28px; display:grid; place-items:center; overflow-x:hidden; color:var(--login-ink); background:radial-gradient(ellipse at 12% 10%,#e4f2f0 0,transparent 35%),linear-gradient(145deg,#f5f8fa,#edf2f5); font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+    .login-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(390px,470px); width:min(1020px,100%); min-height:550px; overflow:hidden; border:1px solid rgba(218,228,233,.9); border-radius:24px; background:#fff; box-shadow:0 28px 80px rgba(20,52,60,.14),0 3px 10px rgba(20,52,60,.04); }
+    .login-brand-panel { position:relative; isolation:isolate; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; padding:clamp(2rem,5vw,3.5rem); color:#f4fbfa; background:linear-gradient(148deg,#073b40 0%,#014D4E 48%,#0a6968 100%); }
+    .login-brand-panel::before,.login-brand-panel::after { position:absolute; z-index:-1; content:""; border:1px solid rgba(210,241,235,.12); border-radius:50%; }
+    .login-brand-panel::before { width:430px; height:430px; right:-180px; top:-150px; box-shadow:0 0 0 34px rgba(255,255,255,.025),0 0 0 70px rgba(255,255,255,.02); }
+    .login-brand-panel::after { width:310px; height:310px; left:-190px; bottom:-130px; background:radial-gradient(circle,rgba(255,255,255,.09),transparent 68%); }
+    .login-brand { display:flex; align-items:center; gap:.85rem; }
+    .login-brand-logo { display:grid; place-items:center; flex:none; width:48px; height:48px; overflow:hidden; border:1px solid rgba(223,247,242,.24); border-radius:15px; background:rgba(255,255,255,.13); box-shadow:0 8px 22px rgba(2,32,35,.16); }
+    .login-brand-logo img { width:36px; height:36px; object-fit:contain; }
+    .login-brand-title { color:#fff; font-size:1.25rem; font-weight:820; letter-spacing:-.045em; line-height:1.05; }
+    .login-brand-title strong { color:#bce8e2; font-weight:850; }
+    .login-brand-caption { margin-top:.3rem; color:rgba(235,248,246,.72); font-size:.67rem; font-weight:650; letter-spacing:.09em; text-transform:uppercase; }
+    .login-brand-message { max-width:410px; margin:3rem 0; }
+    .login-brand-kicker { display:inline-flex; align-items:center; gap:.42rem; margin-bottom:1rem; padding:.36rem .62rem; border:1px solid rgba(207,241,235,.22); border-radius:999px; background:rgba(255,255,255,.075); color:#d3eeea; font-size:.65rem; font-weight:700; letter-spacing:.045em; }
+    .login-brand-kicker i { color:#a5dfd7; }
+    .login-brand-message h1 { max-width:390px; margin:0; color:#fff; font-size:clamp(2rem,4vw,3rem); font-weight:760; letter-spacing:-.055em; line-height:1.08; }
+    .login-brand-message p { max-width:350px; margin:1rem 0 0; color:rgba(235,248,246,.74); font-size:.9rem; line-height:1.7; }
+    .login-brand-footer { color:rgba(235,248,246,.55); font-size:.66rem; }
+    .login-form-panel { display:flex; flex-direction:column; justify-content:center; padding:clamp(1.6rem,4vw,3.1rem); }
+    .login-language { position:fixed; top:18px; right:22px; z-index:1101; display:flex; align-items:center; gap:.4rem; height:38px; padding:0 .55rem; border:1px solid #dce6e9; border-radius:10px; background:rgba(255,255,255,.92); color:#53677a; box-shadow:0 4px 14px rgba(34,55,69,.07); }
+    .login-language > i { color:#397a79; }
+    .login-language select { width:auto; min-width:95px; padding:.3rem 1.5rem .3rem .2rem; border:0; background-color:transparent; color:#34465c; font-size:.72rem; font-weight:650; box-shadow:none; }
+    .login-form-heading { margin-bottom:1.55rem; }
+    .login-form-heading > span { color:var(--login-teal); font-size:.68rem; font-weight:750; letter-spacing:.1em; text-transform:uppercase; }
+    .login-form-heading h2 { margin:.5rem 0 .4rem; color:#1d2d43; font-size:1.75rem; font-weight:760; letter-spacing:-.045em; }
+    .login-form-heading p { margin:0; color:#77869a; font-size:.78rem; line-height:1.55; }
+    .login-field { margin-bottom:1rem; }
+    .login-field label { display:block; margin-bottom:.42rem; color:#46586e; font-size:.7rem; font-weight:700; }
+    .login-input-wrap { position:relative; }
+    .login-input-wrap > i { position:absolute; top:50%; left:.85rem; z-index:1; transform:translateY(-50%); color:#91a0ae; font-size:.92rem; pointer-events:none; }
+    .login-input-wrap .form-control { min-height:47px; padding:.65rem .8rem .65rem 2.55rem; border:1px solid var(--login-line); border-radius:10px; background:#fbfcfd; color:#25364c; font-size:.82rem; box-shadow:none; }
+    .login-input-wrap .form-control::placeholder { color:#a0aab6; }
+    .login-input-wrap .form-control:focus { border-color:#68a09e; background:#fff; box-shadow:0 0 0 3px rgba(1,77,78,.1); }
+    .login-password-toggle { position:absolute; top:50%; right:.45rem; display:grid; place-items:center; width:35px; height:35px; transform:translateY(-50%); border:0; border-radius:8px; background:transparent; color:#728295; }
+    .login-password-toggle:hover { background:#eef4f4; color:var(--login-teal); }
+    .login-password-toggle:focus-visible { outline:2px solid #68a09e; outline-offset:1px; }
+    .login-submit { display:flex; align-items:center; justify-content:center; gap:.5rem; width:100%; min-height:47px; margin-top:.35rem; border:0; border-radius:10px; background:linear-gradient(120deg,#014D4E,#08716f); color:#fff; font-size:.82rem; font-weight:720; box-shadow:0 8px 18px rgba(1,77,78,.19); transition:transform .16s ease,box-shadow .16s ease,filter .16s ease; }
+    .login-submit:hover { transform:translateY(-1px); filter:brightness(1.04); box-shadow:0 12px 22px rgba(1,77,78,.23); }
+    .login-submit:focus-visible { outline:3px solid rgba(1,77,78,.25); outline-offset:3px; }
+    .login-error { margin-bottom:1rem; border:1px solid #f2d2cc; border-radius:9px; background:#fff4f1; color:#a54335; font-size:.75rem; }
+    .login-help { display:flex; align-items:flex-start; gap:.5rem; margin-top:1rem; padding:.75rem; border:1px solid #e8edf0; border-radius:9px; background:#f8fafb; color:#77869a; font-size:.67rem; line-height:1.55; }
+    .login-help i { flex:none; margin-top:.05rem; color:#6c9694; }
+    .login-mobile-footer { display:none; }
+    @media(max-width:760px) { body { padding:82px 16px 24px; } .login-layout { grid-template-columns:1fr; width:min(480px,100%); min-height:auto; } .login-brand-panel { min-height:230px; padding:1.45rem 1.5rem; } .login-brand-message { margin:1.8rem 0 1rem; } .login-brand-message h1 { max-width:440px; font-size:2rem; } .login-brand-message p { margin-top:.55rem; font-size:.78rem; } .login-brand-footer { display:none; } .login-form-panel { padding:1.65rem 1.5rem 1.5rem; } .login-form-heading { margin-bottom:1.15rem; } .login-form-heading h2 { font-size:1.45rem; } }
+    @media(max-width:390px) { body { padding-inline:10px; } .login-layout { border-radius:18px; } .login-brand-panel { min-height:205px; padding:1.15rem; } .login-form-panel { padding:1.25rem 1.1rem; } .login-language { top:10px; right:10px; } }
+    @media(prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; } }
   </style>
 </head>
 <body>
-  <div class="login-card">
-    <form method="get" class="d-flex justify-content-end mb-2">
-      {% if next_value %}
-        <input type="hidden" name="next" value="{{ next_value }}">
-      {% endif %}
-      <label class="small-note me-2" for="lang">{{ ui.language }}</label>
-      <select id="lang" name="lang" class="form-select form-select-sm" style="max-width: 180px;" onchange="this.form.submit()">
-        {% for code, label in lang_labels.items() %}
-          <option value="{{ code }}" {% if code == lang %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </form>
-    <div class="brand">
-      <div class="brand-logo">
-        <img src="/static/logo.png" alt="Putzelf Marketing">
-      </div>
-      <div>
-        <div class="brand-title">Putzelf Marketing</div>
-        <div class="brand-sub">{{ ui.login_secure_access }}</div>
-      </div>
-    </div>
-    <h1 class="h5 text-dark mb-3">{{ ui.login_title }}</h1>
-    <form method="post" class="needs-validation" novalidate>
-      <input type="hidden" name="next" value="{{ next_value or request.args.get('next','') }}">
-      <input type="hidden" name="lang" value="{{ lang }}">
-      <div class="mb-3">
-        <label class="form-label small-note text-uppercase" for="username">{{ ui.login_username }}</label>
-        <input class="form-control form-control-sm" id="username" name="username" required autofocus>
-      </div>
-      <div class="mb-3">
-        <label class="form-label small-note text-uppercase" for="password">{{ ui.login_password }}</label>
-        <input type="password" class="form-control form-control-sm" id="password" name="password" required>
-      </div>
-      {% if error %}
-        <div class="alert alert-danger py-2" role="alert">{{ error }}</div>
-      {% endif %}
-      <div class="d-flex align-items-center gap-2 flex-wrap">
-        <button class="btn btn-sm btn-primary">{{ ui.login_button }}</button>
-        <span class="small-note">{{ ui.login_hint }}</span>
-      </div>
-    </form>
-  </div>
+  <form method="get" class="login-language" aria-label="{{ ui.language }}">
+    {% if next_value %}<input type="hidden" name="next" value="{{ next_value }}">{% endif %}
+    <i class="bi bi-translate" aria-hidden="true"></i>
+    <label class="visually-hidden" for="lang">{{ ui.language }}</label>
+    <select id="lang" name="lang" class="form-select form-select-sm" onchange="this.form.submit()">
+      {% for code, label in lang_labels.items() %}<option value="{{ code }}" {% if code == lang %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </form>
+  <main class="login-layout">
+    <section class="login-brand-panel" aria-label="Elf's Plan">
+      <div class="login-brand"><span class="login-brand-logo"><img src="/static/employee-icon-192.png" alt=""></span><div><div class="login-brand-title">Elf's <strong>Plan</strong></div><div class="login-brand-caption">{{ ui.login_secure_access }}</div></div></div>
+      <div class="login-brand-message"><span class="login-brand-kicker"><i class="bi bi-shield-lock-fill"></i>{{ ui.login_workspace_label }}</span><h1>{{ ui.login_tagline }}</h1><p>{{ ui.login_brand_message }}</p></div>
+      <div class="login-brand-footer">Elf's Plan | {{ ui.login_workspace_label }}</div>
+    </section>
+    <section class="login-form-panel" aria-labelledby="login-heading">
+      <div class="login-form-heading"><span>{{ ui.login_secure_access }}</span><h2 id="login-heading">{{ ui.login_title }}</h2><p>{{ ui.login_form_intro }}</p></div>
+      <form method="post" class="needs-validation" novalidate>
+        <input type="hidden" name="next" value="{{ next_value or request.args.get('next','') }}"><input type="hidden" name="lang" value="{{ lang }}">
+        <div class="login-field"><label for="username">{{ ui.login_username }}</label><div class="login-input-wrap"><i class="bi bi-person" aria-hidden="true"></i><input class="form-control" id="username" name="username" autocomplete="username" required autofocus></div></div>
+        <div class="login-field"><label for="password">{{ ui.login_password }}</label><div class="login-input-wrap"><i class="bi bi-lock" aria-hidden="true"></i><input type="password" class="form-control" id="password" name="password" autocomplete="current-password" required><button class="login-password-toggle" type="button" id="toggle-password" aria-label="{{ ui.login_show_password }}" title="{{ ui.login_show_password }}"><i class="bi bi-eye"></i></button></div></div>
+        {% if error %}<div class="alert login-error py-2" role="alert"><i class="bi bi-exclamation-circle me-1"></i>{{ error }}</div>{% endif %}
+        <button class="login-submit" type="submit"><i class="bi bi-box-arrow-in-right"></i>{{ ui.login_button }}</button>
+        <div class="login-help"><i class="bi bi-info-circle-fill"></i><span>{{ ui.login_hint }}</span></div>
+      </form>
+    </section>
+  </main>
   <script>
-    (function () {
-      'use strict';
-      const forms = document.querySelectorAll('.needs-validation');
-      Array.from(forms).forEach(form => {
-        form.addEventListener('submit', event => {
-          if (!form.checkValidity()) {
-            event.preventDefault();
-            event.stopPropagation();
-          }
-          form.classList.add('was-validated');
-        }, false);
+    (() => {
+      const form = document.querySelector('.needs-validation');
+      form?.addEventListener('submit', event => {
+        if (!form.checkValidity()) { event.preventDefault(); event.stopPropagation(); }
+        form.classList.add('was-validated');
+      });
+      const toggle = document.getElementById('toggle-password');
+      const password = document.getElementById('password');
+      toggle?.addEventListener('click', () => {
+        const showing = password.type === 'password';
+        password.type = showing ? 'text' : 'password';
+        toggle.innerHTML = showing ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+        toggle.setAttribute('aria-label', showing ? '{{ ui.login_hide_password }}' : '{{ ui.login_show_password }}');
+        toggle.title = showing ? '{{ ui.login_hide_password }}' : '{{ ui.login_show_password }}';
       });
     })();
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
 """
-
 
 EMPLOYEE_DASHBOARD_TEMPLATE = """
 <!doctype html>
@@ -3272,13 +3284,14 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Putzelf Marketing — {{ ui.your_missions }}</title>
+  <title>Elf's Plan — {{ ui.your_missions }}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#0f172a" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="/static/logo.png">
+  <link rel="apple-touch-icon" href="/static/employee-icon-192.png">
   <style>
     :root { color-scheme: light; }
     * { box-sizing: border-box; }
@@ -3290,10 +3303,24 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
     .app-header { position: sticky; top: 0; z-index: 20; padding: calc(env(safe-area-inset-top, 0px) + 1rem) 1.35rem 1rem; background: rgba(255,255,255,0.95); backdrop-filter: blur(16px); border-bottom: 1px solid #e2e8f0; }
     .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
     .brand-group { display: flex; align-items: center; gap: 0.75rem; }
-    .brand-mark { width: 2.75rem; height: 2.75rem; border-radius: 1rem; display: inline-flex; align-items: center; justify-content: center; background: #0f766e; font-size: 1.5rem; color: #ffffff; }
+    .brand-mark { width: 2.75rem; height: 2.75rem; border-radius: 1rem; display: inline-flex; align-items: center; justify-content: center; background: #fff; object-fit: contain; padding: .12rem; }
     .brand-text { display: grid; gap: 0.1rem; }
     .brand-label { font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.82rem; color: #0f172a; }
     .brand-sub { font-size: 0.76rem; color: #475569; letter-spacing: 0.04em; text-transform: uppercase; }
+    .employee-header-actions { display:flex; align-items:center; gap:.45rem; }
+    .employee-notification-toggle { position:relative; width:42px; height:42px; display:grid; place-items:center; border:1px solid #dbe3ed; border-radius:14px; background:#fff; color:#334155; font-size:1.1rem; }
+    .employee-notification-count { position:absolute; top:-4px; right:-4px; min-width:18px; height:18px; display:grid; place-items:center; padding:0 4px; border-radius:999px; background:#2563eb; color:white; font-size:.65rem; font-weight:700; }
+    .employee-notification-panel { margin-top:.75rem; padding:.8rem; border:1px solid #e2e8f0; border-radius:14px; background:#fff; box-shadow:0 12px 25px rgba(15,23,42,.08); }
+    .employee-notification-panel[hidden] { display:none !important; }
+    .employee-notification-panel-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.5rem; }
+    .employee-notification-panel-head strong { font-size:.9rem; }
+    .employee-notification-enable { border:0; border-radius:999px; padding:.35rem .65rem; background:#eff6ff; color:#1d4ed8; font-size:.74rem; font-weight:650; }
+    .employee-notification-list { display:grid; gap:.45rem; max-height:280px; overflow:auto; }
+    .employee-notification-item { width:100%; padding:.65rem; border:1px solid #e5eaf1; border-radius:11px; background:#f8fafc; color:#334155; text-align:left; }
+    .employee-notification-item strong,.employee-notification-item span { display:block; }
+    .employee-notification-item strong { font-size:.82rem; margin-bottom:.2rem; }
+    .employee-notification-item span { font-size:.76rem; color:#64748b; }
+    .employee-notification-empty { margin:0; padding:.5rem; color:#64748b; font-size:.82rem; }
     .logout-chip { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.55rem 1.05rem; border-radius: 999px; background: #f1f5f9; color: #0f172a; text-decoration: none; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.05em; border: 1px solid #cbd5f5; transition: transform 0.16s ease, background 0.16s ease; }
     .logout-chip:hover { transform: translateY(-1px); background: #e0f2fe; }
     .date-line { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: center; }
@@ -3359,14 +3386,22 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
     <header class="app-header">
       <div class="brand-row">
         <div class="brand-group">
-          <span class="brand-mark" aria-hidden="true">🧽</span>
+          <img class="brand-mark" src="/static/employee-icon-192.png" alt="Elf's Plan">
           <div class="brand-text">
             <span class="brand-label">{{ ui.dashboard_title }}</span>
-            <span class="brand-sub">Putzelf Marketing</span>
+            <span class="brand-sub">Elf's Plan</span>
           </div>
         </div>
-        <a class="logout-chip" href="{{ url_for('logout') }}">{{ ui.sign_out }}</a>
+        <div class="employee-header-actions">
+          <button type="button" class="employee-notification-toggle" id="employee-notifications-toggle" aria-label="{{ 'Benachrichtigungen' if lang == 'de' else 'Notifications' }}" aria-expanded="false"><i class="bi bi-bell-fill" aria-hidden="true"></i><span class="employee-notification-count" id="employee-notification-count" hidden>0</span></button>
+          <a class="logout-chip" href="{{ url_for('logout') }}">{{ ui.sign_out }}</a>
+        </div>
       </div>
+      <section class="employee-notification-panel" id="employee-notification-panel" hidden aria-label="Notifications">
+        <div class="employee-notification-panel-head"><strong>{{ 'Benachrichtigungen' if lang == 'de' else 'Notifications' }}</strong><button type="button" class="employee-notification-enable" id="employee-notification-enable">{{ 'Aktivieren' if lang == 'de' else 'Enable alerts' }}</button></div>
+        <p class="employee-notification-empty" id="employee-notification-status" aria-live="polite"></p>
+        <div class="employee-notification-list" id="employee-notification-list"><p class="employee-notification-empty">{{ 'Lade Benachrichtigungen…' if lang == 'de' else 'Loading notifications…' }}</p></div>
+      </section>
       <div class="d-flex justify-content-end mt-2">
         <form method="get" class="d-flex align-items-center gap-2">
           <label class="small-note" for="employee-lang">{{ ui.language }}</label>
@@ -3571,6 +3606,89 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
 
   <script>
     (function() {
+      const toggle=document.getElementById('employee-notifications-toggle');
+      const panel=document.getElementById('employee-notification-panel');
+      const badge=document.getElementById('employee-notification-count');
+      const list=document.getElementById('employee-notification-list');
+      const status=document.getElementById('employee-notification-status');
+      const enable=document.getElementById('employee-notification-enable');
+      const lang=document.documentElement.lang==='de'?'de':'en';
+      const text={
+        loading:lang==='de'?'Benachrichtigungen werden geladen…':'Loading notifications…',
+        empty:lang==='de'?'Keine neuen Benachrichtigungen.':'No new notifications.',
+        paused:lang==='de'?'Benachrichtigungen sind pausiert. Updates erscheinen nach der Reaktivierung.':'Notifications are paused. Shift updates will appear when they resume.',
+        enable:lang==='de'?'Browser-Benachrichtigungen aktivieren':'Enable browser notifications',
+        allowed:lang==='de'?'Browser-Benachrichtigungen sind aktiviert.':'Browser notifications are enabled.',
+        denied:lang==='de'?'Bitte Benachrichtigungen in den Browsereinstellungen erlauben.':'Allow notifications in your browser settings.',
+        reminder:lang==='de'?'Deine heutigen Einsätze':'Your shifts today'
+      };
+      const seenKey='elfs-plan-seen-notifications';
+      let pollTimer=null;
+      const seenIds=()=>{try{return new Set(JSON.parse(localStorage.getItem(seenKey)||'[]'));}catch(_error){return new Set();}};
+      const rememberSeen=(seen)=>{try{localStorage.setItem(seenKey,JSON.stringify(Array.from(seen).slice(-100)));}catch(_error){}};
+      const updateMorningReminder=(data)=>{
+        if(!('Notification' in window)||Notification.permission!=='granted'||!data.notifications_enabled)return;
+        const now=new Date();if(now.getHours()<6)return;
+        const localDate=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const key='elfs-plan-morning-reminder-'+localDate;
+        try{if(localStorage.getItem(key))return;}catch(_error){}
+        const shifts=data.today_shifts||[];if(!shifts.length)return;
+        const body=shifts.slice(0,3).map(item=>`${item.site_name} · ${item.time_window}`).join('\n');
+        try{const notice=new Notification(text.reminder,{body,icon:'/static/employee-icon-192.png',tag:key});notice.onclick=()=>{window.focus();notice.close();};localStorage.setItem(key,'1');}catch(_error){}
+      };
+      if(enable&&'Notification' in window){
+        if(Notification.permission==='granted')enable.textContent=lang==='de'?'Browser-Benachrichtigungen aktiviert':'Browser alerts enabled';
+        else if(Notification.permission==='denied')enable.textContent=lang==='de'?'In Browsereinstellungen erlauben':'Allow in browser settings';
+      }
+      const renderNotifications=(data)=>{
+        const items=data.items||[];
+        if(badge){badge.hidden=items.length===0;badge.textContent=String(items.length>9?'9+':items.length);}
+        if(status)status.textContent=data.notifications_enabled?'':text.paused;
+        if(!list)return;
+        list.replaceChildren();
+        if(!items.length){const empty=document.createElement('p');empty.className='employee-notification-empty';empty.textContent=text.empty;list.appendChild(empty);return;}
+        items.forEach(item=>{
+          const button=document.createElement('button');button.type='button';button.className='employee-notification-item';
+          const heading=document.createElement('strong');heading.textContent=item.title;
+          const description=document.createElement('span');description.textContent=item.body;
+          button.append(heading,description);
+          button.addEventListener('click',async()=>{await fetch(`/employee/api/notifications/${item.id}/read`,{method:'POST',credentials:'same-origin'});refreshNotifications();});
+          list.appendChild(button);
+        });
+      };
+      async function refreshNotifications(){
+        try{
+          const response=await fetch('/employee/api/notifications',{credentials:'same-origin',cache:'no-store'});
+          if(!response.ok)return;
+          const data=await response.json();renderNotifications(data);updateMorningReminder(data);
+          if('Notification' in window&&Notification.permission==='granted'){
+            const seen=seenIds();let changed=false;
+            for(const item of data.items||[]){
+              if(seen.has(item.id))continue;
+              seen.add(item.id);changed=true;
+              try{const notice=new Notification(item.title,{body:item.body,icon:'/static/employee-icon-192.png',tag:`elfs-plan-notification-${item.id}`});notice.onclick=()=>{window.focus();panel.hidden=false;notice.close();};}catch(_error){}
+            }
+            if(changed)rememberSeen(seen);
+          }
+        }catch(_error){/* Offline: cached planner remains usable; refresh when connected. */}
+      }
+      toggle?.addEventListener('click',()=>{const open=panel.hidden;panel.hidden=!open;toggle.setAttribute('aria-expanded',String(open));if(open)refreshNotifications();});
+      enable?.addEventListener('click',async()=>{
+        if(!('Notification' in window)){if(status)status.textContent=text.denied;return;}
+        if(Notification.permission==='denied'){if(status)status.textContent=text.denied;return;}
+        const permission=await Notification.requestPermission();
+        if(status)status.textContent=permission==='granted'?text.allowed:text.denied;
+        if(permission==='granted'&&enable)enable.textContent=lang==='de'?'Browser-Benachrichtigungen aktiviert':'Browser alerts enabled';
+        if(permission==='granted')refreshNotifications();
+      });
+      refreshNotifications();
+      pollTimer=window.setInterval(refreshNotifications,45000);
+      window.addEventListener('online',refreshNotifications);
+      window.addEventListener('beforeunload',()=>{if(pollTimer)clearInterval(pollTimer);});
+    })();
+  </script>
+  <script>
+    (function() {
       const navLinks = Array.from(document.querySelectorAll('.bottom-nav .nav-link'));
       const sections = navLinks.map(link => document.getElementById(link.dataset.target));
       const content = document.getElementById('content');
@@ -3679,11 +3797,11 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
 
 LEADS_TEMPLATE = """
 <!doctype html>
-<html lang="en">
+<html lang="{{ current_lang|default('de') }}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing — Lead-Center</title>
+  <title>Elf's Plan &mdash; Lead Center</title>
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -3750,7 +3868,7 @@ LEADS_TEMPLATE = """
     .sidebar-collapsed .nav-pill { justify-content: center; padding: 0.45rem; }
     .sidebar-collapsed .nav-pill-icon { margin: 0 auto; }
     .sidebar-collapsed .sidebar-logo { margin: 0 auto; }
-    .kanban { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; }
+    .kanban { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }
     .kanban-column { border:1px solid #e2e8f0; border-radius:0.9rem; background:#f8fafc; padding:0.75rem; min-height:240px; box-shadow:0 8px 16px rgba(15,23,42,0.08); }
     .kanban-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem; color:#0f172a; font-weight:600; font-size:0.95rem; }
     .lead-card { border:1px solid #cbd5f5; border-radius:0.7rem; padding:0.65rem; background:#ffffff; color:#0f172a; margin-bottom:0.5rem; cursor:grab; box-shadow:0 4px 12px rgba(15,23,42,0.08); }
@@ -3760,6 +3878,56 @@ LEADS_TEMPLATE = """
     .lead-email-copy { border:0; background:none; padding:0; color:#0f766e; text-decoration:underline; cursor:pointer; font-size:0.8rem; }
     .lead-email-copy:hover { color:#0c615b; }
     .copy-status { min-height:1.2rem; }
+    :root { --accent:#014D4E; --ep-lead-canvas:#f5f7fa; --ep-lead-border:#e4e9ef; }
+    body { min-height:100vh; background:var(--ep-lead-canvas); color:#1d2d44; font-size:14px; }
+    .app-shell { min-height:calc(100dvh - 40px); background:var(--ep-lead-canvas); }
+    .main-shell { min-width:0; padding:1.35rem clamp(.85rem,2vw,1.7rem) 2rem; background:var(--ep-lead-canvas); }
+    .lead-page-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+    .lead-page-title { display:flex; align-items:center; gap:.75rem; min-width:0; }
+    .lead-page-icon { width:44px; height:44px; display:grid; place-items:center; flex:none; border:1px solid #cce1df; border-radius:13px; color:#014D4E; background:#e8f3f2; font-size:1.15rem; }
+    .lead-page-title h1 { margin:.05rem 0 .1rem; color:#1d2d44; font-size:1.35rem; font-weight:720; letter-spacing:-.035em; }
+    .lead-page-title .badge-soft { padding:0; border:0; color:#718096; background:transparent; font-size:.68rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+    .lead-page-title .small-note { color:#758197; font-size:.82rem; }
+    .lead-summary-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; margin:0 0 .85rem; }
+    .lead-summary { display:flex; align-items:center; gap:.65rem; min-width:0; padding:.7rem .85rem; border:1px solid var(--ep-lead-border); border-radius:12px; background:#fff; box-shadow:0 3px 12px rgba(25,39,61,.035); }
+    .lead-summary-icon { width:34px; height:34px; display:grid; place-items:center; flex:none; border-radius:10px; color:#014D4E; background:#e8f3f2; }
+    .lead-summary-copy { display:grid; min-width:0; line-height:1.25; }
+    .lead-summary-copy span { color:#77849a; font-size:.7rem; }
+    .lead-summary-copy strong { color:#23314a; font-size:1.05rem; }
+    .lead-workspace { display:grid; grid-template-columns:minmax(230px,290px) minmax(0,1fr); gap:.85rem; align-items:start; }
+    .lead-workspace { margin:0; }
+    .lead-workspace > .col-12 { width:auto; max-width:none; padding:0; }
+    .main-shell .card-surface { min-width:0; padding:1rem; border:1px solid var(--ep-lead-border); border-radius:14px; background:#fff; box-shadow:0 4px 14px rgba(25,39,61,.04); }
+    .lead-form-card h2 { margin:0 0 .85rem; color:#23314a!important; font-size:.95rem; font-weight:700; letter-spacing:0; text-transform:none!important; }
+    .lead-form-card .form-label { color:#69778c; font-size:.72rem; font-weight:650; letter-spacing:.02em; text-transform:none!important; }
+    .lead-form-card .form-control,.lead-form-card .form-select,.lead-filter-panel .form-control,.lead-filter-panel .form-select { min-height:37px; border-color:#e3e8ef; border-radius:9px; font-size:.83rem; box-shadow:none; }
+    .lead-form-card textarea.form-control { min-height:72px; }
+    .lead-form-card .btn { min-height:38px; border-radius:9px; font-size:.82rem; }
+    .lead-filter-panel { display:grid; grid-template-columns:repeat(4,minmax(110px,1fr)) auto; align-items:end; gap:.55rem; margin-bottom:.8rem; padding:.75rem; border:1px solid var(--ep-lead-border); border-radius:12px; background:#fbfcfd; }
+    .lead-filter-field { min-width:0; }
+    .lead-filter-field .form-label { margin-bottom:.25rem; color:#77849a; font-size:.68rem; font-weight:650; }
+    .lead-filter-actions { display:flex; flex-wrap:wrap; gap:.4rem; }
+    .lead-filter-actions .btn { min-height:36px; padding:.42rem .62rem; border-radius:9px; font-size:.76rem; white-space:nowrap; }
+    .kanban { gap:.65rem; overflow-x:auto; padding-bottom:.35rem; }
+    .kanban-column { min-width:190px; min-height:320px; padding:.65rem; border:1px solid #e6eaf0; border-radius:13px; background:#f7f9fb; box-shadow:none; }
+    .kanban-header { min-height:34px; margin:0 0 .55rem; color:#35445b; font-size:.81rem; }
+    .kanban-header .badge { color:#607087!important; background:#e9eef3!important; font-size:.69rem; }
+    .lead-card { padding:.7rem; border:1px solid #e5eaf0; border-left:3px solid #80b9b5; border-radius:11px; background:#fff; box-shadow:0 2px 8px rgba(25,39,61,.045); transition:box-shadow .15s,border-color .15s,transform .15s; }
+    .lead-card:hover { border-color:#bdd8d6; box-shadow:0 6px 16px rgba(25,39,61,.08); }
+    .lead-card.dragging { opacity:.55; transform:rotate(1deg); }
+    .kanban-column.drop-target { border-color:#75aaa7; background:#edf6f5; box-shadow:inset 0 0 0 1px rgba(1,77,78,.12); }
+    .lead-card strong { color:#26364d; font-size:.84rem; }
+    .lead-meta,.small-note { color:#78869a; font-size:.74rem; }
+    .lead-email-copy { color:#014D4E; font-size:.75rem; }
+    .lead-card .btn-group .btn { width:29px; height:29px; min-height:29px; padding:0; border-radius:8px!important; }
+    .lead-card .btn-group .btn:hover { transform:none; }
+    .main-shell .btn-primary,.main-shell .btn-outline-primary { color:#fff; background:#014D4E; background-image:none; border:1px solid #014D4E; box-shadow:0 3px 8px rgba(1,77,78,.14); }
+    .main-shell .btn-primary:hover,.main-shell .btn-outline-primary:hover { color:#fff; background:#013f40; }
+    .main-shell .btn-outline-secondary { color:#47566e; background:#fff; background-image:none; border:1px solid #dde4ec; box-shadow:none; }
+    .main-shell .btn-outline-danger { color:#b42318; background:#fff; background-image:none; border:1px solid #f0c7c3; box-shadow:none; }
+    @media(max-width:1100px) { .lead-workspace { grid-template-columns:minmax(210px,250px) minmax(0,1fr); } .lead-filter-panel { grid-template-columns:repeat(2,minmax(110px,1fr)); } }
+    @media(max-width:760px) { .main-shell { padding:.8rem .7rem 1.2rem; } .lead-workspace { grid-template-columns:1fr; } .lead-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .lead-page-title h1 { font-size:1.16rem; } .lead-page-icon { width:40px; height:40px; } .kanban-column { min-width:220px; } }
+    @media(max-width:420px) { .lead-filter-panel { grid-template-columns:1fr 1fr; } .lead-filter-actions { grid-column:1/-1; } }
     .mobile-nav-toggle { display:none; }
     .mobile-nav-backdrop { display:none; }
     @media (max-width: 992px) {
@@ -3804,74 +3972,22 @@ LEADS_TEMPLATE = """
 </head>
 <body>
   <div class="app-shell">
-    <aside id="admin-sidebar" class="sidebar">
-      <div class="sidebar-brand">
-        <div class="sidebar-logo">
-          <img src="/static/logo.png" alt="Putzelf Marketing">
-        </div>
-        <div>
-          <div class="sidebar-title">Putzelf Marketing</div>
-          <div class="sidebar-sub">Lead-Center</div>
-        </div>
-      </div>
-      <div>
-        <div class="sidebar-section-title">Navigation</div>
-        <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">
-          <span class="nav-pill-icon">⚙</span>
-          <span class="nav-text">Overview</span>
-        </a>
-        <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">
-          <span class="nav-pill-icon">👥</span>
-          <span class="nav-text">Manage employees</span>
-        </a>
-        <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">
-          <span class="nav-pill-icon">🏢</span>
-          <span class="nav-text">Manage sites</span>
-        </a>
-        <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">
-          <span class="nav-pill-icon">🪪</span>
-          <span class="nav-text">Profiles</span>
-        </a>
-        <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">
-          <span class="nav-pill-icon">📄</span>
-          <span class="nav-text">Invoices</span>
-        </a>
-        <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">
-          <span class="nav-pill-icon">🗓</span>
-          <span class="nav-text">Assign coverage</span>
-        </a>
-<!--         <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">
-                <span class="nav-pill-icon">📇</span>
-                <span class="nav-text">Lead-Center</span>
-              </a> -->
-        <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">
-          <span class="nav-pill-icon">◎</span>
-          <span class="nav-text">Crawler</span>
-        </a>
-      </div>
-      <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
-      <div class="sidebar-footer">
-        <div>© <span id="year"></span> Putzelf Marketing</div>
-        <div class="mt-1">Track and advance leads with drag & drop.</div>
-      </div>
-    </aside>
+{% include "partials/admin_sidebar.html" %}
     <main class="main-shell">
-      <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="admin-sidebar">☰ Menu</button>
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <div>
+
+      <header class="lead-page-header">
+        <div class="lead-page-title"><span class="lead-page-icon"><i class="bi bi-funnel-fill"></i></span><div>
           <div class="badge-soft mb-2">Leads</div>
           <h1 class="h4 mb-1 text-dark">Lead-Center</h1>
-          <p class="small-note mb-0">Manage leads through New → Qualified → Contacted → Converted.</p>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-primary">☰</button>
-          <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Logout</a>
-        </div>
-      </div>
-      <div class="row g-3 mb-3">
+          <p class="small-note mb-0">Website bookings arrive as new leads. Move each lead through Contacted to Converted.</p>
+        </div></div>
+      </header>
+      <section class="lead-summary-grid" aria-label="Lead pipeline totals">
+        {% for s in stages %}<div class="lead-summary"><span class="lead-summary-icon"><i class="bi {{ 'bi-stars' if s == 'New Leads' else 'bi-chat-dots' if s == 'Contacted' else 'bi-trophy' }}"></i></span><div class="lead-summary-copy"><span>{{ s }}</span><strong>{{ grouped_leads.get(s, [])|length }}</strong></div></div>{% endfor %}
+      </section>
+      <div class="row g-3 mb-3 lead-workspace">
         <div class="col-12 col-lg-4">
-          <div class="card-surface h-100">
+          <div class="card-surface h-100 lead-form-card">
             <h2 class="h6 text-uppercase text-secondary">Add lead</h2>
             <form method="post" class="small needs-validation" novalidate>
               <input type="hidden" name="action" value="create">
@@ -3908,9 +4024,9 @@ LEADS_TEMPLATE = """
           </div>
         </div>
         <div class="col-12 col-lg-8">
-          <div class="card-surface h-100">
-            <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
-              <div>
+          <div class="card-surface h-100 lead-board-card">
+            <div class="lead-filter-panel">
+              <div class="lead-filter-field">
                 <label class="form-label small-note text-uppercase mb-1" for="filter_stage">Stage</label>
                 <select class="form-select form-select-sm" id="filter_stage" name="stage" form="filters-form">
                   <option value="">All stages</option>
@@ -3919,23 +4035,23 @@ LEADS_TEMPLATE = """
                   {% endfor %}
                 </select>
               </div>
-              <div>
+              <div class="lead-filter-field">
                 <label class="form-label small-note text-uppercase mb-1" for="filter_start">From</label>
                 <input type="date" class="form-control form-control-sm" id="filter_start" name="start" form="filters-form" value="{{ start_filter or '' }}">
               </div>
-              <div>
+              <div class="lead-filter-field">
                 <label class="form-label small-note text-uppercase mb-1" for="filter_end">To</label>
                 <input type="date" class="form-control form-control-sm" id="filter_end" name="end" form="filters-form" value="{{ end_filter or '' }}">
               </div>
-              <div>
+              <div class="lead-filter-field">
                 <label class="form-label small-note text-uppercase mb-1" for="filter_sort">Sort</label>
                 <select class="form-select form-select-sm" id="filter_sort" name="sort" form="filters-form">
                   <option value="desc" {% if sort=='desc' %}selected{% endif %}>Newest first</option>
                   <option value="asc" {% if sort=='asc' %}selected{% endif %}>Oldest first</option>
                 </select>
               </div>
-              <div class="ms-auto d-flex gap-2">
-                <form id="filters-form" method="get" class="d-flex gap-2">
+              <div class="lead-filter-actions">
+                <form id="filters-form" method="get" class="d-flex flex-wrap gap-2">
                   <button class="btn btn-sm btn-outline-primary" type="submit">Apply</button>
                   <a href="{{ url_for('leads_dashboard') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
                 </form>
@@ -4077,27 +4193,6 @@ LEADS_TEMPLATE = """
       backdrop.addEventListener('click', closeNav);
       sidebar.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeNav));
     })();
-    (function () {
-      const KEY = 'pm-sidebar-collapsed';
-      const body = document.body;
-      const btn = document.getElementById('sidebar-toggle');
-      const setState = (val) => {
-        body.classList.toggle('sidebar-collapsed', val);
-        try { localStorage.setItem(KEY, val ? '1' : '0'); } catch (e) {}
-      };
-      const initial = (() => {
-        try {
-          const raw = localStorage.getItem(KEY);
-          if (raw === null) return true; // default: collapsed (icons only)
-          return raw === '1';
-        } catch (e) {
-          return true;
-        }
-      })();
-      setState(initial);
-      if (btn) btn.addEventListener('click', () => setState(!body.classList.contains('sidebar-collapsed')));
-    })();
-
     // Drag & drop
     (() => {
       const cards = document.querySelectorAll('.lead-card');
@@ -4390,58 +4485,7 @@ HTML_TEMPLATE = """
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
-      <div class="sidebar-brand">
-        <div class="sidebar-logo">
-          <img src="/static/logo.png" alt="Putzelf Marketing">
-        </div>
-        <div>
-          <div class="sidebar-title">Putzelf Marketing</div>
-          <div class="sidebar-sub">Contact Studio</div>
-        </div>
-      </div>
-      <div>
-        <div class="sidebar-section-title">Navigation</div>
-        <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">
-          <span class="nav-pill-icon">⚙</span>
-          <span class="nav-text">Overview</span>
-        </a>
-        <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">
-          <span class="nav-pill-icon">👥</span>
-          <span class="nav-text">Manage employees</span>
-        </a>
-        <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">
-          <span class="nav-pill-icon">🏢</span>
-          <span class="nav-text">Manage sites</span>
-        </a>
-        <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">
-          <span class="nav-pill-icon">🪪</span>
-          <span class="nav-text">Profiles</span>
-        </a>
-        <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">
-          <span class="nav-pill-icon">📄</span>
-          <span class="nav-text">Invoices</span>
-        </a>
-        <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">
-          <span class="nav-pill-icon">🗓</span>
-          <span class="nav-text">Assign coverage</span>
-        </a>
-<!--         <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">
-                <span class="nav-pill-icon">📇</span>
-                <span class="nav-text">Lead-Center</span>
-              </a> -->
-        <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">
-          <span class="nav-pill-icon">◎</span>
-          <span class="nav-text">Crawler</span>
-        </a>
-      </div>
-      <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
-      <div class="sidebar-footer">
-        <div>© <span id="year"></span> Putzelf Marketing</div>
-        <div class="mt-1">Built for fast B2B prospecting.</div>
-      </div>
-    </aside>
+{% include "partials/admin_sidebar.html" %}
     <div class="main-shell">
       <header class="topbar">
         <div>
@@ -4820,58 +4864,7 @@ SCHEDULE_TEMPLATE = """
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
-      <div class="sidebar-brand">
-        <div class="sidebar-logo">
-          <img src="/static/logo.png" alt="Putzelf Marketing">
-        </div>
-        <div>
-          <div class="sidebar-title">Putzelf Marketing</div>
-          <div class="sidebar-sub">Contact Studio</div>
-        </div>
-      </div>
-      <div>
-        <div class="sidebar-section-title">Navigation</div>
-        <a href="{{ url_for('admin_dashboard') }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}">
-          <span class="nav-pill-icon">⚙</span>
-          <span class="nav-text">Overview</span>
-        </a>
-        <a href="{{ url_for('admin_employees') }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}">
-          <span class="nav-pill-icon">👥</span>
-          <span class="nav-text">Manage employees</span>
-        </a>
-        <a href="{{ url_for('admin_sites') }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}">
-          <span class="nav-pill-icon">🏢</span>
-          <span class="nav-text">Manage sites</span>
-        </a>
-        <a href="{{ url_for('admin_profiles') }}" class="nav-pill {% if active_page == 'profiles' %}active{% endif %}">
-          <span class="nav-pill-icon">🪪</span>
-          <span class="nav-text">Profiles</span>
-        </a>
-        <a href="{{ url_for('admin_invoices') }}" class="nav-pill {% if active_page == 'invoices' %}active{% endif %}">
-          <span class="nav-pill-icon">📄</span>
-          <span class="nav-text">Invoices</span>
-        </a>
-        <a href="{{ url_for('schedule_dashboard') }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}">
-          <span class="nav-pill-icon">🗓</span>
-          <span class="nav-text">Assign coverage</span>
-        </a>
-<!--         <a href="{{ url_for('leads_dashboard') }}" class="nav-pill {% if active_page == 'leads' %}active{% endif %}">
-                <span class="nav-pill-icon">📇</span>
-                <span class="nav-text">Lead-Center</span>
-              </a> -->
-        <a href="{{ url_for('index') }}" class="nav-pill {% if active_page == 'crawler' %}active{% endif %}">
-          <span class="nav-pill-icon">◎</span>
-          <span class="nav-text">Crawler</span>
-        </a>
-      </div>
-      <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('logout') }}" class="nav-pill nav-pill-logout">⇦ <span class="nav-text">Log out</span></a>
-      <div class="sidebar-footer">
-        <div>© <span id="year"></span> Putzelf Marketing</div>
-        <div class="mt-1">Einfache Einsatzübersicht für Außenteams.</div>
-      </div>
-    </aside>
+{% include "partials/admin_sidebar.html" %}
     <div class="main-shell">
       <header class="page-header">
         <div>
@@ -5766,7 +5759,7 @@ SCHEDULE_TEMPLATE = """
         }
         if (start && end && end <= start) {
           e.preventDefault();
-          alert('Die Endzeit muss nach der Startzeit liegen.');
+          alert('Die End time must be after start time.');
           return false;
         }
       });
@@ -5914,9 +5907,16 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "change-me")
 app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
 app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
 app.config.setdefault("MAX_CONTENT_LENGTH", 16 * 1024 * 1024)
+app.config["PUBLIC_APP_URL"] = (os.getenv("PUBLIC_APP_URL") or "").strip().rstrip("/")
 
 UPLOAD_FOLDER = os.path.join(APP_ROOT, "static", "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+PUBLIC_DOCUMENT_FOLDER = os.path.join(APP_ROOT, "private_uploads", "public_documents")
+INSPECTION_PHOTO_FOLDER = os.path.join(APP_ROOT, "private_uploads", "inspection_photos")
+EMPLOYEE_DOCUMENT_FOLDER = os.path.join(APP_ROOT, "private_uploads", "employee_documents")
+os.makedirs(PUBLIC_DOCUMENT_FOLDER, exist_ok=True)
+os.makedirs(INSPECTION_PHOTO_FOLDER, exist_ok=True)
+os.makedirs(EMPLOYEE_DOCUMENT_FOLDER, exist_ok=True)
 ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "heic", "heif"}
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
@@ -5924,11 +5924,68 @@ AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
 AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "admin")
 
 SUPPORTED_LANGUAGES = {"en", "de"}
-DEFAULT_LANGUAGE = "en"
+DEFAULT_LANGUAGE = "de"
 
 # Phrase-level translations applied app-wide on HTML responses.
 # This keeps the single-file app maintainable without rewriting every template.
 DE_HTML_REPLACEMENTS: dict[str, str] = {
+  "Functions": "Funktionen",
+  "All functions": "Alle Funktionen",
+  "No system access": "Kein Systemzugriff",
+  "Site manager": "Standortleiter",
+  "Sales manager": "Vertriebsleiter",
+  "Choose every function this person performs. A person can have more than one.": "W\u00e4hlen Sie alle Funktionen dieser Person aus. Mehrfachauswahl ist m\u00f6glich.",
+  "Select all functions this person performs. Multiple functions are supported.": "W\u00e4hlen Sie alle Funktionen dieser Person aus. Mehrfachauswahl ist m\u00f6glich.",
+  "Platform access must be enabled by an administrator before an employee can sign in. Other functions are stored on the employee record.": "Ein Administrator muss den Plattformzugang aktivieren, bevor sich ein Mitarbeiter anmelden kann. Weitere Funktionen werden im Mitarbeiterprofil gespeichert.",
+  "Platform sign-in": "Plattformanmeldung",
+  "Save platform access": "Plattformzugang speichern",
+  "Functions and sign-in permissions for this employee.": "Funktionen und Anmeldeberechtigungen f\u00fcr diesen Mitarbeiter.",
+  "Staff type": "Personaltyp",
+  "Platform access": "Plattformzugang",
+  "System access": "Systemzugriff",
+  "Staff type / department": "Personaltyp / Abteilung",
+  "Role / job title": "Rolle / Berufsbezeichnung",
+  "The employee’s specific job title.": "Die konkrete Berufsbezeichnung des Mitarbeiters.",
+  "The employee’s company function or department.": "Der Unternehmensbereich oder die Abteilung des Mitarbeiters.",
+  "System access controls which parts of Elf’s Plan this employee can use.": "Der Systemzugriff legt fest, welche Bereiche von Elf’s Plan dieser Mitarbeiter nutzen kann.",
+  "Choose the account’s permissions.": "Wählen Sie die Berechtigungen des Kontos.",
+  "Employee email": "E-Mail-Adresse des Mitarbeiters",
+  "Used for sign-in and credential delivery.": "Wird für die Anmeldung und den Versand der Zugangsdaten verwendet.",
+  "Send sign-in details by email": "Zugangsdaten per E-Mail senden",
+  "Enable platform access, set a valid email, and set the employee to Active before sending sign-in details.": "Aktivieren Sie den Plattformzugang, geben Sie eine gültige E-Mail-Adresse ein und setzen Sie den Mitarbeiter vor dem Versand der Zugangsdaten auf Aktiv.",
+  "Email is not configured. Set the SMTP sender and password first.": "E-Mail ist nicht konfiguriert. Bitte richten Sie zuerst SMTP-Absender und Passwort ein.",
+  "Enter a valid employee email address first.": "Geben Sie zuerst eine gültige Mitarbeiter-E-Mail-Adresse ein.",
+  "Could not send the email. Check SMTP settings and try again.": "Die E-Mail konnte nicht gesendet werden. Prüfen Sie die SMTP-Einstellungen und versuchen Sie es erneut.",
+  "All staff types": "Alle Funktionen",
+  "All branches": "Alle Niederlassungen",
+  "More filters": "Weitere Filter",
+  "Manage staff across both branch offices": "Mitarbeitende an beiden Standorten verwalten",
+  "All": "Alle",
+  "Passive": "Passiv",
+  "Employee status": "Mitarbeiterstatus",
+  "Phone number": "Telefonnummer",
+  "Download": "Herunterladen",
+  "Employee status updated.": "Mitarbeiterstatus aktualisiert.",
+  "Upload profile photo": "Profilbild hochladen",
+  "Profile photo updated.": "Profilbild aktualisiert.",
+  "Choose a profile photo to upload.": "Bitte ein Profilbild zum Hochladen auswählen.",
+  "Choose a valid image file (PNG, JPG, GIF, or WebP).": "Bitte eine gültige Bilddatei auswählen (PNG, JPG, GIF oder WebP).",
+  "Employee profile could not be found.": "Das Mitarbeiterprofil wurde nicht gefunden.",
+  "Could not update your profile photo. Please try again.": "Das Profilbild konnte nicht aktualisiert werden. Bitte erneut versuchen.",
+  "Cleaners without shifts this week": "Reinigungskräfte ohne Einsätze diese Woche",
+  "Search name, role, email, phone, or city": "Nach Name, Rolle, E-Mail, Telefon oder Stadt suchen",
+  "Cleaner": "Reinigungskraft",
+  "Branch office": "Niederlassung",
+  "Office administrator": "Büroadministration",
+  "IT": "IT",
+  "Reception": "Empfang",
+  "Intern": "Praktikant/in",
+  "Graphic designer": "Grafikdesigner/in",
+  "Other": "Sonstiges",
+  "Wien": "Wien",
+  "Graz": "Graz",
+  "Enable platform access and create sign-in details": "Plattformzugang und Anmeldedaten erstellen",
+  "Turn this on only for employees who need an app account.": "Nur für Mitarbeitende aktivieren, die ein App-Konto benötigen.",
   "Overview": "Übersicht",
   "Manage employees": "Mitarbeiter verwalten",
   "Manage sites": "Standorte verwalten",
@@ -6078,9 +6135,674 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   "Thank you for your business!": "Vielen Dank für Ihr Vertrauen!",
   "Best regards,": "Mit freundlichen Grüßen,",
   "Your Company": "Ihr Unternehmen",
+  'Client database': 'Kundendatenbank',
+  'Manage clients': 'Kunden verwalten',
+  'Client': 'Kunde',
+  'Clients': 'Kunden',
+  'All clients': 'Alle Kunden',
+  'Active clients': 'Aktive Kunden',
+  'With shifts this week': 'Mit Eins?tzen diese Woche',
+  'Without shifts this week': 'Ohne Eins?tze diese Woche',
+  'Search company, contact, email, phone, address or tax ID': 'Firma, Kontakt, E-Mail, Telefon, Adresse oder Steuer-ID suchen',
+  'Search': 'Suchen',
+  'Clear search': 'Suche zur?cksetzen',
+  'Contact': 'Kontakt',
+  'Service address': 'Einsatzadresse',
+  'Rate': 'Stundensatz',
+  'Shifts': 'Eins?tze',
+  'Status': 'Status',
+  'Actions': 'Aktionen',
+  'No email': 'Keine E-Mail',
+  'Active': 'Aktiv',
+  'Inactive': 'Inaktiv',
+  'Edit client': 'Kunden bearbeiten',
+  'No clients found': 'Keine Kunden gefunden',
+  'Adjust your search or add a client to the database.': 'Passen Sie die Suche an oder f?gen Sie einen Kunden hinzu.',
+  'Page': 'Seite',
+  'Previous': 'Zur?ck',
+  'Next': 'Weiter',
+  'Add client': 'Kunden hinzuf?gen',
+  'Company / client name': 'Firmen- / Kundenname',
+  'Service location name': 'Name des Einsatzstandorts',
+  'Defaults to company name': 'Standardm??ig der Firmenname',
+  'Logo / attachment': 'Logo / Anhang',
+  'Upload a client logo or image.': 'Laden Sie ein Kundenlogo oder Bild hoch.',
+  'Current logo': 'Aktuelles Logo',
+  'Contact person': 'Kontaktperson',
+  'Email': 'E-Mail',
+  'Phone': 'Telefon',
+  'Billing and service': 'Abrechnung und Leistung',
+  'Billing address': 'Rechnungsadresse',
+  'VAT ID': 'USt-IdNr.',
+  'Customer / tax ID': 'Kunden- / Steuer-ID',
+  'Hourly rate (?)': 'Stundensatz (?)',
+  'Contract start': 'Vertragsbeginn',
+  'Contract end': 'Vertragsende',
+  'Notes': 'Notizen',
+  'Client notes': 'Kundennotizen',
+  'Add client details, access notes, or preferences': 'Kundendetails, Zugangshinweise oder Pr?ferenzen eintragen',
+  'Open full client profile': 'Vollst?ndiges Kundenprofil ?ffnen',
+  'Cancel': 'Abbrechen',
+  'Create client': 'Kunden anlegen',
+  'Save changes': '?nderungen speichern',
+  'Collapse navigation': 'Navigation einklappen',
+  'Expand navigation': 'Navigation ausklappen',
+  'Navigation': 'Navigation',
+  'Manage employees': 'Mitarbeiter verwalten',
+  'Profiles': 'Profile',
+  'Plan schedule': 'Planung ?ffnen',
+  'Crawler': 'Crawler',
+  'Invoices': 'Rechnungen',
+  'Sign out': 'Abmelden',
+  'Menu': 'Men?',
+  'A client with the same name and service address already exists.': 'Ein Kunde mit demselben Namen und derselben Einsatzadresse ist bereits vorhanden.',
+  'Another client already uses that name and service address.': 'Ein anderer Kunde verwendet bereits diesen Namen und diese Einsatzadresse.',
+  'Enter contract dates in a valid format.': 'Geben Sie g?ltige Vertragsdaten ein.',
+  'Invalid client image. Use PNG, JPG, GIF, WEBP, or HEIC.': 'Ung?ltiges Kundenbild. Erlaubte Formate: PNG, JPG, GIF, WEBP oder HEIC.',
+  'Client added.': 'Kunde hinzugef?gt.',
+  'Client name is required.': 'Der Kundenname ist erforderlich.',
+  'Client updated.': 'Kunde aktualisiert.',
   "Language switcher": "Sprachauswahl",
 }
 
+# Override client-page phrases using Unicode escapes so labels remain UTF-8 safe.
+DE_HTML_REPLACEMENTS.update({
+  "Lead Center": "Lead-Center",
+  "Lead pipeline totals": "Lead-Pipeline-Übersicht",
+  "Website bookings arrive as new leads. Move each lead through Contacted to Converted.": "Website-Buchungen werden als neue Leads übernommen. Verschieben Sie jeden Lead über Kontaktiert zu Gewonnen.",
+  "New Leads": "Neue Leads",
+  "Contacted": "Kontaktiert",
+  "Converted": "Gewonnen",
+  "Add lead": "Lead hinzufügen",
+  "Save lead": "Lead speichern",
+  "All stages": "Alle Phasen",
+  "Newest first": "Neueste zuerst",
+  "Oldest first": "Älteste zuerst",
+  "Apply": "Anwenden",
+  "Clear": "Zurücksetzen",
+  "Copy page emails": "E-Mail-Adressen kopieren",
+  "No leads": "Keine Leads",
+  "Edit lead": "Lead bearbeiten",
+  "shift(s) were saved despite scheduling conflicts. Review:": "Einsatz/Einsätze wurden trotz Planungskonflikten gespeichert. Bitte prüfen:",
+  "Shift was saved despite scheduling conflicts. Review:": "Der Einsatz wurde trotz Planungskonflikten gespeichert. Bitte prüfen:",
+  "Employees were assigned despite scheduling conflicts. Review:": "Mitarbeitende wurden trotz Planungskonflikten zugewiesen. Bitte prüfen:",
+  "shift(s) were assigned despite scheduling conflicts. Review the schedule.": "Einsatz/Einsätze wurden trotz Planungskonflikten zugewiesen. Bitte prüfen Sie den Dienstplan.",
+  "duplicate shift(s) were saved despite scheduling conflicts. Review the schedule.": "Doppelte Einsätze wurden trotz Planungskonflikten gespeichert. Bitte prüfen Sie den Dienstplan.",
+  "Lead created": "Lead erstellt",
+  "Putzelf Marketing - Employee database": "Putzelf Marketing - Mitarbeiterdatenbank",
+  "Login code": "Anmeldecode",
+  "Cleaner": "Reinigungskraft",
+  "Usage group": "Verwendungsgruppe",
+  "Edit": "Bearbeiten",
+  "Employee name is required.": "Der Mitarbeitername ist erforderlich.",
+  "Invalid employee image. Use PNG, JPG, GIF, WEBP, or HEIC.": "Ung\u00fcltiges Mitarbeiterbild. Erlaubte Formate: PNG, JPG, GIF, WEBP oder HEIC.",
+  "Client database": "Kundendatenbank",
+  "Client summary": "Kunden?bersicht",
+  "Search clients": "Kunden suchen",
+  "Close": "Schlie?en",
+  "Client logo": "Kundenlogo",
+  "Putzelf Marketing \u2014 Client Database": "Putzelf Marketing \u2014 Kundendatenbank",
+  "Manage clients": "Kunden verwalten",
+  "Client": "Kunde",
+  "Clients": "Kunden",
+  "All clients": "Alle Kunden",
+  "Active clients": "Aktive Kunden",
+  "With shifts this week": "Mit Eins\u00e4tzen diese Woche",
+  "Without shifts this week": "Ohne Eins\u00e4tze diese Woche",
+  "Search company, contact, email, phone, address or tax ID": "Firma, Kontakt, E-Mail, Telefon, Adresse oder Steuer-ID suchen",
+  "Search": "Suchen",
+  "Clear search": "Suche zur\u00fccksetzen",
+  "Contact": "Kontakt",
+  "Service address": "Einsatzadresse",
+  "Rate": "Stundensatz",
+  "Shifts": "Eins\u00e4tze",
+  "Actions": "Aktionen",
+  "No email": "Keine E-Mail",
+  "Active": "Aktiv",
+  "Passive": "Passiv",
+  "Inactive": "Inaktiv",
+  "Edit client": "Kunden bearbeiten",
+  "No clients found": "Keine Kunden gefunden",
+  "Adjust your search or add a client to the database.": "Passen Sie die Suche an oder f\u00fcgen Sie einen Kunden hinzu.",
+  "Page": "Seite",
+  "Previous": "Zur\u00fcck",
+  "Next": "Weiter",
+  "Add client": "Kunden hinzuf\u00fcgen",
+  "Company / client name": "Firmen- / Kundenname",
+  "Service location name": "Name des Einsatzstandorts",
+  "Defaults to company name": "Standardm\u00e4\u00dfig der Firmenname",
+  "Logo / attachment": "Logo / Anhang",
+  "Upload a client logo or image.": "Laden Sie ein Kundenlogo oder Bild hoch.",
+  "Current logo": "Aktuelles Logo",
+  "Contact person": "Kontaktperson",
+  "Email": "E-Mail",
+  "Phone": "Telefon",
+  "Billing and service": "Abrechnung und Leistung",
+  "Billing address": "Rechnungsadresse",
+  "VAT ID": "USt-IdNr.",
+  "Customer / tax ID": "Kunden- / Steuer-ID",
+  "Hourly rate (€)": "Stundensatz (€)",
+  "Contract start": "Vertragsbeginn",
+  "Contract end": "Vertragsende",
+  "Notes": "Notizen",
+  "Client notes": "Kundennotizen",
+  "Add client details, access notes, or preferences": "Kundendetails, Zugangshinweise oder Pr\u00e4ferenzen eintragen",
+  "Open full client profile": "Vollst\u00e4ndiges Kundenprofil \u00f6ffnen",
+  "Cancel": "Abbrechen",
+  "Create client": "Kunden anlegen",
+  "Save changes": "\u00c4nderungen speichern",
+  "Collapse navigation": "Navigation einklappen",
+  "Expand navigation": "Navigation ausklappen",
+  "Overview": "\u00dcbersicht",
+  "Manage employees": "Mitarbeiter verwalten",
+  "Profiles": "Profile",
+  "Plan schedule": "Planung \u00f6ffnen",
+  "Invoices": "Rechnungen",
+  "Sign out": "Abmelden",
+  "Menu": "Men\u00fc",
+  "Client name is required.": "Der Kundenname ist erforderlich.",
+  "A client with the same name and service address already exists.": "Ein Kunde mit demselben Namen und derselben Einsatzadresse ist bereits vorhanden.",
+  "Another client already uses that name and service address.": "Ein anderer Kunde verwendet bereits diesen Namen und diese Einsatzadresse.",
+  "Enter contract dates in a valid format.": "Geben Sie g\u00fcltige Vertragsdaten ein.",
+  "Invalid client image. Use PNG, JPG, GIF, WEBP, or HEIC.": "Ung\u00fcltiges Kundenbild. Erlaubte Formate: PNG, JPG, GIF, WEBP oder HEIC.",
+  "Client added.": "Kunde hinzugef\u00fcgt.",
+  "Client updated.": "Kunde aktualisiert.",
+})
+
+
+DE_HTML_REPLACEMENTS.update({
+  "Client profile": "Kundenprofil",
+  "Site profile": "Standortprofil",
+  "All sites": "Alle Standorte",
+  "Active": "Aktiv",
+  "Inactive": "Inaktiv",
+  "Site identity, service address, status, and assigned manager.": "Standortdaten, Einsatzadresse, Status und zuständige Standortleitung.",
+  "Edit fields here, then save your changes below.": "Bearbeiten Sie die Felder direkt und speichern Sie Ihre Änderungen unten.",
+  "Primary site contact and billing information.": "Hauptkontakt und Rechnungsinformationen des Standorts.",
+  "Update the contract period and download the employee contract.": "Bearbeiten Sie die Vertragslaufzeit und laden Sie den Vertrag herunter.",
+  "Keep access instructions and internal site notes up to date.": "Halten Sie Zugangshinweise und interne Standortnotizen aktuell.",
+  "Save site": "Standort speichern",
+  "Save & download contract": "Speichern und Vertrag herunterladen",
+  "Assigned site manager": "Zuständige Standortleitung",
+  "Site logo": "Standortlogo",
+  "Site record": "Standortdatensatz",
+  "Update site logo": "Standortlogo aktualisieren",
+  "Site status updated.": "Standortstatus aktualisiert.",
+  "Site profile saved.": "Standortprofil gespeichert.",
+  "Another site already uses that name and service address.": "Ein anderer Standort verwendet bereits diesen Namen und diese Einsatzadresse.",
+  "Company and service location names are required.": "Firmenname und Einsatzstandort sind erforderlich.",
+  "Invalid site image. Use PNG, JPG, GIF, WEBP, or HEIC.": "Ungültiges Standortbild. Erlaubte Formate: PNG, JPG, GIF, WEBP oder HEIC.",
+  "Client pages": "Kundenseiten",
+  "Client information sections": "Kundeninformationsbereiche",
+  "Information": "Informationen",
+  "Schedule": "Einsatzplan",
+  "Invoices": "Rechnungen",
+  "Documents": "Dokumente",
+  "General": "Allgemein",
+  "Contacts": "Kontakte",
+  "Contract": "Vertrag",
+  "Other": "Sonstiges",
+  "Client and service location information.": "Informationen zum Kunden und Einsatzstandort.",
+  "Primary client contact and billing recipient information.": "Primärer Kundenkontakt und Informationen zum Rechnungsempfänger.",
+  "Contract partner, contact, and term details.": "Vertragspartner, Kontakt und Vertragslaufzeit.",
+  "Client notes and account details.": "Kundennotizen und Kontodetails.",
+  "Recent shifts scheduled for this client location.": "Die letzten für diesen Kundenstandort geplanten Einsätze.",
+  "Recent invoices linked to this client.": "Die letzten Rechnungen für diesen Kunden.",
+  "Client image and contract tools.": "Kundenbild und Vertragswerkzeuge.",
+  "Company / client name": "Firmen- / Kundenname",
+  "Service location name": "Name des Einsatzstandorts",
+  "Service address": "Einsatzadresse",
+  "Status": "Status",
+  "Hourly rate": "Stundensatz",
+  "Shifts on record": "Erfasste Einsätze",
+  "Contact person": "Kontaktperson",
+  "Email": "E-Mail",
+  "Phone": "Telefon",
+  "Invoice recipient": "Rechnungsempfänger",
+  "Billing address": "Rechnungsadresse",
+  "VAT ID": "USt-IdNr.",
+  "Customer / tax ID": "Kunden- / Steuer-ID",
+  "Contract partner": "Vertragspartner",
+  "Contract contact details": "Kontaktdaten zum Vertrag",
+  "Contract start": "Vertragsbeginn",
+  "Contract end": "Vertragsende",
+  "No notes added yet.": "Noch keine Notizen vorhanden.",
+  "Client record ID": "Kundendatensatz-ID",
+  "Created / record reference": "Erstellt / Datensatzreferenz",
+  "Date": "Datum",
+  "Time": "Uhrzeit",
+  "Employee": "Mitarbeiter",
+  "Notes": "Notizen",
+  "Open shift": "Offener Einsatz",
+  "No shifts have been scheduled for this client yet.": "Für diesen Kunden wurden noch keine Einsätze geplant.",
+  "Invoice": "Rechnung",
+  "Issued": "Ausgestellt",
+  "Due": "Fällig",
+  "Amount": "Betrag",
+  "No invoices have been created for this client yet.": "Für diesen Kunden wurden noch keine Rechnungen erstellt.",
+  "Client logo": "Kundenlogo",
+  "No client logo or document has been added.": "Es wurde noch kein Kundenlogo oder Dokument hinzugefügt.",
+  "Open contract tools": "Vertragswerkzeuge ?ffnen",
+})
+
+
+DE_HTML_REPLACEMENTS.update({
+  "Employee database": "Mitarbeiterdatenbank",
+  "Employee profile": "Mitarbeiterprofil",
+  "Employee profiles": "Mitarbeiterprofile",
+  "Employee pages": "Mitarbeiterseiten",
+  "Employee information sections": "Mitarbeiter-Informationsbereiche",
+  "Team directory": "Teamverzeichnis",
+  "Employee": "Mitarbeiter",
+  "employees shown": "Mitarbeiter angezeigt",
+  "total": "insgesamt",
+  "All employees": "Alle Mitarbeiter",
+  "Shown on this page": "Auf dieser Seite angezeigt",
+  "Scheduled today": "Heute eingeplant",
+  "Without shifts this week": "Diese Woche ohne Einsatz",
+  "New employee sign-in details": "Neue Mitarbeiter-Zugangsdaten",
+  "Login code:": "Anmeldecode:",
+  "PIN:": "PIN:",
+  "Save these details before leaving this page.": "Speichern Sie diese Daten, bevor Sie diese Seite verlassen.",
+  "Search employees": "Mitarbeiter suchen",
+  "Search name, role, email, phone, or city": "Name, Rolle, E-Mail, Telefon oder Stadt suchen",
+  "All work types": "Alle Arbeitszeitmodelle",
+  "Filter by role": "Nach Rolle filtern",
+  "Marginal employment": "Geringfügige Beschäftigung",
+  "Clear search": "Suche zur\u00fccksetzen",
+  "Search": "Suchen",
+  "Contact": "Kontakt",
+  "Role": "Rolle",
+  "Contract": "Vertrag",
+  "Shifts": "Eins\u00e4tze",
+  "Actions": "Aktionen",
+  "No contact details": "Keine Kontaktdaten",
+  "Active": "Aktiv",
+  "Inactive": "Inaktiv",
+  "Edit": "Bearbeiten",
+  "No employees found": "Keine Mitarbeiter gefunden",
+  "Adjust your search or add an employee.": "Passen Sie die Suche an oder f\u00fcgen Sie einen Mitarbeiter hinzu.",
+  "Page": "Seite",
+  "Previous": "Zur\u00fcck",
+  "Next": "Weiter",
+  "Add employee": "Mitarbeiter hinzuf\u00fcgen",
+  "Employee profiles": "Mitarbeiterprofile",
+  "Employee profile center": "Mitarbeiterprofilzentrum",
+  "Create employee": "Mitarbeiter anlegen",
+  "Edit employee": "Mitarbeiter bearbeiten",
+  "Send sign-in details": "Zugangsdaten senden",
+  "Fix": "Beheben",
+  "Delete employee": "Mitarbeiter l\u00f6schen",
+  "Weekly shifts in a calendar view.": "Wocheneinsätze in der Kalenderansicht.",
+  "All day": "Ganztägig",
+  "Today": "Heute",
+  "No shifts scheduled this week.": "Für diese Woche sind keine Einsätze geplant.",
+  "Documents": "Dokumente",
+  "Upload and keep employee-related documents in one place.": "Laden Sie mitarbeiterbezogene Dokumente hoch und verwalten Sie diese zentral.",
+  "Choose a document": "Dokument auswählen",
+  "Upload document": "Dokument hochladen",
+  "Uploaded": "Hochgeladen",
+  "Employee document uploaded.": "Mitarbeiterdokument wurde hochgeladen.",
+  "Employee document deleted.": "Mitarbeiterdokument wurde gelöscht.",
+  "Delete this employee document?": "Dieses Mitarbeiterdokument löschen?",
+  "Delete document": "Dokument löschen",
+  "Delete": "Löschen",
+  "Enable platform access to send sign-in details.": "Aktivieren Sie den Plattformzugang, um die Zugangsdaten zu senden.",
+  "Set the employee to Active to send sign-in details.": "Setzen Sie den Mitarbeiterstatus auf Aktiv, um die Zugangsdaten zu senden.",
+  "Add a valid login email to send sign-in details.": "Fügen Sie eine gültige Login-E-Mail-Adresse hinzu, um die Zugangsdaten zu senden.",
+  "Upload a PDF, Word document, or image file.": "Laden Sie eine PDF-, Word- oder Bilddatei hoch.",
+  "No employee documents have been uploaded yet.": "Es wurden noch keine Mitarbeiterdokumente hochgeladen.",
+  "Save changes": "\u00c4nderungen speichern",
+  "Close": "Schlie\u00dfen",
+  "Employee": "Mitarbeiter",
+  "Full name *": "Vollst\u00e4ndiger Name *",
+  "Full name": "Vollst\u00e4ndiger Name",
+  "Phone": "Telefon",
+  "Street address": "Stra\u00dfe und Hausnummer",
+  "Postal code": "Postleitzahl",
+  "City": "Stadt",
+  "Emergency contact": "Notfallkontakt",
+  "Emergency phone": "Telefon des Notfallkontakts",
+  "Contact details": "Kontaktdaten",
+  "Employment and contract": "Besch\u00e4ftigung und Vertrag",
+  "Employment type": "Besch\u00e4ftigungsart",
+  "Work type": "Arbeitszeitmodell",
+  "Part-time": "Teilzeit",
+  "Full-time": "Vollzeit",
+  "Hourly pay": "Stundenlohn",
+  "Weekly hours": "Wochenstunden",
+  "Contract start": "Vertragsbeginn",
+  "Contract end": "Vertragsende",
+  "Pay group type": "Lohngruppentyp",
+  "Pay group": "Lohngruppe",
+  "Usage group": "Verwendungsgruppe",
+  "Group number": "Gruppennummer",
+  "Profile photo": "Profilbild",
+  "Notes": "Notizen",
+  "Employee notes": "Mitarbeiternotizen",
+  "Add notes or work preferences": "Notizen oder Arbeitspr\u00e4ferenzen eintragen",
+  "Open employee profile center": "Mitarbeiterprofilzentrum \u00f6ffnen",
+  "Information": "Informationen",
+  "Schedule": "Einsatzplan",
+  "Documents": "Dokumente",
+  "General": "Allgemein",
+  "Contacts": "Kontakte",
+  "Employment": "Besch\u00e4ftigung",
+  "Account access": "Kontozugang",
+  "Other": "Sonstiges",
+  "Employee identity and current work status.": "Mitarbeiteridentit\u00e4t und aktueller Arbeitsstatus.",
+  "Personal contact and emergency details.": "Pers\u00f6nliche Kontakt- und Notfalldaten.",
+  "Work type, pay, and group information.": "Arbeitszeitmodell, Verg\u00fctung und Lohngruppeninformationen.",
+  "Contract period and the employee contract document.": "Vertragslaufzeit und Mitarbeitervertragsdokument.",
+  "Employee sign-in details.": "Zugangsdaten des Mitarbeiters.",
+  "Additional notes and employee preferences.": "Zus\u00e4tzliche Notizen und Arbeitspr\u00e4ferenzen.",
+  "Recent shifts and assigned client locations.": "Letzte Eins\u00e4tze und zugewiesene Kundenstandorte.",
+  "Employee image and contract document.": "Mitarbeiterbild und Vertragsdokument.",
+  "Full name": "Vollst\u00e4ndiger Name",
+  "Role": "Rolle",
+  "Employee record ID": "Mitarbeiterdatensatz-ID",
+  "Email": "E-Mail",
+  "Address": "Adresse",
+  "Postal code and city": "Postleitzahl und Stadt",
+  "Work type": "Arbeitszeitmodell",
+  "Employee profile": "Mitarbeiterprofil",
+  "Current PIN": "Aktuelle PIN",
+  "Login email": "Anmelde-E-Mail",
+  "New 4-digit PIN": "Neue 4-stellige PIN",
+  "Leave blank to keep current": "Leer lassen, um die aktuelle PIN beizubehalten",
+  "Save sign-in details": "Zugangsdaten speichern",
+  "Prepare sign-in details to share": "Zugangsdaten zum Teilen vorbereiten",
+  "No notes added yet.": "Noch keine Notizen vorhanden.",
+  "Total shifts": "Eins\u00e4tze gesamt",
+  "Date": "Datum",
+  "Time": "Uhrzeit",
+  "Client / location": "Kunde / Standort",
+  "Shift notes": "Einsatznotizen",
+  "Open shift": "Offener Einsatz",
+  "No shifts have been scheduled for this employee yet.": "F\u00fcr diesen Mitarbeiter wurden noch keine Eins\u00e4tze geplant.",
+  "Download employee contract": "Mitarbeitervertrag herunterladen",
+  "This uses the existing employee contract template.": "Hierf\u00fcr wird die bestehende Vertragsvorlage f\u00fcr Mitarbeitende verwendet.",
+  "Generated from the configured employee contract template.": "Wird mit der konfigurierten Vertragsvorlage f\u00fcr Mitarbeitende erstellt.",
+  "Save & download contract": "Speichern und Vertrag herunterladen",
+  "Edit contract details and generate PDF": "Vertragsdaten bearbeiten und PDF erstellen",
+  "Contract partner": "Vertragspartner",
+  "Contract contact details": "Vertragskontaktdaten",
+  "Phone, fax, or email": "Telefon, Fax oder E-Mail",
+  "Fill in the contract partner, company, and phone, fax, or email before generating the contract.": "Bitte Vertragspartner, Firma sowie Telefon, Fax oder E-Mail ausfüllen, bevor Sie den Vertrag erstellen.",
+  "Delete employee": "Mitarbeiter l\u00f6schen",
+  "Delete this employee?": "Diesen Mitarbeiter l\u00f6schen?",
+  "Employee added.": "Mitarbeiter hinzugef\u00fcgt.",
+  "Employee updated.": "Mitarbeiter aktualisiert.",
+  "Employee deleted.": "Mitarbeiter gel\u00f6scht.",
+  "Login details are ready to share.": "Die Zugangsdaten k\u00f6nnen geteilt werden.",
+  "Login details updated.": "Zugangsdaten aktualisiert.",
+  "Could not update login details.": "Zugangsdaten konnten nicht aktualisiert werden.",
+  "Login code is required to save credentials.": "Zum Speichern der Zugangsdaten ist ein Anmeldecode erforderlich.",
+  "That login code is already in use.": "Dieser Anmeldecode wird bereits verwendet.",
+  "PINs must be exactly 4 digits.": "PINs m\u00fcssen genau 4 Ziffern haben.",
+  "Employee not found.": "Mitarbeiter nicht gefunden.",
+  "Employee template not found. Place employee_template.docx in uploads/ or static/uploads/.": "Mitarbeitervorlage nicht gefunden. Legen Sie employee_template.docx in uploads/ oder static/uploads/ ab.",
+  "DOCX generation is unavailable. Install python-docx.": "Die DOCX-Erstellung ist nicht verf\u00fcgbar. Installieren Sie python-docx.",
+})
+
+
+
+
+DE_HTML_REPLACEMENTS.update({
+  "Operations portal": "Betriebsportal",
+  "Manage your team, sites, schedule, and monthly inspections.": "Verwalten Sie Ihr Team, Standorte, Einsatzplanung und monatliche Kontrollen.",
+  "Assigned sites": "Zugewiesene Standorte",
+  "Inspections": "Kontrollen",
+  "Monthly site inspections": "Monatliche Standortkontrollen",
+  "Monthly inspection report": "Monatlicher Kontrollbericht",
+  "Inspection reports": "Kontrollberichte",
+  "Inspection checklist": "Kontrollliste",
+  "Public document library": "\u00d6ffentliche Dokumentbibliothek",
+  "Public documents": "\u00d6ffentliche Dokumente",
+  "Public safety library": "\u00d6ffentliche Sicherheitsbibliothek",
+  "Public QR code": "\u00d6ffentlicher QR-Code",
+  "Safety and work documents": "Sicherheits- und Arbeitsdokumente",
+  "These reference documents are available without signing in.": "Diese Dokumente sind ohne Anmeldung verf\u00fcgbar.",
+  "Manager / employee sign in": "Anmeldung f\u00fcr Leitung / Mitarbeitende",
+  "No public documents have been published yet.": "Es wurden noch keine \u00f6ffentlichen Dokumente ver\u00f6ffentlicht.",
+  "Publish a document": "Dokument ver\u00f6ffentlichen",
+  "Published documents": "Ver\u00f6ffentlichte Dokumente",
+  "PDF or DOCX file": "PDF- oder DOCX-Datei",
+  "Monthly inspection checklist": "Monatliche Kontrollliste",
+
+  "Add an inspection area": "Kontrollbereich hinzuf\u00fcgen",
+  "Add area": "Bereich hinzuf\u00fcgen",
+  "Open checklist": "Kontrollliste \u00f6ffnen",
+  "Inspect this month": "Diesen Monat kontrollieren",
+  "Save inspection": "Kontrolle speichern",
+  "Optional note": "Optionale Notiz",
+  "Optional photo": "Optionales Foto",
+  "Checked": "Kontrolliert",
+  "Not checked": "Nicht kontrolliert",
+  "In progress": "In Bearbeitung",
+  "Complete": "Abgeschlossen",
+  "Not started": "Nicht begonnen",
+  "View report": "Bericht anzeigen",
+  "Edit checklist": "Kontrollliste bearbeiten",
+  "Download QR code PNG": "QR-Code-PNG herunterladen",
+  "Site inspection": "Standortkontrolle",
+  "All inspections": "Alle Kontrollen",
+  "Inspection areas by site": "Kontrollbereiche je Standort",
+  "Inspection setup": "Kontrollbereich einrichten",
+  "Each site has its own checklist. Set up only the areas that apply to that location.": "Jeder Standort hat eine eigene Kontrollliste. Richten Sie nur die Bereiche ein, die für diesen Standort gelten.",
+  "Inspection report": "Kontrollbericht",
+  "Inspection overview": "Kontrollübersicht",
+  "Use the quick actions or check areas one by one.": "Nutzen Sie die Schnellaktionen oder markieren Sie einzelne Bereiche.",
+  "Mark all checked": "Alle als kontrolliert markieren",
+  "Clear all checks": "Alle Markierungen entfernen",
+  "areas checked": "Bereiche kontrolliert",
+  "Edit note and photo": "Notiz und Foto bearbeiten",
+  "Add note or photo": "Notiz oder Foto hinzufügen",
+  "Add a note about this area": "Notiz zu diesem Bereich hinzufügen",
+  "View saved photo": "Gespeichertes Foto ansehen",
+  "Inspection changes save to the selected month.": "Die Kontrolländerungen werden für den ausgewählten Monat gespeichert.",
+  "Track completion by site and see which areas still need attention.": "Verfolgen Sie den Fortschritt je Standort und sehen Sie, wo noch Kontrollen ausstehen.",
+  "Edit checklists": "Kontrolllisten bearbeiten",
+  "Report month": "Berichtsmonat",
+  "Download report": "Bericht herunterladen",
+  "In progress": "In Bearbeitung",
+  "Not started": "Nicht begonnen",
+  "Needs setup": "Einrichtung erforderlich",
+  "Areas checked": "Kontrollierte Bereiche",
+  "areas": "Bereiche",
+  "Resource center": "Ressourcenzentrale",
+  "Putzelf Public resources": "Putzelf öffentliche Ressourcen",
+  "All documents": "Alle Dokumente",
+  "in": "in",
+  "No documents match this search.": "Keine Dokumente entsprechen dieser Suche.",
+  "Find and download the latest safety rules and work instructions.": "Finden Sie aktuelle Sicherheitsregeln und Arbeitsanweisungen und laden Sie diese herunter.",
+  "documents": "Dokumente",
+  "categories": "Kategorien",
+  "These resources are available without signing in.": "Diese Dokumente sind ohne Anmeldung verfügbar.",
+  "Try another title or category.": "Suchen Sie nach einem anderen Titel oder einer anderen Kategorie.",
+  "Please check back later for safety and work resources.": "Schauen Sie später wieder vorbei, um Sicherheits- und Arbeitsdokumente zu finden.",
+  "Publish and organize documents that anyone can open from your QR landing page.": "Veröffentlichen und organisieren Sie Dokumente, die über den QR-Code öffentlich zugänglich sind.",
+  "Public QR code": "Öffentlicher QR-Code",
+  "View public library": "Öffentliche Bibliothek ansehen",
+  "Published documents": "Veröffentlichte Dokumente",
+  "PDF files": "PDF-Dateien",
+  "DOCX files": "DOCX-Dateien",
+  "Add a resource to the public library.": "Fügen Sie ein Dokument zur öffentlichen Bibliothek hinzu.",
+  "Document title": "Dokumenttitel",
+  "e.g. Safety rules for cleaning staff": "z. B. Sicherheitsregeln für Reinigungskräfte",
+  "Choose or enter a category": "Kategorie auswählen oder eingeben",
+  "Choose a PDF or DOCX file": "PDF- oder DOCX-Datei auswählen",
+  "PDF and Word documents are supported": "PDF- und Word-Dokumente werden unterstützt",
+  "No file selected": "Keine Datei ausgewählt",
+  "Publish document": "Dokument veröffentlichen",
+  "Published files are accessible without signing in.": "Veröffentlichte Dateien sind ohne Anmeldung zugänglich.",
+  "Organized resources available in the public library.": "Sortierte Dokumente in der öffentlichen Bibliothek.",
+  "Search documents": "Dokumente suchen",
+  "Filter documents by category": "Dokumente nach Kategorie filtern",
+  "Download": "Herunterladen",
+  "Remove": "Entfernen",
+  "No documents match these filters.": "Keine Dokumente entsprechen diesen Filtern.",
+  "Try another search or choose a different category.": "Ändern Sie die Suche oder wählen Sie eine andere Kategorie.",
+  "No documents published yet": "Noch keine Dokumente veröffentlicht",
+  "Upload a PDF or DOCX file to make it available in the public library.": "Laden Sie eine PDF- oder DOCX-Datei hoch, um sie in der öffentlichen Bibliothek bereitzustellen.",
+  "Search sites or areas": "Standorte oder Bereiche suchen",
+  "Filter sites by inspection status": "Standorte nach Kontrollstatus filtern",
+  "Needs attention": "Offene Kontrollen",
+  "Inspection progress": "Kontrollfortschritt",
+  "areas": "Bereiche",
+  "No inspection submitted this month": "Diesen Monat wurde keine Kontrolle eingereicht.",
+  "No sites match this search or filter.": "Keine Standorte entsprechen dieser Suche oder diesem Filter.",
+  "Try a different search or select all sites.": "Ändern Sie die Suche oder wählen Sie alle Standorte aus.",
+  "No sites are in the database.": "Es sind keine Standorte in der Datenbank vorhanden.",
+  "Add a site to start tracking inspections.": "Legen Sie einen Standort an, um Kontrollen zu verfolgen.",
+  "Site details": "Standortdetails",
+  "Save": "Speichern",
+  "Archive": "Archivieren",
+  "Restore": "Reaktivieren",
+  "Choose the areas that apply to this site. Active areas appear in each new monthly inspection.": "Wählen Sie die passenden Bereiche für diesen Standort aus. Aktive Bereiche erscheinen in jeder neuen Monatskontrolle.",
+  "Archived": "Archiviert",
+  "Suggestions available": "Verfügbare Vorschläge",
+  "Add an inspection area": "Kontrollbereich hinzufügen",
+  "Create a custom area for this site.": "Erstellen Sie einen eigenen Bereich für diesen Standort.",
+  "Area name": "Bereichsname",
+  "e.g. Loading bay, stairwell, or patient rooms": "z. B. Ladebereich, Treppenhaus oder Patientenzimmer",
+  "Add area": "Bereich hinzufügen",
+  "Add only what applies. You can rename areas below at any time.": "Fügen Sie nur passende Bereiche hinzu. Sie können diese unten jederzeit umbenennen.",
+  "All suggestions are already on this checklist.": "Alle Vorschläge sind bereits in dieser Kontrollliste enthalten.",
+  "Checklist areas": "Kontrolllistenbereiche",
+  "Rename, archive, or restore areas for this site.": "Benennen Sie Bereiche um, archivieren oder reaktivieren Sie sie.",
+  "Search areas": "Bereiche suchen",
+  "Filter checklist areas": "Kontrolllistenbereiche filtern",
+  "All": "Alle",
+  "No inspection areas yet": "Noch keine Kontrollbereiche",
+  "Add a custom area or choose from the suggestions above.": "Fügen Sie einen eigenen Bereich hinzu oder wählen Sie einen der obigen Vorschläge.",
+  "No checklist areas match this search.": "Keine Kontrolllistenbereiche entsprechen dieser Suche.",
+  "Ready for inspections": "Bereit für Kontrollen",
+  "Needs areas": "Bereiche erforderlich",
+  "Active areas": "Aktive Bereiche",
+  "Search by site name or address": "Standortname oder Adresse suchen",
+  "Ready": "Bereit",
+  "Needs setup": "Einrichtung erforderlich",
+  "sites shown": "Standorte angezeigt",
+  "No address added": "Keine Adresse hinterlegt",
+  "active area": "aktiver Bereich",
+  "Set up checklist": "Kontrollliste einrichten",
+  "No sites match these filters.": "Keine Standorte entsprechen diesen Filtern.",
+  "Try a different search or show all sites.": "Ändern Sie die Suche oder zeigen Sie alle Standorte an.",
+  "No sites to configure yet": "Noch keine Standorte vorhanden",
+  "Add a site first, then build its inspection checklist.": "Legen Sie zuerst einen Standort an und erstellen Sie danach die Kontrollliste.",
+  "Inspection areas": "Kontrollbereiche",
+  "Site checklist": "Standort-Prüfliste",
+  "These areas belong only to this site. New monthly inspections use its active areas; saved inspection records keep their original area names.": "Diese Bereiche gehören nur zu diesem Standort. Neue Monatskontrollen verwenden die aktiven Bereiche; gespeicherte Kontrollen behalten ihre ursprünglichen Bereichsnamen.",
+  "Each site has its own checklist. Add only the areas that apply to that location.": "Jeder Standort hat eine eigene Prüfliste. Fügen Sie nur Bereiche hinzu, die für diesen Standort gelten.",
+  "Add an area for this site": "Bereich für diesen Standort hinzufügen",
+  "Areas for this site": "Bereiche für diesen Standort",
+  "No inspection areas have been added to this site yet.": "Diesem Standort wurden noch keine Kontrollbereiche hinzugefügt.",
+  "No inspection areas are configured for this site yet. Add the areas that apply to this location before beginning its monthly inspection.": "Für diesen Standort sind noch keine Kontrollbereiche eingerichtet. Fügen Sie die passenden Bereiche hinzu, bevor Sie mit der Monatskontrolle beginnen.",
+  "Manage this site's areas": "Bereiche dieses Standorts verwalten",
+  "Set up areas": "Bereiche einrichten",
+  "Manage areas": "Bereiche verwalten",
+  "active areas": "aktive Bereiche",
+  "sites need their own areas set up": "Standorte benötigen eigene Kontrollbereiche",
+  "Common suggestions": "Häufige Vorschläge",
+  "Add only the areas that apply to this site.": "Fügen Sie nur Bereiche hinzu, die für diesen Standort gelten.",
+  "Inspections complete": "Kontrollen abgeschlossen",
+  "Checklist not configured": "Kontrollliste nicht eingerichtet",
+  "No checklist areas configured.": "Keine Kontrollbereiche eingerichtet.",
+})
+
+SCHEDULE_DE_REPLACEMENTS = {
+  "Management": "Verwaltung", "Workspace": "Arbeitsbereich", "Overview": "\u00dcbersicht",
+  "Clients & Sites": "Kunden und Standorte", "Schedule": "Einsatzplanung", "Inspections": "Kontrollen",
+  "Inspection reports": "Kontrollberichte", "Inspection areas": "Kontrollbereiche", "Public documents": "\u00d6ffentliche Dokumente",
+  "Account": "Konto", "Log out": "Abmelden", "Collapse menu": "Men\u00fc einklappen", "Open menu": "Men\u00fc \u00f6ffnen",
+  "Today": "Heute", "View": "Ansicht", "Notifications are active": "Benachrichtigungen sind aktiv",
+  "Notifications are paused": "Benachrichtigungen sind pausiert", "Employees receive alerts when shifts are added, changed, assigned, or removed.": "Mitarbeitende erhalten eine Benachrichtigung, wenn Eins\u00e4tze erstellt, ge\u00e4ndert, zugewiesen oder entfernt werden.",
+  "Shift updates and daily reminders are paused": "Einsatz\u00e4nderungen und t\u00e4gliche Erinnerungen sind pausiert",
+  "Resume to send queued employee alerts.": "Setzen Sie die Benachrichtigungen fort, um vorgemerkte Hinweise zu senden.",
+  "Daily reminders are sent at 6:00 AM while notifications are active.": "T\u00e4gliche Erinnerungen werden bei aktiven Benachrichtigungen um 6:00 Uhr gesendet.",
+  "No queued employee alerts.": "Keine vorgemerkten Mitarbeiterbenachrichtigungen.", "employee alert(s) queued.": "Mitarbeiterbenachrichtigung(en) vorgemerkt.",
+  "Checking connection...": "Verbindung wird gepr\u00fcft...", "Connected. Notification status is synced.": "Verbunden. Der Benachrichtigungsstatus ist synchronisiert.",
+  "Offline. Notification settings will sync after reconnecting.": "Offline. Die Benachrichtigungseinstellungen werden nach der Verbindung synchronisiert.",
+  "Notification status could not be loaded. Check your connection and retry.": "Der Benachrichtigungsstatus konnte nicht geladen werden. Pr\u00fcfen Sie die Verbindung und versuchen Sie es erneut.",
+  "Offline \u2014 notification status may be out of date": "Offline \u2013 der Benachrichtigungsstatus ist m\u00f6glicherweise veraltet",
+  "Notifications active": "Benachrichtigungen aktiv", "Notifications paused": "Benachrichtigungen pausiert",
+  "Pause notifications": "Benachrichtigungen pausieren", "Resume notifications": "Benachrichtigungen fortsetzen",
+  "Pause notifications for all employees": "Benachrichtigungen f\u00fcr alle Mitarbeitenden pausieren",
+  "Resume notifications and release queued alerts": "Benachrichtigungen fortsetzen und vorgemerkte Hinweise senden",
+  "Pausing queues shift alerts and daily reminders. Resume sends queued alerts. The pause ends automatically at midnight.": "W\u00e4hrend der Pause werden Einsatzbenachrichtigungen und t\u00e4gliche Erinnerungen vorgemerkt. Beim Fortsetzen werden die vorgemerkten Hinweise gesendet. Die Pause endet automatisch um Mitternacht.",
+  "Pause notifications?": "Benachrichtigungen pausieren?", "Resume notifications?": "Benachrichtigungen fortsetzen?",
+  "When you resume, each affected employee will receive their queued shift updates. Notifications automatically resume at midnight.": "Beim Fortsetzen erhalten die jeweils betroffenen Mitarbeitenden ihre vorgemerkten Einsatz\u00e4nderungen. Um Mitternacht werden die Benachrichtigungen automatisch fortgesetzt.",
+  "queued employee alert(s) will become available as soon as notifications resume.": "vorgemerkte Mitarbeiterbenachrichtigung(en) werden beim Fortsetzen verf\u00fcgbar.",
+  "Confirm pause": "Pause best\u00e4tigen", "Resume and notify": "Fortsetzen und benachrichtigen", "Saving...": "Wird gespeichert...",
+  "Week navigation": "Wochennavigation", "Previous week": "Vorherige Woche", "Next week": "N\u00e4chste Woche",
+  "Choose schedule date range": "Einsatzzeitraum ausw\u00e4hlen", "Previous month": "Vorheriger Monat", "Next month": "N\u00e4chster Monat",
+  "Calendar days": "Kalendertage", "Quick date ranges": "Schnellauswahl f\u00fcr Zeitr\u00e4ume",
+  "Unassigned shifts": "Unbesetzte Eins\u00e4tze", "All shifts": "Alle Eins\u00e4tze", "0\u201324 hours": "0\u201324 Stunden",
+  "Split by": "Aufteilung", "Time window": "Zeitraum", "Employees": "Mitarbeitende", "Employee": "Mitarbeiter",
+  "Objects": "Standorte", "All employees": "Alle Mitarbeitenden", "Orders": "Auftr\u00e4ge", "Day": "Tag", "Week": "Woche", "2 weeks": "2 Wochen", "Month": "Monat", "Custom range": "Benutzerdefinierter Zeitraum",
+  "Schedule overview": "Einsatz\u00fcbersicht", "Create shift": "Einsatz erstellen", "Search employees or shifts": "Mitarbeitende oder Eins\u00e4tze suchen",
+  "Employee groups": "Mitarbeitergruppen", "Add filter": "Filter hinzuf\u00fcgen", "Work type": "Arbeitszeitmodell", "All work types": "Alle Arbeitszeitmodelle",
+  "Employee role": "Mitarbeiterrolle", "All roles": "Alle Rollen", "Shift assignment": "Einsatzzuweisung", "Assigned shifts": "Zugewiesene Eins\u00e4tze",
+  "Open shifts": "Offene Eins\u00e4tze", "Day of week": "Wochentag", "Every day": "Jeden Tag",
+  "Monday": "Montag", "Tuesday": "Dienstag", "Wednesday": "Mittwoch", "Thursday": "Donnerstag", "Friday": "Freitag", "Saturday": "Samstag", "Sunday": "Sonntag",
+  "Employee availability": "Mitarbeiterverf\u00fcgbarkeit", "Availability start date": "Beginn der Verf\u00fcgbarkeit", "Availability end date": "Ende der Verf\u00fcgbarkeit",
+  "Available from": "Verf\u00fcgbar ab", "Available until": "Verf\u00fcgbar bis", "Find available employees": "Verf\u00fcgbare Mitarbeitende finden",
+  "Clear filters": "Filter zur\u00fccksetzen", "filters": "Filter", "shifts selected": "Eins\u00e4tze ausgew\u00e4hlt", "shift selected": "Einsatz ausgew\u00e4hlt",
+  "Clear selection": "Auswahl aufheben", "Duplicate": "Duplizieren", "Release": "Freigeben", "Assign": "Zuweisen", "Delete": "L\u00f6schen",
+  "No shifts in the selected period": "Keine Eins\u00e4tze im ausgew\u00e4hlten Zeitraum", "Adjust the dates or filters, or create a shift.": "Passen Sie den Zeitraum oder die Filter an oder erstellen Sie einen Einsatz.",
+  "Sites": "Standorte", "Resize employee column": "Mitarbeiterspalte anpassen", "Drag to resize employee column": "Ziehen, um die Mitarbeiterspalte anzupassen",
+  "Select site shift": "Standorteinsatz ausw\u00e4hlen", "Select shift for ": "Einsatz ausw\u00e4hlen f\u00fcr ", "Click to edit shift": "Klicken, um den Einsatz zu bearbeiten",
+  "Edit shift": "Einsatz bearbeiten", "Editing": "Bearbeiten", "Add employees": "Mitarbeitende hinzuf\u00fcgen", "Remove assignment": "Zuweisung entfernen",
+  "Create shift on this date": "Einsatz an diesem Tag erstellen", "Create shift at this site": "Einsatz an diesem Standort erstellen", "Create open shift": "Offenen Einsatz erstellen",
+  "Repeating schedule": "Wiederkehrender Einsatz", "employee(s) assigned": "Mitarbeitende zugewiesen", "Assigned employees": "Zugewiesene Mitarbeitende",
+  "Schedule type": "Einsatzart", "Split schedule by": "Einsatzplan aufteilen nach", "Language selector": "Sprachauswahl", "One-time": "Einmalig", "Repeating": "Wiederholend", "Site": "Standort", "Select a site": "Standort ausw\u00e4hlen",
+  "Select employees": "Mitarbeitende ausw\u00e4hlen", "Select one or more employees.": "W\u00e4hlen Sie eine oder mehrere Mitarbeitende aus.",
+  "Create without assigning an employee": "Ohne Mitarbeiterzuweisung erstellen", "Date": "Datum", "Start date": "Startdatum", "Start": "Beginn", "Start time": "Beginn",
+  "End": "Ende", "End time": "Ende", "Duration": "Dauer", "Comment": "Kommentar", "Optional notes for this shift": "Optionale Notiz zu diesem Einsatz",
+  "Review the time and employees before creating the shift.": "Pr\u00fcfen Sie Zeit und Mitarbeitende, bevor Sie den Einsatz erstellen.", "Create another shift": "Weiteren Einsatz erstellen",
+  "Add employees to this shift": "Mitarbeitende zu diesem Einsatz hinzuf\u00fcgen", "Date, site, and time will match the selected shift.": "Datum, Standort und Uhrzeit entsprechen dem ausgew\u00e4hlten Einsatz.",
+  "Select one or more employees": "Eine oder mehrere Mitarbeitende ausw\u00e4hlen", "Add selected": "Auswahl hinzuf\u00fcgen", "Search employees": "Mitarbeitende suchen",
+  "Optional notes for this shift": "Optionale Notiz zu diesem Einsatz", "Leave blank to keep existing notes": "Leer lassen, um die bisherigen Notizen beizubehalten",
+  "Import shifts": "Eins\u00e4tze importieren", "Choose the source week and how many weeks ahead to copy.": "W\u00e4hlen Sie die Quellwoche und wie viele Wochen voraus kopiert werden soll.",
+  "Source week (back)": "Quellwoche (zur\u00fcck)", "Current week": "Aktuelle Woche", "1 week back": "Vor 1 Woche", "2 weeks back": "Vor 2 Wochen", "3 weeks back": "Vor 3 Wochen",
+  "Target (weeks ahead)": "Ziel (Wochen voraus)", "+1 week": "+1 Woche", "+2 weeks": "+2 Wochen", "+3 weeks": "+3 Wochen", "+4 weeks": "+4 Wochen",
+  "Loading shifts for the selected month...": "Eins\u00e4tze f\u00fcr den ausgew\u00e4hlten Monat werden geladen...", "Loading shifts for the selected week...": "Eins\u00e4tze f\u00fcr die ausgew\u00e4hlte Woche werden geladen...",
+  "No active shifts found in the previous month.": "Im Vormonat wurden keine aktiven Eins\u00e4tze gefunden.", "Show active shifts only": "Nur aktive Eins\u00e4tze anzeigen",
+  "This employee is active and can be imported": "Dieser Mitarbeiter ist aktiv und kann importiert werden", "Active": "Aktiv", "Inactive": "Inaktiv",
+  "This shift conflicts with an existing schedule": "Dieser Einsatz \u00fcberschneidet sich mit einem bestehenden Einsatzplan", "Warning": "Warnung",
+  "Could not load shifts. Please reload the page.": "Eins\u00e4tze konnten nicht geladen werden. Bitte laden Sie die Seite neu.",
+  "Importing...": "Import wird ausgef\u00fchrt...", "Import complete.": "Import abgeschlossen.", "Import failed. Please try again.": "Import fehlgeschlagen. Bitte versuchen Sie es erneut.",
+  "Edit multiple shifts": "Mehrere Eins\u00e4tze bearbeiten", "selected shifts.": "ausgew\u00e4hlte Eins\u00e4tze.", "New date (optional)": "Neues Datum (optional)",
+  "New start time (optional)": "Neue Startzeit (optional)", "New end time (optional)": "Neue Endzeit (optional)", "New notes (optional)": "Neue Notizen (optional)",
+  "Apply changes": "\u00c4nderungen anwenden", "New start date": "Neues Startdatum", "Selected shifts will be copied to the new dates, preserving their spacing, times, and employees.": "Die ausgew\u00e4hlten Eins\u00e4tze werden auf die neuen Daten kopiert. Zeitabst\u00e4nde, Uhrzeiten und Mitarbeitende bleiben erhalten.",
+  "Assign shifts": "Eins\u00e4tze zuweisen", "Select an employee": "Mitarbeiter ausw\u00e4hlen", "Cancel": "Abbrechen", "Close": "Schlie\u00dfen", "Save changes": "\u00c4nderungen speichern",
+  "Available employees": "Verf\u00fcgbare Mitarbeitende", "Searching...": "Suche l\u00e4uft...", "No available employees found for this period.": "F\u00fcr diesen Zeitraum wurden keine verf\u00fcgbaren Mitarbeitenden gefunden.",
+  "Network error while loading.": "Netzwerkfehler beim Laden.", "Choose a start date.": "W\u00e4hlen Sie ein Startdatum aus.", "Could not load the calendar. Please reload the page.": "Der Kalender konnte nicht geladen werden. Bitte laden Sie die Seite neu.",
+  "Select a start date.": "W\u00e4hlen Sie ein Startdatum aus.", "Invalid time": "Ung\u00fcltige Uhrzeit", "Select an employee or create the shift as unassigned.": "W\u00e4hlen Sie eine mitarbeitende Person aus oder erstellen Sie den Einsatz unbesetzt.",
+  "The end time must be after the start time.": "Die Endzeit muss nach der Startzeit liegen.", "Choose at least one field to update.": "W\u00e4hlen Sie mindestens ein Feld zum Aktualisieren aus.",
+  "Enter both a start and end time.": "Geben Sie sowohl eine Start- als auch eine Endzeit ein.", "Keep at least one employee assigned to this shift.": "Lassen Sie mindestens eine Person diesem Einsatz zugewiesen.",
+  "Select at least one employee.": "W\u00e4hlen Sie mindestens eine mitarbeitende Person aus.", "Could not move the shift. Please try again.": "Der Einsatz konnte nicht verschoben werden. Bitte versuchen Sie es erneut.",
+  "Custom range": "Benutzerdefinierter Zeitraum", "Could not update notifications.": "Benachrichtigungen konnten nicht aktualisiert werden.",
+  "Pause": "Pausieren", "Resume": "Fortsetzen", "Checking connection...": "Verbindung wird geprüft...", "Unassigned": "Unbesetzt",
+  "Repeat every": "Wiederholen alle", "week(s)": "Woche(n)", "Repeat on": "Wiederholen am", "End date": "Enddatum", "hrs": "Std.",
+  "Mon": "Mo", "Tue": "Di", "Wed": "Mi", "Thu": "Do", "Fri": "Fr", "Sat": "Sa", "Sun": "So",
+  "Source": "Quelle", "Target": "Ziel", "Time": "Uhrzeit", "Conflict": "Konflikt", "Import": "Importieren",
+  "Show active shifts only": "Nur aktive Einsätze anzeigen", "Available employees only": "Nur verfügbare Mitarbeitende",
+  "Remove this employee from the shift?": "Diese Person aus dem Einsatz entfernen?", "Create": "Erstellen", "Select": "Auswählen",
+  "Unassign selected employee(s); keep the shift open for reassignment": "Ausgewählte Mitarbeiterzuweisungen lösen; Einsätze zur Neuzuweisung offen lassen",
+  "Add employee": "Mitarbeiter hinzufügen", "Notifications": "Benachrichtigungen", "Notifications: checking status": "Benachrichtigungen: Status wird geprüft",
+}
+SCHEDULE_HTML_REPLACEMENTS = {**DE_HTML_REPLACEMENTS, **SCHEDULE_DE_REPLACEMENTS}
+
+
+def _build_translation_pattern(replacements: dict[str, str]):
+  keys = sorted(replacements, key=len, reverse=True)
+  return re.compile(r"(?<!\w)(?:" + "|".join(re.escape(key) for key in keys) + r")(?!\w)")
+
+
+_DE_HTML_PATTERN = _build_translation_pattern(DE_HTML_REPLACEMENTS)
+_SCHEDULE_HTML_PATTERN = _build_translation_pattern(SCHEDULE_HTML_REPLACEMENTS)
 
 def _get_current_language() -> str:
   value = (session.get("lang") or DEFAULT_LANGUAGE).strip().lower()
@@ -6093,16 +6815,16 @@ def _t(text: str) -> str:
   return DE_HTML_REPLACEMENTS.get(text, text)
 
 
-def _translate_text_fragment(text: str) -> str:
-  translated = text
-  for source, target in sorted(DE_HTML_REPLACEMENTS.items(), key=lambda pair: len(pair[0]), reverse=True):
-    translated = translated.replace(source, target)
-  return translated
+def _translate_text_fragment(text: str, schedule_page: bool = False) -> str:
+  replacements = SCHEDULE_HTML_REPLACEMENTS if schedule_page else DE_HTML_REPLACEMENTS
+  pattern = _SCHEDULE_HTML_PATTERN if schedule_page else _DE_HTML_PATTERN
+  return pattern.sub(lambda match: replacements[match.group(0)], text)
 
 
 def _translate_html_content(content: str) -> str:
   if _get_current_language() != "de":
     return content
+  schedule_page = request.path.rstrip("/") == "/schedule"
   try:
     soup = BeautifulSoup(content, "html.parser")
     for node in soup.find_all(string=True):
@@ -6110,9 +6832,14 @@ def _translate_html_content(content: str) -> str:
       if parent_name in {"script", "style"}:
         continue
       original = str(node)
-      replaced = _translate_text_fragment(original)
+      replaced = _translate_text_fragment(original, schedule_page)
       if replaced != original:
         node.replace_with(replaced)
+    for element in soup.find_all(True):
+      for attribute in ("placeholder", "title", "aria-label", "alt"):
+        value = element.get(attribute)
+        if isinstance(value, str):
+          element[attribute] = _translate_text_fragment(value, schedule_page)
     return str(soup)
   except Exception:
     return content
@@ -6128,17 +6855,17 @@ def _build_language_switcher_markup() -> str:
   current = _get_current_language()
   en_active = "active" if current == "en" else ""
   de_active = "active" if current == "de" else ""
-  return f"""
-  <style>
-    .lang-switcher{{position:fixed;right:14px;top:14px;z-index:9999;background:#ffffff;border:1px solid #cbd5e1;border-radius:999px;box-shadow:0 8px 22px rgba(15,23,42,.15);padding:4px;display:flex;gap:4px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}}
-    .lang-switcher a{{text-decoration:none;color:#0f172a;padding:6px 10px;border-radius:999px;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;min-width:34px}}
-    .lang-switcher a.active{{background:#0f766e;color:#fff}}
-  </style>
-  <div class="lang-switcher" aria-label="Language switcher">
-    <a href="{href_en}" class="{en_active}" title="English" aria-label="English">🇬🇧</a>
-    <a href="{href_de}" class="{de_active}" title="Deutsch" aria-label="Deutsch">🇩🇪</a>
+  en_current = 'aria-current="true"' if current == "en" else ""
+  de_current = 'aria-current="true"' if current == "de" else ""
+  return f'''
+  <div id="global-page-navbar" class="ep-global-topbar">
+    <span class="ep-global-brand"><img class="ep-global-brand-mark" src="/static/employee-icon-192.png" alt=""><span class="ep-global-brand-name">Elf's <strong>Plan</strong></span></span>
+    <nav id="global-language-switcher" class="lang-switcher" aria-label="Language selector">
+    <a href="{href_en}" class="{en_active}" title="Switch to English" aria-label="Switch to English" {en_current}><span>EN</span></a>
+    <a href="{href_de}" class="{de_active}" title="Auf Deutsch (&Ouml;sterreich) wechseln" aria-label="Auf Deutsch (&Ouml;sterreich) wechseln" {de_current}><span aria-hidden="true">&#x1F1E6;&#x1F1F9;</span><span>DE</span></a>
+    </nav>
   </div>
-  """
+  '''
 
 
 @app.before_request
@@ -6188,14 +6915,30 @@ def _language_after_request(response):
   content_type = (response.content_type or "").lower()
   if "text/html" not in content_type:
     return response
-  if request.path == "/login" or request.path.startswith("/employee"):
-    return response
   try:
     html = response.get_data(as_text=True)
   except Exception:
     return response
+  html = html.replace("Putzelf Marketing", "Elf's Plan").replace("Putzelf", "Elf's Plan")
+  def _set_theme_color(match):
+    tag = match.group(0)
+    if re.search(r"\bcontent\s*=", tag, flags=re.IGNORECASE):
+      return re.sub(r"(\bcontent\s*=\s*[\"'])[^\"']*([\"'])", r"\g<1>#014D4E\2", tag, count=1, flags=re.IGNORECASE)
+    return tag[:-1] + ' content="#014D4E">'
+  html = re.sub(r"<meta\b(?=[^>]*\bname\s*=\s*[\"']theme-color[\"'])[^>]*>", _set_theme_color, html, flags=re.IGNORECASE)
+  if "</head>" in html:
+    shared_assets = (
+      '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">'
+      '<link rel="stylesheet" href="/static/elfs-plan.css">'
+    )
+    html = html.replace("</head>", shared_assets + "</head>", 1)
   if "</body>" in html:
-    html = html.replace("</body>", _build_language_switcher_markup() + "</body>", 1)
+    body_open = re.search(r"<body\b[^>]*>", html, flags=re.IGNORECASE)
+    if body_open and request.endpoint != "login":
+      language_nav = _build_language_switcher_markup()
+      html = html[:body_open.end()] + language_nav + html[body_open.end():]
+    shared_script = '<script src="/static/elfs-plan.js" defer></script>'
+    html = html.replace("</body>", shared_script + "</body>", 1)
   html = _translate_html_content(html)
   response.set_data(html)
   return response
@@ -6399,6 +7142,53 @@ def _ensure_default_website_site(db, address: str | None = None):
   return site
 
 
+def _upsert_website_booking_lead(db, payload, booking_id, address, day, start, duration_minutes):
+  """Record a confirmed website booking in Lead Center, idempotent by booking ID."""
+  marker = f"Website booking #{booking_id}" if booking_id is not None else None
+  lead = None
+  if marker:
+    lead = (
+      db.query(Lead)
+      .filter(Lead.source == "Website booking", Lead.notes.ilike(f"%{marker}%"))
+      .first()
+    )
+
+  customer_name = str(
+    payload.get("customer_name") or payload.get("full_name") or payload.get("name") or ""
+  ).strip()
+  customer_email = str(payload.get("customer_email") or payload.get("email") or "").strip() or None
+  customer_phone = str(payload.get("customer_phone") or payload.get("phone") or "").strip() or None
+  booking_details = [marker or "Confirmed website booking"]
+  if address:
+    booking_details.append(f"Address: {address}")
+  booking_details.append(f"Service: {day:%Y-%m-%d} {start:%H:%M} ({duration_minutes / 60:g} hours)")
+  instructions = str(payload.get("instructions") or "").strip()
+  if instructions:
+    booking_details.append(f"Instructions: {instructions}")
+  details = "\n".join(booking_details)
+
+  if lead is None:
+    lead = Lead(
+      name=customer_name or (f"Website booking #{booking_id}" if booking_id is not None else "Website booking"),
+      email=customer_email,
+      phone=customer_phone,
+      source="Website booking",
+      notes=details,
+      stage="New Leads",
+    )
+    db.add(lead)
+  else:
+    # Fill in customer details if a repeated webhook supplies information later.
+    if customer_name and (not lead.name or lead.name.startswith("Website booking #")):
+      lead.name = customer_name
+    if customer_email:
+      lead.email = customer_email
+    if customer_phone:
+      lead.phone = customer_phone
+    lead.notes = details
+  return lead
+
+
 @app.route("/api/integrations/shifts/from-booking", methods=["POST"])
 def api_integrations_shift_from_booking():
   ok, error = _require_integration_key()
@@ -6428,18 +7218,25 @@ def api_integrations_shift_from_booking():
 
   db = SessionLocal()
   try:
+    # The integration endpoint represents a confirmed booking. Record it independently
+    # from worker availability so scheduling conflicts do not erase the sales lead.
+    lead = _upsert_website_booking_lead(db, payload, booking_id, address, day, start, duration_minutes)
+    db.commit()
+
     # Ensure employee login codes exist (so the website's employee_code always resolves).
     _generate_missing_employee_credentials(db)
 
     emp = (
       db.query(Employee)
-      .filter(func.lower(Employee.login_code) == employee_code.strip().lower())
+      .filter(func.lower(Employee.login_code) == employee_code.strip().lower(), Employee.has_platform_access.is_(True), _employee_staff_function_filter("Cleaner"), Employee.is_active.is_(True))
       .first()
     )
     if not emp:
       return jsonify({"error": "Employee not found"}), 404
 
-    # Idempotency: if a shift for this booking already exists, return it.
+    # Idempotency: recognize the booking before checking for overlaps so a retry
+    # does not report its own previously-created shift as a conflict.
+    existing = None
     if booking_id is not None:
       needle = f"Website booking #{booking_id}"
       existing = (
@@ -6448,22 +7245,39 @@ def api_integrations_shift_from_booking():
         .filter(Shift.instructions.ilike(f"%{needle}%"))
         .first()
       )
-      if existing:
-        return jsonify({"shiftId": existing.id})
 
-    # Conflict check: any overlap means slot is no longer available.
+    # Preserve confirmed bookings even if the employee has an overlapping shift.
+    # Return the conflict details so the website can show the user a warning.
+    conflicting_shift_ids = []
     shifts = db.query(Shift).filter(Shift.employee_id == emp.id, Shift.day == day).all()
     for s in shifts:
+      if existing and s.id == existing.id:
+        continue
       try:
         b_start = _time_to_minutes(s.start_time)
         b_end = _time_to_minutes(s.end_time)
       except Exception:
         continue
       if _intervals_overlap(start_min, end_min, b_start, b_end):
-        return jsonify({"error": "Slot no longer available"}), 409
+        conflicting_shift_ids.append(s.id)
+
+    result = {
+      "leadId": lead.id,
+      "conflict": bool(conflicting_shift_ids),
+      "conflictingShiftIds": conflicting_shift_ids,
+    }
+    if conflicting_shift_ids:
+      result["notification"] = "This confirmed booking overlaps an existing shift. The shift was saved; please review the schedule."
+    if existing:
+      result["shiftId"] = existing.id
+      return jsonify(result)
 
     site = _ensure_default_website_site(db, address=address)
     full_instructions = instructions
+    if booking_id is not None:
+      booking_marker = f"Website booking #{booking_id}"
+      if booking_marker.lower() not in full_instructions.lower():
+        full_instructions = f"{booking_marker}\n{full_instructions}".strip()
     if address and address.lower() not in full_instructions.lower():
       full_instructions = (full_instructions + f"\nAddress: {address}").strip()
 
@@ -6477,7 +7291,8 @@ def api_integrations_shift_from_booking():
     )
     db.add(shift)
     db.commit()
-    return jsonify({"shiftId": shift.id}), 201
+    result["shiftId"] = shift.id
+    return jsonify(result), 201
   finally:
     db.close()
 
@@ -6501,7 +7316,7 @@ def api_integrations_availability_slots():
     _generate_missing_employee_credentials(db)
     emp = (
       db.query(Employee)
-      .filter(func.lower(Employee.login_code) == employee_code.strip().lower())
+      .filter(func.lower(Employee.login_code) == employee_code.strip().lower(), Employee.has_platform_access.is_(True), _employee_staff_function_filter("Cleaner"), Employee.is_active.is_(True))
       .first()
     )
     if not emp:
@@ -6547,7 +7362,7 @@ def api_integrations_availability_month():
     _generate_missing_employee_credentials(db)
     emp = (
       db.query(Employee)
-      .filter(func.lower(Employee.login_code) == employee_code.strip().lower())
+      .filter(func.lower(Employee.login_code) == employee_code.strip().lower(), Employee.has_platform_access.is_(True), _employee_staff_function_filter("Cleaner"), Employee.is_active.is_(True))
       .first()
     )
     if not emp:
@@ -6691,7 +7506,7 @@ EU_COUNTRY_CODES = {
   "420", "421", "423",
 }
 
-LEAD_STAGES = ["New Leads", "Qualified", "Contacted", "Converted"]
+LEAD_STAGES = ["New Leads", "Contacted", "Converted"]
 
 EMAIL_REGEX = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.IGNORECASE)
 PHONE_TOKEN_REGEX = re.compile(r"\+?\d[\d\s().\/\-]{6,20}")
@@ -6854,441 +7669,6 @@ def find_labelled_phones(text: str | None, region: str | None = None) -> list[st
   return results
 
 
-ADMIN_PROFILES_TEMPLATE = """
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing — Profile</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
-  <style>
-    :root {
-      --accent: #0f766e;
-      --bg-soft: #f1f5f9;
-      --panel: #ffffff;
-      --line: #dbe5f2;
-      --muted: #64748b;
-    }
-    body { background:linear-gradient(180deg,#f8fbff 0%, #eef6ff 100%); color:#0f172a; }
-    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); background:transparent; }
-    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.25rem; }
-    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; }
-    .nav-pill.active, .nav-pill:hover { background:var(--accent); color:#fff; }
-    .main-shell { padding:1.5rem; }
-    .badge-soft { border-radius:999px; border:1px solid #d6d3f0; color:#6366f1; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
-    .tab-btn { text-decoration:none; display:inline-flex; align-items:center; gap:.4rem; padding:0.5rem 0.85rem; border-radius:0.7rem; border:1px solid #cbd5f5; color:#1e293b; background:#fff; }
-    .tab-btn.active { background:#0f766e; color:#fff; border-color:#0f766e; }
-    .card-surface { border-radius:1rem; border:1px solid var(--line); background:var(--panel); padding:1rem; box-shadow:0 12px 24px rgba(15,23,42,0.06); }
-    .registration-card {
-      border:1px solid #e2e8f0;
-      border-radius:1rem;
-      background:#f8fbff;
-      padding:0.95rem;
-    }
-    .registration-grid { display:grid; grid-template-columns:120px minmax(0,1fr); gap:0.9rem; align-items:start; }
-    .avatar-wrap { display:flex; justify-content:center; }
-    .avatar-uploader {
-      position:relative;
-      width:88px;
-      height:88px;
-      border-radius:999px;
-      cursor:pointer;
-      border:2px solid #cbd5f5;
-      background:#e2e8f0;
-      overflow:hidden;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      color:#334155;
-      font-weight:700;
-      font-size:1.2rem;
-    }
-    .avatar-uploader img {
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      display:none;
-    }
-    .avatar-badge {
-      position:absolute;
-      right:-2px;
-      bottom:-2px;
-      width:28px;
-      height:28px;
-      border-radius:999px;
-      background:#0f766e;
-      color:#fff;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      border:2px solid #fff;
-      font-size:.82rem;
-    }
-    .form-label { text-transform:uppercase; font-size:0.71rem; letter-spacing:0.08em; color:#475569; margin-bottom:.3rem; }
-    .form-control, .form-select {
-      background:#ffffff;
-      color:#0f172a;
-      border:1.5px solid #94a3b8;
-    }
-    .form-control::placeholder { color:#64748b; opacity:1; }
-    .form-control:focus, .form-select:focus {
-      border-color:#0f766e;
-      box-shadow:0 0 0 3px rgba(15,118,110,0.15);
-      background:#ffffff;
-      color:#0f172a;
-    }
-    .muted { color:var(--muted); }
-    .icon-btn {
-      min-width:2.4rem;
-      height:2.4rem;
-      border-radius:.65rem;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      padding:0;
-    }
-    .btn { border:1px solid rgba(15,23,42,0.18); }
-    .flatpickr-calendar { z-index: 9999 !important; }
-    .flatpickr-calendar.inline { display: none !important; }
-    @media(max-width:992px){
-      .app-shell{ grid-template-columns:minmax(0,1fr);} .sidebar{display:none;}
-      .registration-grid{ grid-template-columns:minmax(0,1fr); }
-      .avatar-wrap{ justify-content:flex-start; }
-    }
-  </style>
-</head>
-<body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <a href="{{ url_for('admin_dashboard') }}" class="nav-pill">⚙ Übersicht</a>
-      <a href="{{ url_for('admin_employees') }}" class="nav-pill">👥 Mitarbeiter verwalten</a>
-      <a href="{{ url_for('admin_sites') }}" class="nav-pill">🏢 Standorte verwalten</a>
-      <a href="{{ url_for('admin_profiles') }}" class="nav-pill active">🪪 Profile</a>
-      <a href="{{ url_for('admin_invoices') }}" class="nav-pill">📄 Rechnungen</a>
-      <a href="{{ url_for('logout') }}" class="nav-pill">⇦ Abmelden</a>
-    </aside>
-    <main class="main-shell">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          <div class="mb-3">
-            {% for category, message in messages %}
-              <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }} border-0 text-dark">{{ message }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      {% endwith %}
-      <header class="mb-4">
-        <div class="badge-soft mb-2">Profile</div>
-        <h1 class="h4 text-dark mb-1">Profilzentrum</h1>
-      </header>
-
-      <div class="d-flex gap-2 mb-3">
-        <a class="tab-btn {% if active_tab == 'employees' %}active{% endif %}" href="{{ url_for('admin_profiles', tab='employees') }}"><i class="bi bi-person-vcard"></i> Mitarbeiterprofile</a>
-        <a class="tab-btn {% if active_tab == 'clients' %}active{% endif %}" href="{{ url_for('admin_profiles', tab='clients') }}"><i class="bi bi-building"></i> Kundenprofile</a>
-      </div>
-
-      {% if active_tab == 'employees' %}
-        <div class="card-surface">
-          <h2 class="h6 text-uppercase text-secondary mb-3">Mitarbeiterprofil</h2>
-          <form method="get" class="mb-3">
-            <input type="hidden" name="tab" value="employees">
-            <input type="hidden" name="employees_page" value="1">
-            <div class="row g-2">
-              <div class="col-md-4">
-                <input type="text" class="form-control form-control-sm" name="emp_search" value="{{ emp_search or '' }}" placeholder="Name, Telefon, Adresse, Stadt suchen...">
-              </div>
-              <div class="col-md-3">
-                <select class="form-select form-select-sm" name="emp_work_type">
-                  <option value="">Alle Beschäftigungsarten</option>
-                  <option value="Teilzeit" {% if emp_work_type_filter == 'Teilzeit' %}selected{% endif %}>Teilzeit</option>
-                  <option value="Vollzeit" {% if emp_work_type_filter == 'Vollzeit' %}selected{% endif %}>Vollzeit</option>
-                  <option value="Geringfügige" {% if emp_work_type_filter == 'Geringfügige' %}selected{% endif %}>Geringfügige / Minijobs</option>
-                </select>
-              </div>
-              <div class="col-md-3">
-                <input type="text" class="form-control form-control-sm" name="emp_role" value="{{ emp_role_filter or '' }}" placeholder="Nach Rolle filtern...">
-              </div>
-              <div class="col-md-2">
-                <button type="submit" class="btn btn-sm btn-primary w-100">Filtern</button>
-              </div>
-            </div>
-            {% if emp_search or emp_work_type_filter or emp_role_filter %}
-              <div class="mt-2">
-                <a href="{{ url_for('admin_profiles', tab='employees') }}" class="btn btn-sm btn-outline-secondary">Filter zurücksetzen</a>
-              </div>
-            {% endif %}
-          </form>
-          {% if employees %}
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <span class="small text-secondary">Seite {{ employees_page }} von {{ employees_total_pages }} · {{ employees_total_count }} Mitarbeiter</span>
-              <div class="d-flex gap-2">
-                <a
-                  class="btn btn-sm btn-outline-secondary {% if not employees_has_prev %}disabled{% endif %}"
-                  href="{{ url_for('admin_profiles', tab='employees', employees_page=employees_prev_page, emp_search=emp_search, emp_work_type=emp_work_type_filter, emp_role=emp_role_filter) if employees_has_prev else '#' }}"
-                >Zurück</a>
-                <a
-                  class="btn btn-sm btn-outline-secondary {% if not employees_has_next %}disabled{% endif %}"
-                  href="{{ url_for('admin_profiles', tab='employees', employees_page=employees_next_page, emp_search=emp_search, emp_work_type=emp_work_type_filter, emp_role=emp_role_filter) if employees_has_next else '#' }}"
-                >Weiter</a>
-              </div>
-            </div>
-            <div class="vstack gap-3">
-              {% for emp in employees %}
-                <form method="post" enctype="multipart/form-data" class="registration-card">
-                  <input type="hidden" name="entity" value="employee_profile">
-                  <input type="hidden" name="id" value="{{ emp.id }}">
-                  <input type="hidden" name="tab" value="employees">
-                  <input type="hidden" name="employees_page" value="{{ employees_page }}">
-                  <div class="registration-grid">
-                    <div class="avatar-wrap">
-                      <label class="avatar-uploader" title="Foto hochladen">
-                        <img class="avatar-preview" alt="Vorschau Profilbild" {% if emp.profile_image_path %}src="/static/{{ emp.profile_image_path }}" style="display:block;"{% endif %}>
-                        <span class="avatar-initials" {% if emp.profile_image_path %}style="display:none;"{% endif %}>{{ (emp.name or 'U')[:1]|upper }}</span>
-                        <span class="avatar-badge"><i class="bi bi-camera-fill"></i></span>
-                        <input type="file" name="employee_profile_image" class="d-none avatar-input" accept="image/*">
-                      </label>
-                    </div>
-                    <div>
-                      <div class="mb-2"><strong>{{ emp.name }}</strong> <span class="muted">· {{ emp.role or 'Keine Rolle' }}</span></div>
-                      <div class="row g-2">
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Telefon</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_phone" value="{{ emp.profile_phone or '' }}">
-                        </div>
-                        <div class="col-md-6 col-12">
-                          <label class="form-label">Straße / Adresse</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_address" value="{{ emp.profile_address or '' }}">
-                        </div>
-                        <div class="col-md-3 col-12">
-                          <label class="form-label">PLZ</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_zip_code" value="{{ emp.profile_zip_code or '' }}">
-                        </div>
-                        <div class="col-md-3 col-12">
-                          <label class="form-label">Stadt</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_city" value="{{ emp.profile_city or '' }}">
-                        </div>
-                        <div class="col-md-3 col-12">
-                          <label class="form-label">Beginn-Datum</label>
-                          <input type="text" class="form-control form-control-sm js-contract-date" name="profile_contract_start_date" value="{{ emp.profile_contract_start_date or '' }}" placeholder="YYYY-MM-DD">
-                        </div>
-                        <div class="col-md-3 col-12">
-                          <label class="form-label">End-Datum</label>
-                          <input type="text" class="form-control form-control-sm js-contract-date" name="profile_contract_end_date" value="{{ emp.profile_contract_end_date or '' }}" placeholder="YYYY-MM-DD">
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Beschäftigungsart</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_employment_type" value="{{ emp.profile_employment_type or 'Reinigungskraft' }}">
-                        </div>
-                        <div class="col-md-3 col-12">
-                          <label class="form-label">Euro/Std.</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_euros_per_hour" value="{{ emp.profile_euros_per_hour or '12,37' }}" placeholder="12,37">
-                        </div>
-                        <div class="col-md-3 col-12">
-                          <label class="form-label">Arbeitsstunden</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_working_hours" value="{{ emp.profile_working_hours or '3' }}" placeholder="3">
-                        </div>
-                        <div class="col-md-3 col-12">
-                          <label class="form-label">Arbeitsmodell</label>
-                          <select class="form-select form-select-sm" name="profile_work_type">
-                            <option value="Teilzeit" {% if (emp.profile_work_type or 'Teilzeit') == 'Teilzeit' %}selected{% endif %}>Teilzeit</option>
-                            <option value="Vollzeit" {% if (emp.profile_work_type or '') == 'Vollzeit' %}selected{% endif %}>Vollzeit</option>
-                            <option value="Geringfügige" {% if (emp.profile_work_type or '') == 'Geringfügige' %}selected{% endif %}>Geringfügige / Minijobs</option>
-                          </select>
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Gruppen</label>
-                          <div class="input-group input-group-sm">
-                            <select class="form-select" name="profile_group_type">
-                              <option value="Lohngruppe" {% if (emp.profile_group_type or 'Lohngruppe') == 'Lohngruppe' %}selected{% endif %}>Lohngruppe</option>
-                              <option value="Verwendungsgruppe" {% if (emp.profile_group_type or '') == 'Verwendungsgruppe' %}selected{% endif %}>Verwendungsgruppe</option>
-                            </select>
-                            <input type="number" min="1" class="form-control" name="profile_group_number" value="{{ emp.profile_group_number or '6' }}" placeholder="6">
-                          </div>
-                        </div>
-                        <div class="col-md-6 col-12">
-                          <label class="form-label">Notizen</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_notes" value="{{ emp.profile_notes or '' }}">
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="mt-2 d-flex justify-content-end">
-                    <a href="{{ url_for('admin_employee_docx', employee_id=emp.id) }}" class="btn btn-sm btn-outline-primary icon-btn me-2" title="Mitarbeiterdokument herunterladen"><i class="bi bi-file-earmark-word"></i></a>
-                    <button class="btn btn-sm btn-primary icon-btn" type="submit" title="Profil speichern"><i class="bi bi-check2-circle"></i></button>
-                  </div>
-                </form>
-              {% endfor %}
-            </div>
-          {% else %}
-            <p class="muted mb-0">Keine Mitarbeiter gefunden.</p>
-          {% endif %}
-        </div>
-      {% else %}
-        <div class="card-surface">
-          <h2 class="h6 text-uppercase text-secondary mb-3">Kundenprofil</h2>
-          <form method="get" class="mb-3">
-            <input type="hidden" name="tab" value="clients">
-            <input type="hidden" name="clients_page" value="1">
-            <div class="row g-2">
-              <div class="col-md-5">
-                <input type="text" class="form-control form-control-sm" name="client_search" value="{{ client_search or '' }}" placeholder="Name, Adresse, Firma, Kontakt suchen...">
-              </div>
-              <div class="col-md-3">
-                <input type="text" class="form-control form-control-sm" name="client_vat" value="{{ client_vat_filter or '' }}" placeholder="Nach USt-ID filtern...">
-              </div>
-              <div class="col-md-2">
-                <button type="submit" class="btn btn-sm btn-primary w-100">Filtern</button>
-              </div>
-              <div class="col-md-2">
-                {% if client_search or client_vat_filter %}
-                  <a href="{{ url_for('admin_profiles', tab='clients') }}" class="btn btn-sm btn-outline-secondary w-100">Zurücksetzen</a>
-                {% endif %}
-              </div>
-            </div>
-          </form>
-          {% if sites %}
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <span class="small text-secondary">Seite {{ clients_page }} von {{ clients_total_pages }} · {{ clients_total_count }} Kunden</span>
-              <div class="d-flex gap-2">
-                <a
-                  class="btn btn-sm btn-outline-secondary {% if not clients_has_prev %}disabled{% endif %}"
-                  href="{{ url_for('admin_profiles', tab='clients', clients_page=clients_prev_page, client_search=client_search, client_vat=client_vat_filter) if clients_has_prev else '#' }}"
-                >Zurück</a>
-                <a
-                  class="btn btn-sm btn-outline-secondary {% if not clients_has_next %}disabled{% endif %}"
-                  href="{{ url_for('admin_profiles', tab='clients', clients_page=clients_next_page, client_search=client_search, client_vat=client_vat_filter) if clients_has_next else '#' }}"
-                >Weiter</a>
-              </div>
-            </div>
-            <div class="vstack gap-3">
-              {% for site in sites %}
-                <form method="post" enctype="multipart/form-data" class="registration-card">
-                  <input type="hidden" name="entity" value="site_profile">
-                  <input type="hidden" name="id" value="{{ site.id }}">
-                  <input type="hidden" name="tab" value="clients">
-                  <input type="hidden" name="clients_page" value="{{ clients_page }}">
-                  <div class="registration-grid">
-                    <div class="avatar-wrap">
-                      <label class="avatar-uploader" title="Logo hochladen">
-                        <img class="avatar-preview" alt="Logo-Vorschau" {% if site.profile_image_path %}src="/static/{{ site.profile_image_path }}" style="display:block;"{% endif %}>
-                        <span class="avatar-initials" {% if site.profile_image_path %}style="display:none;"{% endif %}>{{ (site.name or 'C')[:1]|upper }}</span>
-                        <span class="avatar-badge"><i class="bi bi-camera-fill"></i></span>
-                        <input type="file" name="site_profile_image" class="d-none avatar-input" accept="image/*">
-                      </label>
-                    </div>
-                    <div>
-                      <div class="mb-2"><strong>{{ site.name }}</strong> <span class="muted">· {{ site.address or 'Keine Adresse' }}</span></div>
-                      <div class="row g-2">
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Firma</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_company_name" value="{{ site.profile_company_name or '' }}">
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Name Rechnungs-Kontakt</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_contact_name" value="{{ site.profile_contact_name or '' }}">
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">E-Mail Rechnungs-Kontakt</label>
-                          <input type="email" class="form-control form-control-sm" name="profile_contact_email" value="{{ site.profile_contact_email or '' }}">
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Rechnungstelefon</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_phone" value="{{ site.profile_phone or '' }}">
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Kundennummer</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_tax_id" value="{{ site.profile_tax_id or '' }}" readonly>
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">USt-ID</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_vat_id" value="{{ site.profile_vat_id or '' }}" placeholder="ATU...">
-                        </div>
-                        <div class="col-md-6 col-12">
-                          <label class="form-label">Notizen</label>
-                          <input type="text" class="form-control form-control-sm" name="profile_notes" value="{{ site.profile_notes or '' }}">
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Name des partners</label>
-                          <input type="text" class="form-control form-control-sm" name="contract_partner_name" value="{{ site.contract_partner_name or '' }}">
-                        </div>
-                        <div class="col-md-8 col-12">
-                          <label class="form-label">Tel./ Fax / E-Mail</label>
-                          <input type="text" class="form-control form-control-sm" name="contract_contact_details" value="{{ site.contract_contact_details or '' }}">
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Vertragsbeginn</label>
-                          <input type="text" class="form-control form-control-sm js-contract-date-dmy" name="contract_start_date" value="{{ site.contract_start_date or '' }}" placeholder="TT-MM-JJJJ">
-                        </div>
-                        <div class="col-md-4 col-12">
-                          <label class="form-label">Vertragsende</label>
-                          <input type="text" class="form-control form-control-sm js-contract-date-dmy" name="contract_end_date" value="{{ site.contract_end_date or '' }}" placeholder="TT-MM-JJJJ">
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="mt-2 d-flex justify-content-end gap-2">
-                    <button class="btn btn-sm btn-outline-primary icon-btn" type="submit" name="profile_action" value="generate_contract" title="Vertrags-PDF erstellen"><i class="bi bi-file-earmark-pdf"></i></button>
-                    <button class="btn btn-sm btn-primary icon-btn" type="submit" name="profile_action" value="save" title="Profil speichern"><i class="bi bi-check2-circle"></i></button>
-                  </div>
-                </form>
-              {% endfor %}
-            </div>
-          {% else %}
-            <p class="muted mb-0">Keine Standorte gefunden.</p>
-          {% endif %}
-        </div>
-      {% endif %}
-    </main>
-  </div>
-  <script>
-    document.querySelectorAll('.avatar-input').forEach((input) => {
-      input.addEventListener('change', (event) => {
-        const file = event.target.files && event.target.files[0];
-        const wrap = event.target.closest('.avatar-uploader');
-        if (!file || !wrap) return;
-        const img = wrap.querySelector('.avatar-preview');
-        const initials = wrap.querySelector('.avatar-initials');
-        if (!img) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          img.src = e.target && e.target.result ? e.target.result : '';
-          img.style.display = 'block';
-          if (initials) initials.style.display = 'none';
-        };
-        reader.readAsDataURL(file);
-      });
-    });
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script>
-    if (window.flatpickr) {
-      flatpickr('.js-contract-date', {
-        dateFormat: 'Y-m-d',
-        locale: {
-          firstDayOfWeek: 1,
-        },
-        static: false,
-        disableMobile: false,
-      });
-
-      flatpickr('.js-contract-date-dmy', {
-        dateFormat: 'd-m-Y',
-        locale: {
-          firstDayOfWeek: 1,
-        },
-        static: false,
-        disableMobile: false,
-      });
-    }
-  </script>
-</body>
-</html>
-"""
-
-
 # --- ORM models ----------------------------------------------------------------
 
 
@@ -7299,10 +7679,16 @@ class Employee(Base):
   name = Column(String(255), nullable=False)
   is_active = Column(Boolean, nullable=False, default=True)
   role = Column(String(255))
+  access_role = Column(String(32), nullable=False, default="employee")
   login_email = Column(String(255), unique=True)
   login_code = Column(String(64), unique=True)
   login_pin_hash = Column(String(255))
   login_pin_plain = Column(String(32))
+  staff_type = Column(String(64), nullable=False, default="Cleaner")
+  staff_functions = Column(Text, nullable=False, default="[]")
+  branch = Column(String(32), nullable=False, default="Wien")
+  has_platform_access = Column(Boolean, nullable=False, default=True)
+  worker_status = Column(String(16), nullable=False, default="active")
   profile_phone = Column(String(64))
   profile_emergency_name = Column(String(255))
   profile_emergency_phone = Column(String(64))
@@ -7321,6 +7707,53 @@ class Employee(Base):
   profile_image_path = Column(String(255))
 
   shifts = relationship("Shift", back_populates="employee", cascade="all, delete-orphan")
+
+
+STAFF_FUNCTION_OPTIONS = ("Cleaner", "Office administrator", "IT", "Reception", "Intern", "Graphic designer", "Site manager", "Sales manager", "Other")
+
+
+def _normalize_staff_functions(raw, fallback="Cleaner"):
+  try:
+    values = json.loads(raw) if isinstance(raw, str) else raw
+  except (TypeError, ValueError):
+    values = []
+  if not isinstance(values, (list, tuple, set)):
+    values = [values] if isinstance(values, str) else []
+  selected = []
+  for value in values:
+    value = str(value).strip()
+    if value in STAFF_FUNCTION_OPTIONS and value not in selected:
+      selected.append(value)
+  if not selected and fallback in STAFF_FUNCTION_OPTIONS:
+    selected = [fallback]
+  return selected
+
+
+def _employee_staff_functions(employee):
+  stored = getattr(employee, "staff_functions", None)
+  functions = _normalize_staff_functions(stored, fallback="")
+  if functions:
+    return functions
+  legacy = getattr(employee, "staff_type", None)
+  return [legacy] if legacy in STAFF_FUNCTION_OPTIONS else ["Cleaner"]
+
+
+def _employee_has_staff_function(employee, function):
+  return function in _employee_staff_functions(employee)
+
+
+def _employee_staff_function_filter(function):
+  return or_(Employee.staff_type == function, Employee.staff_functions.like(f'%"{function}"%'))
+
+
+class EmployeeDocument(Base):
+  __tablename__ = "employee_documents"
+  id = Column(Integer, primary_key=True)
+  employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False, index=True)
+  original_filename = Column(String(255), nullable=False)
+  storage_name = Column(String(255), nullable=False, unique=True)
+  uploaded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+  employee = relationship("Employee", backref="documents")
 
 
 class Site(Base):
@@ -7347,21 +7780,24 @@ class Site(Base):
   contract_contact_details = Column(String(255))
   contract_start_date = Column(String(10))
   contract_end_date = Column(String(10))
+  manager_employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
 
   shifts = relationship("Shift", back_populates="site", cascade="all, delete-orphan")
+  site_manager = relationship("Employee", foreign_keys=[manager_employee_id])
 
 
 class Shift(Base):
   __tablename__ = "shifts"
 
   id = Column(Integer, primary_key=True)
-  employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+  employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
   site_id = Column(Integer, ForeignKey("sites.id"), nullable=False)
   day = Column(Date, nullable=False)
   start_time = Column(Time, nullable=False)
   end_time = Column(Time, nullable=False)
   created_at = Column(DateTime, default=datetime.utcnow)
   instructions = Column(Text)
+  is_recurring = Column(Boolean, nullable=False, default=False)
   clock_in_at = Column(DateTime)
   clock_in_lat = Column(Float)
   clock_in_lng = Column(Float)
@@ -7373,6 +7809,52 @@ class Shift(Base):
 
   employee = relationship("Employee", back_populates="shifts")
   site = relationship("Site", back_populates="shifts")
+  tour_links = relationship("TourStop", back_populates="shift", cascade="all, delete-orphan")
+
+
+class NotificationSettings(Base):
+  __tablename__ = "notification_settings"
+
+  id = Column(Integer, primary_key=True, default=1)
+  paused_until = Column(DateTime, nullable=True)
+  paused_by = Column(String(255), nullable=True)
+  updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class EmployeeNotification(Base):
+  __tablename__ = "employee_notifications"
+
+  id = Column(Integer, primary_key=True)
+  employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False, index=True)
+  shift_id = Column(Integer, nullable=True, index=True)
+  kind = Column(String(40), nullable=False, default="shift_updated")
+  title = Column(String(180), nullable=False)
+  body = Column(Text, nullable=False)
+  payload = Column(Text, nullable=False, default="{}")
+  created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+  available_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+  read_at = Column(DateTime, nullable=True)
+
+
+class Tour(Base):
+  __tablename__ = "schedule_tours"
+
+  id = Column(Integer, primary_key=True)
+  name = Column(String(160), nullable=False)
+  day = Column(Date, nullable=False)
+  created_at = Column(DateTime, default=datetime.utcnow)
+  stops = relationship("TourStop", back_populates="tour", cascade="all, delete-orphan", order_by="TourStop.position")
+
+
+class TourStop(Base):
+  __tablename__ = "schedule_tour_stops"
+
+  id = Column(Integer, primary_key=True)
+  tour_id = Column(Integer, ForeignKey("schedule_tours.id", ondelete="CASCADE"), nullable=False)
+  shift_id = Column(Integer, ForeignKey("shifts.id", ondelete="CASCADE"), nullable=False)
+  position = Column(Integer, nullable=False)
+  tour = relationship("Tour", back_populates="stops")
+  shift = relationship("Shift", back_populates="tour_links")
 
 
 class Lead(Base):
@@ -7418,7 +7900,206 @@ class Invoice(Base):
   site = relationship("Site", backref="invoices")
 
 
+class InspectionArea(Base):
+  """Legacy area names retained for older inspection records."""
+  __tablename__ = "inspection_areas"
+  id = Column(Integer, primary_key=True)
+  name = Column(String(160), nullable=False, unique=True)
+  sort_order = Column(Integer, nullable=False, default=0)
+  is_active = Column(Boolean, nullable=False, default=True)
+
+
+class SiteInspectionArea(Base):
+  __tablename__ = "site_inspection_areas"
+  __table_args__ = (UniqueConstraint("site_id", "name", name="uq_site_inspection_area_name"),)
+  id = Column(Integer, primary_key=True)
+  site_id = Column(Integer, ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+  name = Column(String(160), nullable=False)
+  sort_order = Column(Integer, nullable=False, default=0)
+  is_active = Column(Boolean, nullable=False, default=True)
+  site = relationship("Site")
+
+
+class SiteInspection(Base):
+  __tablename__ = "site_inspections"
+  __table_args__ = (UniqueConstraint("site_id", "month", name="uq_site_inspection_month"),)
+  id = Column(Integer, primary_key=True)
+  site_id = Column(Integer, ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
+  month = Column(String(7), nullable=False)  # YYYY-MM
+  inspected_by_employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
+  updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+  site = relationship("Site")
+  inspector = relationship("Employee")
+  items = relationship("InspectionItem", back_populates="inspection", cascade="all, delete-orphan")
+
+
+class InspectionItem(Base):
+  __tablename__ = "inspection_items"
+  __table_args__ = (
+    UniqueConstraint("inspection_id", "area_id", name="uq_inspection_area"),
+    UniqueConstraint("inspection_id", "site_area_id", name="uq_inspection_site_area"),
+  )
+  id = Column(Integer, primary_key=True)
+  inspection_id = Column(Integer, ForeignKey("site_inspections.id", ondelete="CASCADE"), nullable=False)
+  area_id = Column(Integer, ForeignKey("inspection_areas.id"), nullable=True)
+  site_area_id = Column(Integer, ForeignKey("site_inspection_areas.id"), nullable=True)
+  area_name = Column(String(160), nullable=False)  # snapshot preserves report history
+  checked = Column(Boolean, nullable=False, default=False)
+  notes = Column(Text)
+  photo_path = Column(String(255))
+  checked_at = Column(DateTime)
+  inspection = relationship("SiteInspection", back_populates="items")
+  area = relationship("InspectionArea")
+  site_area = relationship("SiteInspectionArea")
+
+
+class PublicDocument(Base):
+  __tablename__ = "public_documents"
+  id = Column(Integer, primary_key=True)
+  title = Column(String(200), nullable=False)
+  category = Column(String(100), nullable=False, default="General")
+  original_filename = Column(String(255), nullable=False)
+  storage_name = Column(String(255), nullable=False, unique=True)
+  uploaded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+def _shift_notification_description(shift, overrides=None):
+  values = overrides or {}
+  site_id = values.get("site_id", shift.site_id)
+  site = None
+  if site_id:
+    site = shift.site if site_id == shift.site_id else None
+    site_name = (site.profile_company_name or site.name) if site else f"Site #{site_id}"
+  else:
+    site_name = "Site"
+  day_value = values.get("day", shift.day)
+  start_value = values.get("start_time", shift.start_time)
+  end_value = values.get("end_time", shift.end_time)
+  day_label = day_value.strftime("%d.%m.%Y") if day_value else "Date to be confirmed"
+  start_label = start_value.strftime("%H:%M") if start_value else "--:--"
+  end_label = end_value.strftime("%H:%M") if end_value else "--:--"
+  return f"{site_name} · {day_label}, {start_label}–{end_label}"
+
+
+@event.listens_for(SQLAlchemySession, "before_flush")
+def _collect_shift_notification_events(db_session, flush_context, instances):
+  changes = db_session.info.setdefault("_employee_shift_notification_changes", [])
+  deleted_employee_ids = {item.id for item in db_session.deleted if isinstance(item, Employee) and item.id}
+  important_fields = ("site_id", "day", "start_time", "end_time", "instructions")
+
+  for shift in tuple(db_session.new):
+    if not isinstance(shift, Shift) or not shift.employee_id:
+      continue
+    changes.append({
+      "employee_id": shift.employee_id, "shift": shift, "kind": "shift_assigned",
+      "title": "New shift assigned", "body": _shift_notification_description(shift),
+      "summary": "A new shift was added to your schedule.",
+    })
+
+  for shift in tuple(db_session.dirty):
+    if not isinstance(shift, Shift) or shift in db_session.new or shift in db_session.deleted:
+      continue
+    state = sqlalchemy_inspect(shift)
+    employee_history = state.attrs.employee_id.history
+    old_employee_id = employee_history.deleted[0] if employee_history.deleted else shift.employee_id
+    new_employee_id = None if shift in db_session.deleted else shift.employee_id
+    changed_fields = {name for name in important_fields if state.attrs[name].history.has_changes()}
+    if not employee_history.has_changes() and not changed_fields:
+      continue
+    if old_employee_id and old_employee_id not in deleted_employee_ids and (employee_history.has_changes() or shift in db_session.deleted):
+      changes.append({
+        "employee_id": old_employee_id, "shift": shift, "kind": "shift_cancelled",
+        "title": "Shift removed", "body": _shift_notification_description(shift),
+        "summary": "A shift was removed from your schedule.",
+      })
+    if new_employee_id and new_employee_id not in deleted_employee_ids:
+      if employee_history.has_changes():
+        kind, title, summary = "shift_assigned", "New shift assigned", "A shift was assigned to your schedule."
+      elif changed_fields:
+        kind, title, summary = "shift_updated", "Shift updated", "A shift in your schedule was changed."
+      else:
+        continue
+      changes.append({
+        "employee_id": new_employee_id, "shift": shift, "kind": kind, "title": title,
+        "body": _shift_notification_description(shift), "summary": summary,
+      })
+
+  for shift in tuple(db_session.deleted):
+    if not isinstance(shift, Shift) or not shift.employee_id or shift.employee_id in deleted_employee_ids:
+      continue
+    changes.append({
+      "employee_id": shift.employee_id, "shift": shift, "kind": "shift_cancelled",
+      "title": "Shift removed", "body": _shift_notification_description(shift),
+      "summary": "A shift was removed from your schedule.",
+    })
+
+
+@event.listens_for(SQLAlchemySession, "after_flush_postexec")
+def _persist_shift_notifications(db_session, flush_context):
+  changes = db_session.info.pop("_employee_shift_notification_changes", [])
+  if not changes:
+    return
+  now = datetime.utcnow()
+  settings = db_session.get(NotificationSettings, 1)
+  pause_is_active = bool(settings and settings.paused_until and settings.paused_until > now)
+  available_at = settings.paused_until if pause_is_active else now
+  queued_by_shift = {}
+  for change in changes:
+    shift = change["shift"]
+    notification_values = {
+      "kind": change["kind"],
+      "title": change["title"],
+      "body": change["body"],
+      "payload": json.dumps({"summary": change["summary"], "shift_id": shift.id}, ensure_ascii=False),
+      "created_at": now,
+    }
+    key = (change["employee_id"], shift.id)
+    pending = queued_by_shift.get(key)
+    if pause_is_active and pending is None and shift.id:
+      pending = db_session.query(EmployeeNotification).filter(
+        EmployeeNotification.employee_id == change["employee_id"],
+        EmployeeNotification.shift_id == shift.id,
+        EmployeeNotification.available_at > now,
+        EmployeeNotification.read_at.is_(None),
+      ).order_by(EmployeeNotification.id.desc()).first()
+    if pause_is_active and pending:
+      for name, value in notification_values.items():
+        setattr(pending, name, value)
+      queued_by_shift[key] = pending
+      continue
+    notification = EmployeeNotification(
+      employee_id=change["employee_id"], shift_id=shift.id,
+      available_at=available_at, **notification_values,
+    )
+    db_session.add(notification)
+    if pause_is_active:
+      queued_by_shift[key] = notification
+
+
 Base.metadata.create_all(bind=engine)
+with engine.begin() as connection:
+  connection.execute(text("UPDATE leads SET stage = 'Contacted' WHERE stage = 'Qualified'"))
+
+
+def _notification_state(db):
+  now = datetime.utcnow()
+  settings = db.get(NotificationSettings, 1)
+  if settings and settings.paused_until and settings.paused_until <= now:
+    settings.paused_until = None
+    settings.paused_by = None
+    db.query(EmployeeNotification).filter(EmployeeNotification.available_at > now).update(
+      {EmployeeNotification.available_at: now}, synchronize_session=False
+    )
+    db.commit()
+    settings = db.get(NotificationSettings, 1)
+  pending = db.query(func.count(EmployeeNotification.id)).filter(EmployeeNotification.available_at > now).scalar() or 0
+  return {
+    "paused": bool(settings and settings.paused_until and settings.paused_until > now),
+    "paused_until": settings.paused_until.isoformat() + "Z" if settings and settings.paused_until else None,
+    "paused_by": settings.paused_by if settings else None,
+    "pending_count": int(pending),
+  }
+
 
 
 def _ensure_sqlite_column(engine, table: str, column: str, ddl: str):
@@ -7431,11 +8112,42 @@ def _ensure_sqlite_column(engine, table: str, column: str, ddl: str):
       conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
 
 
+_ensure_sqlite_column(engine, "inspection_items", "site_area_id", "INTEGER REFERENCES site_inspection_areas(id)")
+if engine.dialect.name == "postgresql":
+  with engine.begin() as conn:
+    conn.execute(text(
+      "ALTER TABLE inspection_items ADD COLUMN IF NOT EXISTS "
+      "site_area_id INTEGER REFERENCES site_inspection_areas(id)"
+    ))
+    conn.execute(text(
+      "ALTER TABLE shifts ADD COLUMN IF NOT EXISTS "
+      "is_recurring BOOLEAN NOT NULL DEFAULT FALSE"
+    ))
+    conn.execute(text("ALTER TABLE employees ADD COLUMN IF NOT EXISTS staff_type VARCHAR(64) NOT NULL DEFAULT 'Cleaner'"))
+    conn.execute(text("ALTER TABLE employees ADD COLUMN IF NOT EXISTS staff_functions TEXT NOT NULL DEFAULT '[]'"))
+    conn.execute(text("ALTER TABLE employees ADD COLUMN IF NOT EXISTS branch VARCHAR(32) NOT NULL DEFAULT 'Wien'"))
+    conn.execute(text("ALTER TABLE employees ADD COLUMN IF NOT EXISTS has_platform_access BOOLEAN NOT NULL DEFAULT TRUE"))
+    conn.execute(text("ALTER TABLE employees ADD COLUMN IF NOT EXISTS worker_status VARCHAR(16) NOT NULL DEFAULT 'active'"))
+
+
 _ensure_sqlite_column(engine, "shifts", "created_at", "DATETIME")
+_ensure_sqlite_column(engine, "shifts", "is_recurring", "BOOLEAN NOT NULL DEFAULT 0")
 _ensure_sqlite_column(engine, "employees", "login_email", "TEXT")
+_ensure_sqlite_column(engine, "employees", "access_role", "TEXT NOT NULL DEFAULT 'employee'")
 _ensure_sqlite_column(engine, "employees", "login_code", "TEXT")
 _ensure_sqlite_column(engine, "employees", "login_pin_hash", "TEXT")
 _ensure_sqlite_column(engine, "employees", "login_pin_plain", "TEXT")
+_ensure_sqlite_column(engine, "employees", "staff_type", "TEXT NOT NULL DEFAULT 'Cleaner'")
+_ensure_sqlite_column(engine, "employees", "staff_functions", "TEXT NOT NULL DEFAULT '[]'")
+_ensure_sqlite_column(engine, "employees", "branch", "TEXT NOT NULL DEFAULT 'Wien'")
+_ensure_sqlite_column(engine, "employees", "has_platform_access", "BOOLEAN NOT NULL DEFAULT 1")
+_ensure_sqlite_column(engine, "employees", "worker_status", "TEXT NOT NULL DEFAULT 'active'")
+employee_columns = {column["name"] for column in sqlalchemy_inspect(engine).get_columns("employees")}
+with engine.begin() as conn:
+  conn.execute(text("UPDATE employees SET worker_status = 'active' WHERE worker_status IS NULL"))
+  conn.execute(text("UPDATE employees SET worker_status = 'passive' WHERE worker_status = 'interested'"))
+  if "is_active" in employee_columns:
+    conn.execute(text("UPDATE employees SET worker_status = 'passive' WHERE is_active = 0 AND worker_status = 'active'"))
 _ensure_sqlite_column(engine, "employees", "profile_phone", "TEXT")
 _ensure_sqlite_column(engine, "employees", "profile_emergency_name", "TEXT")
 _ensure_sqlite_column(engine, "employees", "profile_emergency_phone", "TEXT")
@@ -7465,6 +8177,7 @@ _ensure_sqlite_column(engine, "sites", "hourly_rate", "FLOAT")
 _ensure_sqlite_column(engine, "sites", "contact_name", "TEXT")
 _ensure_sqlite_column(engine, "sites", "contact_email", "TEXT")
 _ensure_sqlite_column(engine, "sites", "is_active", "INTEGER NOT NULL DEFAULT 1")
+_ensure_sqlite_column(engine, "sites", "manager_employee_id", "INTEGER")
 _ensure_sqlite_column(engine, "sites", "profile_company_name", "TEXT")
 _ensure_sqlite_column(engine, "sites", "profile_contact_name", "TEXT")
 _ensure_sqlite_column(engine, "sites", "profile_contact_email", "TEXT")
@@ -7485,6 +8198,62 @@ _ensure_sqlite_column(engine, "invoices", "site_billing_address", "TEXT")
 _ensure_sqlite_column(engine, "invoices", "site_tax_id", "TEXT")
 _ensure_sqlite_column(engine, "invoices", "paid_at", "DATETIME")
 _ensure_sqlite_column(engine, "invoices", "billing_month", "TEXT")
+
+
+def _ensure_nullable_shift_employee_id():
+  """Allow a released shift to remain on the board as an open assignment."""
+  if engine.dialect.name == "postgresql":
+    with engine.begin() as conn:
+      conn.execute(text("ALTER TABLE shifts ALTER COLUMN employee_id DROP NOT NULL"))
+    return
+  if engine.dialect.name != "sqlite":
+    return
+
+  raw = engine.raw_connection()
+  cursor = raw.cursor()
+  try:
+    cursor.execute("PRAGMA foreign_keys=OFF")
+    cursor.execute("PRAGMA legacy_alter_table=ON")
+    table_sql = cursor.execute(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='shifts'"
+    ).fetchone()
+    columns = cursor.execute("PRAGMA table_info('shifts')").fetchall()
+    employee_column = next((column for column in columns if column[1] == "employee_id"), None)
+    if not table_sql or not employee_column or not employee_column[3]:
+      return
+    create_sql = table_sql[0]
+    create_sql = create_sql.replace("CREATE TABLE shifts", "CREATE TABLE shifts_new", 1)
+    create_sql = create_sql.replace("employee_id INTEGER NOT NULL", "employee_id INTEGER", 1)
+    indexes = [row[0] for row in cursor.execute(
+      "SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='shifts' AND sql IS NOT NULL"
+    ).fetchall()]
+    column_names = [column[1] for column in columns]
+    quoted_names = ", ".join('"' + name.replace('"', '""') + '"' for name in column_names)
+    cursor.execute("BEGIN IMMEDIATE")
+    cursor.execute("ALTER TABLE shifts RENAME TO shifts_old_employee_required")
+    cursor.execute(create_sql)
+    cursor.execute(
+      f"INSERT INTO shifts_new ({quoted_names}) SELECT {quoted_names} FROM shifts_old_employee_required"
+    )
+    cursor.execute("DROP TABLE shifts_old_employee_required")
+    cursor.execute("ALTER TABLE shifts_new RENAME TO shifts")
+    for index_sql in indexes:
+      cursor.execute(index_sql)
+    raw.commit()
+  except Exception:
+    raw.rollback()
+    raise
+  finally:
+    try:
+      cursor.execute("PRAGMA foreign_keys=ON")
+      cursor.execute("PRAGMA legacy_alter_table=OFF")
+    except Exception:
+      pass
+    cursor.close()
+    raw.close()
+
+
+_ensure_nullable_shift_employee_id()
 
 
 def _allowed_image(filename: str | None) -> bool:
@@ -7709,7 +8478,7 @@ def _generate_missing_employee_credentials(db) -> dict[int, dict[str, str | None
   existing_codes = _collect_existing_codes(db)
   updated: dict[int, dict[str, str | None]] = {}
   any_changes = False
-  for emp in db.query(Employee).all():
+  for emp in db.query(Employee).filter(Employee.has_platform_access.is_(True)).all():
     current_code = (emp.login_code or "").strip()
     current_pin_hash = (emp.login_pin_hash or "").strip()
     code_generated = None
@@ -7743,14 +8512,173 @@ def login_required(view_func):
   return wrapper
 
 
-def employee_login_required(view_func):
+def site_manager_required(view_func):
+  """Allow the main admin or an active employee account with manager access."""
   @wraps(view_func)
   def wrapper(*args, **kwargs):
-    if session.get("role") == "employee" and session.get("employee_id"):
+    if session.get("role") == "admin" and session.get("auth"):
       return view_func(*args, **kwargs)
+    employee_id = session.get("employee_id")
+    if session.get("role") == "site_manager" and employee_id:
+      db = SessionLocal()
+      try:
+        employee = db.get(Employee, employee_id)
+        if employee and employee.is_active and employee.has_platform_access and employee.access_role == "site_manager":
+          return view_func(*args, **kwargs)
+      finally:
+        db.close()
     return redirect(url_for("login", next=request.url))
 
   return wrapper
+
+
+def _active_employee_has_role(role: str) -> bool:
+  employee_id = session.get("employee_id")
+  if not employee_id or session.get("role") != role:
+    return False
+  db = SessionLocal()
+  try:
+    employee = db.get(Employee, employee_id)
+    return bool(employee and employee.is_active and employee.has_platform_access and employee.access_role == role)
+  finally:
+    db.close()
+
+
+def site_or_sales_manager_required(view_func):
+  """Allow admins and operational managers into site/client management."""
+  @wraps(view_func)
+  def wrapper(*args, **kwargs):
+    if session.get("role") == "admin" and session.get("auth"):
+      return view_func(*args, **kwargs)
+    if _active_employee_has_role("site_manager") or _active_employee_has_role("sales_manager"):
+      return view_func(*args, **kwargs)
+    return redirect(url_for("login", next=request.url))
+  return wrapper
+
+
+def sales_manager_or_admin_required(view_func):
+  """Limit sales accounts to their crawler tools and configured admin access."""
+  @wraps(view_func)
+  def wrapper(*args, **kwargs):
+    if session.get("role") == "admin" and session.get("auth"):
+      return view_func(*args, **kwargs)
+    if _active_employee_has_role("sales_manager"):
+      return view_func(*args, **kwargs)
+    return redirect(url_for("login", next=request.url))
+  return wrapper
+
+
+def employee_login_required(view_func):
+  @wraps(view_func)
+  def wrapper(*args, **kwargs):
+    employee_id = session.get("employee_id")
+    if session.get("role") in {"employee", "site_manager"} and employee_id:
+      db = SessionLocal()
+      try:
+        employee = db.get(Employee, int(employee_id))
+        if employee and employee.is_active and employee.has_platform_access:
+          return view_func(*args, **kwargs)
+      finally:
+        db.close()
+      session.clear()
+    return redirect(url_for("login", next=request.url))
+
+  return wrapper
+
+
+@app.route("/admin/notifications/state", methods=["GET", "POST"])
+@site_manager_required
+def admin_notification_state():
+  db = SessionLocal()
+  try:
+    state = _notification_state(db)
+    if request.method == "GET":
+      return jsonify(state)
+    action = (request.form.get("action") or "").strip().lower()
+    settings = db.get(NotificationSettings, 1)
+    if not settings:
+      settings = NotificationSettings(id=1)
+      db.add(settings)
+    now = datetime.utcnow()
+    if action == "pause":
+      local_zone = ZoneInfo(os.getenv("APP_TIMEZONE", "Europe/Vienna"))
+      local_now = datetime.now(local_zone)
+      next_midnight = datetime.combine(local_now.date() + timedelta(days=1), time.min, tzinfo=local_zone)
+      settings.paused_until = next_midnight.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+      settings.paused_by = session.get("employee_name") or session.get("username") or "Manager"
+      db.commit()
+      return jsonify({**_notification_state(db), "message": "Notifications paused until midnight."})
+    if action == "resume":
+      settings.paused_until = None
+      settings.paused_by = None
+      resumed = db.query(EmployeeNotification).filter(EmployeeNotification.available_at > now).update(
+        {EmployeeNotification.available_at: now}, synchronize_session=False
+      )
+      db.commit()
+      return jsonify({**_notification_state(db), "released_count": int(resumed), "message": "Queued employee notifications are now available."})
+    return jsonify({"error": "Choose pause or resume."}), 400
+  except Exception:
+    db.rollback()
+    app.logger.exception("Unable to update notification pause state")
+    return jsonify({"error": "Could not update notifications."}), 500
+  finally:
+    db.close()
+
+
+@app.route("/employee/api/notifications", methods=["GET"])
+@employee_login_required
+def employee_notifications_api():
+  employee_id = session.get("employee_id")
+  db = SessionLocal()
+  try:
+    state = _notification_state(db)
+    now = datetime.utcnow()
+    state["pending_count"] = db.query(func.count(EmployeeNotification.id)).filter(
+      EmployeeNotification.employee_id == employee_id,
+      EmployeeNotification.available_at > now,
+      EmployeeNotification.read_at.is_(None),
+    ).scalar() or 0
+    notifications = db.query(EmployeeNotification).filter(
+      EmployeeNotification.employee_id == employee_id,
+      EmployeeNotification.available_at <= now,
+      EmployeeNotification.read_at.is_(None),
+    ).order_by(EmployeeNotification.created_at.desc()).limit(30).all()
+    today = date.today()
+    shifts = db.query(Shift).options(joinedload(Shift.site)).filter(
+      Shift.employee_id == employee_id, Shift.day == today
+    ).order_by(Shift.start_time.asc()).all()
+    return jsonify({
+      "notifications_enabled": not state["paused"],
+      "paused_until": state["paused_until"],
+      "pending_count": state["pending_count"],
+      "today_shifts": [{
+        "site_name": (shift.site.profile_company_name or shift.site.name) if shift.site else "Scheduled shift",
+        "time_window": f"{shift.start_time.strftime('%H:%M')}–{shift.end_time.strftime('%H:%M')}",
+      } for shift in shifts],
+      "items": [{
+        "id": item.id, "kind": item.kind, "title": item.title, "body": item.body,
+        "created_at": item.created_at.isoformat() + "Z",
+      } for item in notifications],
+    })
+  finally:
+    db.close()
+
+
+@app.route("/employee/api/notifications/<int:notification_id>/read", methods=["POST"])
+@employee_login_required
+def employee_notification_mark_read(notification_id: int):
+  db = SessionLocal()
+  try:
+    notification = db.query(EmployeeNotification).filter_by(
+      id=notification_id, employee_id=session.get("employee_id")
+    ).first()
+    if not notification:
+      return jsonify({"error": "Notification not found."}), 404
+    notification.read_at = datetime.utcnow()
+    db.commit()
+    return jsonify({"ok": True})
+  finally:
+    db.close()
 
 
 @app.teardown_appcontext
@@ -8305,12 +9233,29 @@ def _get_day_range(start: date | None = None, weeks: int = 1, days: int | None =
 def _load_schedule_context(db, week_days):
     employees = db.query(Employee).order_by(Employee.name).all()
     sites = db.query(Site).order_by(Site.name).all()
-    shifts = db.query(Shift).filter(Shift.day >= week_days[0], Shift.day <= week_days[-1]).all()
+    shifts = (
+        db.query(Shift)
+        .options(joinedload(Shift.site), joinedload(Shift.employee))
+        .filter(Shift.day >= week_days[0], Shift.day <= week_days[-1])
+        .all()
+    )
 
     matrix = {}
+    crews_by_slot = {}
+    for shift in shifts:
+        if shift.employee_id is None:
+            continue
+        slot = (shift.day, shift.site_id, shift.start_time, shift.end_time)
+        person = shift.employee
+        if person and all(existing['id'] != person.id for existing in crews_by_slot.get(slot, [])):
+            crews_by_slot.setdefault(slot, []).append({
+                'id': person.id,
+                'name': person.name,
+                'image': person.profile_image_path or '',
+            })
     for s in shifts:
         key = (s.employee_id, s.day)
-        site_name = s.site.name if s.site and s.site.name else "Standort"
+        site_name = s.site.name if s.site and s.site.name else "Site"
         site_address = s.site.address if s.site and s.site.address else "Adresse unbekannt"
         time_window = f"{s.start_time.strftime('%H:%M')}–{s.end_time.strftime('%H:%M')}"
         shift_info = {
@@ -8324,6 +9269,8 @@ def _load_schedule_context(db, week_days):
             'start_time_str': s.start_time.strftime('%H:%M'),
             'end_time_str': s.end_time.strftime('%H:%M'),
             'instructions': s.instructions or '',
+            'is_recurring': bool(s.is_recurring),
+            'assigned_people': crews_by_slot.get((s.day, s.site_id, s.start_time, s.end_time), []),
         }
         matrix.setdefault(key, []).append(shift_info)
     for key in matrix:
@@ -8371,7 +9318,7 @@ def _find_employee_schedule_conflict(
   if exclude_shift_id is not None:
     query = query.filter(Shift.id != exclude_shift_id)
 
-  candidate_site_name = "Standort"
+  candidate_site_name = "Site"
   candidate_site = db.get(Site, site_id)
   if candidate_site and candidate_site.name:
     candidate_site_name = candidate_site.name
@@ -8381,9 +9328,9 @@ def _find_employee_schedule_conflict(
 
     if candidate_start < existing_end and existing_start < candidate_end:
       existing_site = db.get(Site, existing.site_id)
-      existing_site_name = (existing_site.name if existing_site and existing_site.name else "Standort")
+      existing_site_name = (existing_site.name if existing_site and existing_site.name else "Site")
       return (
-        "Planungs-Konflikt: Dieser Mitarbeiter ist bereits eingeteilt "
+        "Scheduling conflict: this employee is already assigned "
         f"({existing.day.strftime('%d.%m.%Y')} {existing.start_time.strftime('%H:%M')}–{existing.end_time.strftime('%H:%M')} · {existing_site_name})."
       )
 
@@ -8395,7 +9342,7 @@ def _find_employee_schedule_conflict(
 
     if gap is not None and gap < timedelta(minutes=30) and existing.site_id != site_id:
       existing_site = db.get(Site, existing.site_id)
-      existing_site_name = (existing_site.name if existing_site and existing_site.name else "Standort")
+      existing_site_name = (existing_site.name if existing_site and existing_site.name else "Site")
       return (
         "Warnung: Zwischen Einsätzen an unterschiedlichen Standorten müssen mindestens 30 Minuten liegen "
         f"({existing_site_name} ↔ {candidate_site_name})."
@@ -8816,123 +9763,110 @@ def _generate_hours_pdf(
 
 
 def _generate_schedule_pdf(week_days, employees, matrix):
+    """Build the schedule PDF with no more than seven day columns per page."""
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
-        buf,
-        pagesize=landscape(A4),
-        leftMargin=32,
-        rightMargin=32,
-        topMargin=32,
-        bottomMargin=28,
+        buf, pagesize=landscape(A4), leftMargin=32, rightMargin=32,
+        topMargin=32, bottomMargin=28,
     )
     styles = getSampleStyleSheet()
-    title_style = styles["Title"]
-    title_style.fontName = "Helvetica-Bold"
-    title_style.textColor = colors.HexColor("#0f172a")
-    subtitle_style = styles["Heading4"]
-    subtitle_style.fontName = "Helvetica"
-    subtitle_style.textColor = colors.HexColor("#475569")
+    title_style = ParagraphStyle(
+        "SchedulePdfTitle", parent=styles["Title"], fontName="Helvetica-Bold",
+        textColor=colors.HexColor("#0f172a"), fontSize=19, leading=23,
+    )
+    subtitle_style = ParagraphStyle(
+        "SchedulePdfSubtitle", parent=styles["Heading4"], fontName="Helvetica",
+        textColor=colors.HexColor("#475569"), fontSize=10, leading=13,
+    )
     header_style = ParagraphStyle(
-        "ScheduleHeader",
-        parent=styles["Heading5"],
-        alignment=1,
-        fontSize=11,
-        leading=13,
+        "SchedulePdfHeader", parent=styles["Heading5"], alignment=1,
+        fontSize=8, leading=10, textColor=colors.whitesmoke,
     )
     cell_style = ParagraphStyle(
-        "ScheduleCell",
-        parent=styles["BodyText"],
-        leading=12,
+        "SchedulePdfCell", parent=styles["BodyText"], fontSize=7.5,
+        leading=9, spaceAfter=0,
     )
     elements = []
-
     logo_path = os.path.join(app.root_path, "static", "logo.png")
     if os.path.exists(logo_path):
-        logo = Image(logo_path, width=1.2 * inch, height=1.2 * inch)
+        logo = Image(logo_path, width=.8 * inch, height=.8 * inch)
         logo.hAlign = "LEFT"
-        elements.append(logo)
-        elements.append(Spacer(1, 10))
+        elements.extend([logo, Spacer(1, 7)])
+    elements.append(Paragraph("Employee Schedule", title_style))
+    elements.append(Paragraph(
+        f"{week_days[0].strftime('%d %b %Y')} &ndash; {week_days[-1].strftime('%d %b %Y')}",
+        subtitle_style,
+    ))
+    elements.append(Spacer(1, 12))
 
-    elements.append(Paragraph("Weekly Employee Schedule", title_style))
-    elements.append(
-        Paragraph(
-            f"{week_days[0].strftime('%d %b %Y')} &ndash; {week_days[-1].strftime('%d %b %Y')}",
-            subtitle_style,
-        )
-    )
-    elements.append(Spacer(1, 16))
+    date_groups = []
+    for day in week_days:
+        week_key = day.isocalendar()[:2]
+        if not date_groups or date_groups[-1][0].isocalendar()[:2] != week_key:
+            date_groups.append([])
+        date_groups[-1].append(day)
 
-    header = [Paragraph("<b>Employee</b>", header_style)]
-    for d in week_days:
-        header.append(
-            Paragraph(
-                f"{d.strftime('%a')}<br/><font size='9'>{d.strftime('%d %b')}</font>",
-                header_style,
-            )
-        )
-    data = [header]
-    for emp in employees:
-        header_line = html.escape(emp.name or "")
-        if emp.role:
-            header_line += f"<br/><font color='#94a3b8' size='9'>{html.escape(emp.role)}</font>"
-        row = [Paragraph(header_line, cell_style)]
-        for day in week_days:
-            cell_items = matrix.get((emp.id, day), [])
-            if not cell_items:
-                row.append(Paragraph("<font color='#9ca3af'>Free</font>", cell_style))
-            else:
-                lines = []
-                for item in cell_items:
-                    if isinstance(item, dict):
-                        label_raw = str(item.get("label") or "")
+    for group_index, date_group in enumerate(date_groups):
+        if group_index:
+            elements.append(PageBreak())
+            week_number = date_group[0].isocalendar()[1]
+            elements.append(Paragraph(
+                f"Week {week_number}: {date_group[0].strftime('%d %b')} &ndash; {date_group[-1].strftime('%d %b %Y')}",
+                subtitle_style,
+            ))
+            elements.append(Spacer(1, 8))
+
+        data = [[Paragraph("<b>Employee</b>", header_style)] + [
+            Paragraph(f"<b>{day.strftime('%a')}</b><br/>{day.strftime('%d %b')}", header_style)
+            for day in date_group
+        ]]
+        for employee in employees:
+            employee_label = html.escape(employee.name or "")
+            if employee.role:
+                employee_label += f"<br/><font color='#64748b' size='7'>{html.escape(employee.role)}</font>"
+            row = [Paragraph(employee_label, cell_style)]
+            for day in date_group:
+                shifts = matrix.get((employee.id, day), [])
+                if not shifts:
+                    row.append(Paragraph("<font color='#9ca3af'>Free</font>", cell_style))
+                    continue
+                descriptions = []
+                for shift in shifts:
+                    if isinstance(shift, dict):
+                        site = html.escape(str(shift.get("site_name") or "Site"))
+                        time_window = html.escape(str(shift.get("time_window") or ""))
+                        address = html.escape(str(shift.get("site_address") or ""))
+                        notes = html.escape(str(shift.get("instructions") or ""))
+                        detail = " · ".join(part for part in (time_window, address, notes) if part)
+                        descriptions.append(f"<b>{site}</b>" + (f"<br/><font color='#475569'>{detail}</font>" if detail else ""))
                     else:
-                        label_raw = str(item or "")
-                    head, sep, tail = label_raw.partition(" — ")
-                    head_safe = html.escape(head)
-                    tail_safe = html.escape(tail) if sep else ""
-                    if tail_safe:
-                        lines.append(
-                            f"<font color='#0f172a'><b>{head_safe}</b></font>"
-                            f"<br/><font color='#475569'>{tail_safe}</font>"
-                        )
-                    else:
-                        lines.append(f"<font color='#0f172a'><b>{head_safe}</b></font>")
-                bullet = "<br/><br/>".join(lines)
-                row.append(Paragraph(bullet, cell_style))
-        data.append(row)
+                        descriptions.append(html.escape(str(shift or "")))
+                row.append(Paragraph("<br/><br/>".join(descriptions), cell_style))
+            data.append(row)
 
-    len_days = max(len(week_days), 1)
-    employee_col_width = 1.8 * inch
-    remaining_width = max(doc.width - employee_col_width, 0.0)
-    per_day_width = remaining_width / len_days if len_days else 1.0 * inch
-    col_widths = [employee_col_width] + [per_day_width] * len_days
-
-    table = Table(data, repeatRows=1, hAlign="LEFT", colWidths=col_widths)
-    table.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f766e")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("FONTSIZE", (0, 0), (-1, 0), 11),
-                ("FONTSIZE", (0, 1), (-1, -1), 9),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#f8fafc"), colors.HexColor("#e2e8f0")]),
-                ("LINEBEFORE", (1, 0), (-1, -1), 0.4, colors.HexColor("#cbd5f5")),
-                ("LINEABOVE", (0, 1), (-1, -1), 0.3, colors.HexColor("#cbd5f5")),
-                ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#0f172a")),
-                ("LEFTPADDING", (0, 0), (-1, -1), 10),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ]
+        employee_width = 1.55 * inch
+        day_width = max(doc.width - employee_width, 1) / max(len(date_group), 1)
+        table = Table(
+            data, repeatRows=1, hAlign="LEFT",
+            colWidths=[employee_width] + [day_width] * len(date_group),
         )
-    )
-    elements.append(table)
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f766e")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#f8fafc"), colors.HexColor("#e2e8f0")]),
+            ("GRID", (0, 0), (-1, -1), .35, colors.HexColor("#cbd5e1")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        elements.append(table)
+
     doc.build(elements)
     buf.seek(0)
     return buf
-
 
 
 def _generate_contacts_pdf(rows: list[dict[str, str]]):
@@ -9007,7 +9941,7 @@ def _generate_contacts_pdf(rows: list[dict[str, str]]):
 
     elements: list = []
     generated_at = datetime.utcnow().strftime("%d %b %Y %H:%M UTC")
-    elements.append(Paragraph("Putzelf Marketing - Contact Crawl", title_style))
+    elements.append(Paragraph("Elf's Plan - Contact Crawl", title_style))
     elements.append(Paragraph(f"Generated {generated_at}", subtitle_style))
 
     bulk_emails = sorted({(row.get("email") or "").strip() for row in rows if (row.get("email") or "").strip()})
@@ -9104,6 +10038,9 @@ ADMIN_I18N = {
     "live_revenue_charts": "Live revenue charts",
     "track_hint": "Track the last 6 billing months and export the data anytime.",
     "open_invoices": "Open invoices",
+    "paid_invoices": "Paid invoices",
+    "needs_attention": "Requires follow-up",
+    "hours": "Hours",
     "download_csv": "Download CSV",
     "revenue_hours_performance": "Revenue & hours performance",
     "revenue_hours_hint": "Interactive trends for invoice volume, revenue, and billed hours.",
@@ -9144,6 +10081,9 @@ ADMIN_I18N = {
     "live_revenue_charts": "Live-Umsatzdiagramme",
     "track_hint": "Verfolge die letzten 6 Abrechnungsmonate und exportiere die Daten jederzeit.",
     "open_invoices": "Rechnungen öffnen",
+    "paid_invoices": "Bezahlte Rechnungen",
+    "needs_attention": "Nachverfolgung erforderlich",
+    "hours": "Stunden",
     "download_csv": "CSV herunterladen",
     "revenue_hours_performance": "Umsatz- & Stundenentwicklung",
     "revenue_hours_hint": "Interaktive Trends für Rechnungsanzahl, Umsatz und gebuchte Stunden.",
@@ -9362,7 +10302,42 @@ def _safe_next_url() -> str | None:
 
 
 def _employee_redirect_target(next_url: str | None) -> str:
+  if session.get("role") == "admin":
+    if not next_url:
+      return url_for("admin_employees")
+    try:
+      parsed = urlparse(next_url)
+      path = parsed.path or ""
+    except Exception:
+      return url_for("admin_employees")
+    if path.startswith("/employee") or path == url_for("login"):
+      return url_for("admin_employees")
+    return f"{path}?{parsed.query}" if parsed.query else path
   # Employees may only land on employee-scoped routes to avoid redirect loops.
+  if session.get("role") == "site_manager":
+    if not next_url:
+      return url_for("admin_employees")
+    try:
+      parsed = urlparse(next_url)
+      path = parsed.path or ""
+    except Exception:
+      return url_for("admin_employees")
+    safe_prefixes = ("/site-manager", "/manager/", "/employee", "/schedule", "/admin/employees", "/admin/sites")
+    if path.startswith(safe_prefixes):
+      return f"{path}?{parsed.query}" if parsed.query else path
+    return url_for("admin_employees")
+  if session.get("role") == "sales_manager":
+    if not next_url:
+      return url_for("admin_employees")
+    try:
+      parsed = urlparse(next_url)
+      path = parsed.path or ""
+    except Exception:
+      return url_for("admin_employees")
+    safe_prefixes = ("/admin/sites", "/admin/employees", "/crawler", "/gpt")
+    if path.startswith(safe_prefixes):
+      return f"{path}?{parsed.query}" if parsed.query else path
+    return url_for("admin_employees")
   if not next_url:
     return url_for("employee_dashboard")
   try:
@@ -9381,19 +10356,25 @@ def _employee_redirect_target(next_url: str | None) -> str:
   return url_for("employee_dashboard")
 
 
-EMPLOYEE_LANG_DEFAULT = "en"
+EMPLOYEE_LANG_DEFAULT = "de"
 EMPLOYEE_LANG_SUPPORTED = ("en", "de", "uk")
 EMPLOYEE_LANG_LABELS = {
-  "en": "English",
   "de": "Deutsch",
+  "en": "English",
   "uk": "Українська",
 }
 
 EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
   "en": {
     "login_secure_access": "Secure access",
+    "login_workspace_label": "COMPANY WORKSPACE",
+    "login_tagline": "Welcome to Elf's Plan.",
+    "login_brand_message": "Sign in to access schedules, sites, and team information.",
+    "login_form_intro": "Use your company sign-in details to continue.",
+    "login_show_password": "Show password",
+    "login_hide_password": "Hide password",
     "login_title": "Sign in",
-    "login_username": "Username or login code",
+    "login_username": "Username, work email, or login code",
     "login_password": "Password / PIN",
     "login_button": "Login",
     "login_hint": "Admins use their username and password. Employees use their work email or login code plus PIN.",
@@ -9458,8 +10439,14 @@ EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
   },
   "de": {
     "login_secure_access": "Sicherer Zugang",
+    "login_workspace_label": "UNTERNEHMENSBEREICH",
+    "login_tagline": "Willkommen bei Elf's Plan.",
+    "login_brand_message": "Melden Sie sich an, um Einsatzpläne, Standorte und Teamdaten aufzurufen.",
+    "login_form_intro": "Melden Sie sich mit Ihren Unternehmensdaten an.",
+    "login_show_password": "Passwort anzeigen",
+    "login_hide_password": "Passwort ausblenden",
     "login_title": "Anmelden",
-    "login_username": "Benutzername oder Login-Code",
+    "login_username": "Benutzername, E-Mail oder Login-Code",
     "login_password": "Passwort / PIN",
     "login_button": "Login",
     "login_hint": "Admins nutzen Benutzername und Passwort. Mitarbeitende nutzen E-Mail oder Login-Code plus PIN.",
@@ -9524,8 +10511,14 @@ EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
   },
   "uk": {
     "login_secure_access": "Безпечний вхід",
+    "login_workspace_label": "РОБОЧИЙ ПРОСТІР",
+    "login_tagline": "Ласкаво просимо до Elf's Plan.",
+    "login_brand_message": "Увійдіть, щоб переглянути графіки, об'єкти та інформацію про команду.",
+    "login_form_intro": "Увійдіть за допомогою даних компанії.",
+    "login_show_password": "Показати пароль",
+    "login_hide_password": "Приховати пароль",
     "login_title": "Увійти",
-    "login_username": "Ім'я користувача або код входу",
+    "login_username": "Ім'я користувача, робоча пошта або код входу",
     "login_password": "Пароль / PIN",
     "login_button": "Увійти",
     "login_hint": "Адміни входять за логіном і паролем. Співробітники — за робочим email або кодом входу та PIN.",
@@ -9640,13 +10633,24 @@ def employee_service_worker():
   )
 
 
+@app.route("/manager-sw.js")
+def manager_service_worker():
+  return send_file(
+    os.path.join(APP_ROOT, "static", "site-manager-sw.js"),
+    mimetype="application/javascript",
+    max_age=0,
+  )
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
   lang = _get_employee_lang()
   ui = EMPLOYEE_TEXTS.get(lang, EMPLOYEE_TEXTS[EMPLOYEE_LANG_DEFAULT])
   next_url = _safe_next_url()
   if session.get("role") == "admin" and session.get("auth"):
-    return redirect(next_url or url_for("admin_dashboard"))
+    return redirect(next_url or url_for("admin_employees"))
+  if session.get("role") == "site_manager" and session.get("employee_id"):
+    return redirect(_employee_redirect_target(next_url))
   if session.get("role") == "employee" and session.get("employee_id"):
     return redirect(_employee_redirect_target(next_url))
 
@@ -9660,7 +10664,7 @@ def login():
         session["auth"] = True
         session["role"] = "admin"
         session["user"] = username_raw
-        return redirect(next_url or url_for("admin_dashboard"))
+        return redirect(next_url or url_for("admin_employees"))
 
       normalized = username_raw.lower()
       db = SessionLocal()
@@ -9678,10 +10682,12 @@ def login():
       finally:
         db.close()
 
-      if employee and employee.login_pin_hash:
+      if employee and employee.has_platform_access and employee.is_active and employee.login_pin_hash:
         if check_password_hash(employee.login_pin_hash, password):
           session.clear()
-          session["role"] = "employee"
+          session["role"] = employee.access_role if employee.access_role in {"admin", "site_manager", "sales_manager"} else "employee"
+          if employee.access_role == "admin":
+            session["auth"] = True
           session["employee_id"] = employee.id
           session["employee_name"] = employee.name
           session["employee_code"] = employee.login_code
@@ -10043,7 +11049,7 @@ def employee_complete_shift(shift_id: int):
 
 
 @app.route("/shift/<int:shift_id>/edit", methods=["POST"])
-@login_required
+@site_manager_required
 def edit_shift(shift_id: int):
     db = SessionLocal()
     try:
@@ -10051,87 +11057,204 @@ def edit_shift(shift_id: int):
         if not shift:
             flash("Shift not found.", "warning")
             return redirect(request.referrer or url_for("schedule_dashboard"))
-        
-        # Get form data
-        employee_id_raw = (request.form.get("employee_id") or "").strip()
+
+        raw_employee_ids = request.form.getlist("employee_ids[]")
+        if not raw_employee_ids:
+            legacy_employee_id = (request.form.get("employee_id") or "").strip()
+            raw_employee_ids = [legacy_employee_id] if legacy_employee_id else []
+        employee_ids = []
+        for raw_id in raw_employee_ids:
+            try:
+                employee_id = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            if employee_id not in employee_ids:
+                employee_ids.append(employee_id)
+        if not employee_ids:
+            flash("Keep at least one employee assigned to this shift.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+
         day_str = (request.form.get("day") or "").strip()
         start_str = (request.form.get("start_time") or "").strip()
         end_str = (request.form.get("end_time") or "").strip()
         instructions = (request.form.get("instructions") or "").strip() or None
-
-        if employee_id_raw:
-            try:
-                new_employee_id = int(employee_id_raw)
-            except (TypeError, ValueError):
-                flash("Invalid employee selected.", "warning")
-                return redirect(request.referrer or url_for("schedule_dashboard"))
-
-            employee_exists = db.query(Employee.id).filter(Employee.id == new_employee_id).first()
-            if not employee_exists:
-                flash("Selected employee was not found.", "warning")
-                return redirect(request.referrer or url_for("schedule_dashboard"))
-        else:
-            flash("Please select an employee.", "warning")
-            return redirect(request.referrer or url_for("schedule_dashboard"))
-        
-        # Parse and validate inputs
         try:
             day = datetime.strptime(day_str, "%Y-%m-%d").date()
-        except (ValueError, TypeError):
-            flash("Invalid day format.", "warning")
-            return redirect(request.referrer or url_for("schedule_dashboard"))
-        
-        try:
             start_time = datetime.strptime(start_str, "%H:%M").time()
-        except (ValueError, TypeError):
-            flash("Invalid start time format.", "warning")
-            return redirect(request.referrer or url_for("schedule_dashboard"))
-        
-        try:
             end_time = datetime.strptime(end_str, "%H:%M").time()
         except (ValueError, TypeError):
-            flash("Invalid end time format.", "warning")
+            flash("Enter a valid date and time.", "warning")
             return redirect(request.referrer or url_for("schedule_dashboard"))
-        
-        # Validate that end time is after start time
         if end_time <= start_time:
             flash("End time must be after start time.", "warning")
             return redirect(request.referrer or url_for("schedule_dashboard"))
 
-        conflict_message = _find_employee_schedule_conflict(
-          db,
-          employee_id=new_employee_id,
-          day=day,
-          start_time=start_time,
-          end_time=end_time,
-          site_id=shift.site_id,
-          exclude_shift_id=shift.id,
-        )
-        if conflict_message:
-          flash(conflict_message, "warning")
-          return redirect(request.referrer or url_for("schedule_dashboard"))
-        
-        # Update shift
-        shift.employee_id = new_employee_id
-        shift.day = day
-        shift.start_time = start_time
-        shift.end_time = end_time
-        shift.instructions = instructions
-        
+        original_crew = db.query(Shift).filter(
+            Shift.site_id == shift.site_id,
+            Shift.day == shift.day,
+            Shift.start_time == shift.start_time,
+            Shift.end_time == shift.end_time,
+            Shift.employee_id.isnot(None),
+        ).all()
+        if shift.employee_id is not None and all(item.id != shift.id for item in original_crew):
+            original_crew.append(shift)
+        current_by_employee = {item.employee_id: item for item in original_crew}
+        selected_employees = {employee.id: employee for employee in db.query(Employee).filter(Employee.id.in_(employee_ids)).all()}
+        if len(selected_employees) != len(employee_ids):
+            flash("One or more selected employees were not found.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+        for employee_id, employee in selected_employees.items():
+            if not employee.is_active and employee_id not in current_by_employee:
+                flash(f"{employee.name} is inactive and cannot be added to a shift.", "warning")
+                return redirect(request.referrer or url_for("schedule_dashboard"))
+
+        removed = [item for employee_id, item in current_by_employee.items() if employee_id not in selected_employees]
+        if any(item.clock_in_at or item.clock_out_at for item in removed):
+            flash("An employee who has started this shift cannot be removed.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+
+        conflict_messages = []
+        for employee_id in employee_ids:
+            existing = current_by_employee.get(employee_id)
+            conflict_message = _find_employee_schedule_conflict(
+                db,
+                employee_id=employee_id,
+                day=day,
+                start_time=start_time,
+                end_time=end_time,
+                site_id=shift.site_id,
+                exclude_shift_id=existing.id if existing else None,
+            )
+            if conflict_message:
+                conflict_messages.append(f"{selected_employees[employee_id].name}: {conflict_message}")
+
+        for employee_id, item in current_by_employee.items():
+            if employee_id not in selected_employees:
+                db.delete(item)
+                continue
+            item.day = day
+            item.start_time = start_time
+            item.end_time = end_time
+            item.instructions = instructions
+
+        reusable_open_shift = shift if shift.employee_id is None else None
+        for employee_id in employee_ids:
+            if employee_id in current_by_employee:
+                continue
+            if reusable_open_shift is not None:
+                reusable_open_shift.employee_id = employee_id
+                reusable_open_shift.day = day
+                reusable_open_shift.start_time = start_time
+                reusable_open_shift.end_time = end_time
+                reusable_open_shift.instructions = instructions
+                reusable_open_shift = None
+                continue
+            db.add(Shift(
+                employee_id=employee_id,
+                site_id=shift.site_id,
+                day=day,
+                start_time=start_time,
+                end_time=end_time,
+                instructions=instructions,
+                is_recurring=shift.is_recurring,
+            ))
+
         db.commit()
-        flash("Shift updated successfully!")
-    except Exception as e:
+        flash("Shift and assigned employees updated successfully.", "success")
+        if conflict_messages:
+            flash(f"Shift was saved despite scheduling conflicts. Review: {conflict_messages[0]}", "warning")
+    except Exception:
         db.rollback()
-        app.logger.error(f"Error editing shift {shift_id}: {e}")
+        app.logger.exception("Error editing shift %s", shift_id)
         flash("Error updating shift.", "warning")
     finally:
         db.close()
-    
+
+    return redirect(request.referrer or url_for("schedule_dashboard"))
+
+
+@app.route("/shift/<int:shift_id>/assign-employee", methods=["POST"])
+@site_manager_required
+def assign_employee_to_shift(shift_id: int):
+    """Add one or more employees as matching assignments to an existing shift."""
+    db = SessionLocal()
+    try:
+        source = db.get(Shift, shift_id)
+        raw_ids = request.form.getlist("employee_ids[]")
+        if not raw_ids:
+            single_id = request.form.get("employee_id")
+            raw_ids = [single_id] if single_id else []
+        employee_ids = []
+        for raw_id in raw_ids:
+            try:
+                employee_id = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            if employee_id not in employee_ids:
+                employee_ids.append(employee_id)
+        if not source or not employee_ids:
+            flash("Choose at least one employee for this shift.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+
+        assigned = 0
+        skipped = []
+        conflicts = []
+        for employee_id in employee_ids:
+            employee = db.get(Employee, employee_id)
+            if not employee or not employee.is_active:
+                skipped.append("An employee was not found or is inactive.")
+                continue
+
+            duplicate = db.query(Shift.id).filter(
+                Shift.employee_id == employee.id,
+                Shift.site_id == source.site_id,
+                Shift.day == source.day,
+                Shift.start_time == source.start_time,
+                Shift.end_time == source.end_time,
+            ).first()
+            if duplicate:
+                skipped.append(f"{employee.name} is already assigned to this shift.")
+                continue
+
+            conflict = _find_employee_schedule_conflict(
+                db, employee_id=employee.id, day=source.day,
+                start_time=source.start_time, end_time=source.end_time,
+                site_id=source.site_id,
+                exclude_shift_id=source.id if source.employee_id is None else None,
+            )
+            if conflict:
+                conflicts.append(f"{employee.name}: {conflict}")
+
+            if source.employee_id is None and assigned == 0:
+                source.employee_id = employee.id
+            else:
+                db.add(Shift(
+                    employee_id=employee.id, site_id=source.site_id, day=source.day,
+                    start_time=source.start_time, end_time=source.end_time,
+                    instructions=source.instructions, is_recurring=source.is_recurring,
+                ))
+            assigned += 1
+
+        if assigned:
+            db.commit()
+            flash(f"{assigned} employee(s) added to the shift.", "success")
+            if conflicts:
+                flash(f"Employees were assigned despite scheduling conflicts. Review: {conflicts[0]}", "warning")
+        elif skipped:
+            db.rollback()
+        for message in skipped[:3]:
+            flash(message, "warning")
+    except Exception:
+        db.rollback()
+        app.logger.exception("Could not assign employees to shift %s", shift_id)
+        flash("Employees could not be added to the shift.", "warning")
+    finally:
+        db.close()
     return redirect(request.referrer or url_for("schedule_dashboard"))
 
 
 @app.route("/shift/<int:shift_id>/move", methods=["POST"])
-@login_required
+@site_manager_required
 def move_shift_day(shift_id: int):
     db = SessionLocal()
     try:
@@ -10169,13 +11292,14 @@ def move_shift_day(shift_id: int):
           site_id=shift.site_id,
           exclude_shift_id=shift.id,
         )
-        if conflict_message:
-          return jsonify({"ok": False, "error": conflict_message}), 400
 
         shift.day = new_day
         shift.employee_id = new_employee_id
         db.commit()
-        return jsonify({"ok": True})
+        result = {"ok": True, "conflict": bool(conflict_message)}
+        if conflict_message:
+          result["notification"] = f"Shift moved and saved despite a scheduling conflict: {conflict_message}"
+        return jsonify(result)
     except Exception as exc:
         db.rollback()
         app.logger.error("Error moving shift %s: %s", shift_id, exc)
@@ -10185,7 +11309,7 @@ def move_shift_day(shift_id: int):
 
 
 @app.route("/shift/batch-edit", methods=["POST"])
-@login_required
+@site_manager_required
 def batch_edit_shifts():
   db = SessionLocal()
   try:
@@ -10234,7 +11358,7 @@ def batch_edit_shifts():
         return redirect(request.referrer or url_for("schedule_dashboard"))
 
       if new_end <= new_start:
-        flash("Endzeit muss nach der Startzeit liegen.", "warning")
+        flash("End time must be after start time.", "warning")
         return redirect(request.referrer or url_for("schedule_dashboard"))
 
     shifts = db.query(Shift).filter(Shift.id.in_(shift_ids)).all()
@@ -10243,6 +11367,7 @@ def batch_edit_shifts():
       return redirect(request.referrer or url_for("schedule_dashboard"))
 
     updated_count = 0
+    conflict_messages = []
     for shift in shifts:
       target_day = new_day if new_day is not None else shift.day
       target_start = new_start if new_start is not None else shift.start_time
@@ -10258,8 +11383,7 @@ def batch_edit_shifts():
         exclude_shift_id=shift.id,
       )
       if conflict_message:
-        flash(f"Einsatz #{shift.id}: {conflict_message}", "warning")
-        continue
+        conflict_messages.append(f"Shift #{shift.id}: {conflict_message}")
 
       if new_day is not None:
         shift.day = new_day
@@ -10272,6 +11396,8 @@ def batch_edit_shifts():
 
     if updated_count > 0:
       db.commit()
+      if conflict_messages:
+        flash(f"{len(conflict_messages)} shift(s) were saved despite scheduling conflicts. Review: {conflict_messages[0]}", "warning")
       flash(f"{updated_count} Einsatz/Einsätze erfolgreich aktualisiert.")
     else:
       flash("Es wurden keine Einsätze aktualisiert.", "warning")
@@ -10287,7 +11413,7 @@ def batch_edit_shifts():
 
 
 @app.route("/shift/batch-delete", methods=["POST"])
-@login_required
+@site_manager_required
 def batch_delete_shifts():
     db = SessionLocal()
     try:
@@ -10311,7 +11437,7 @@ def batch_delete_shifts():
 
 
 @app.route("/shift/delete/<int:shift_id>")
-@login_required
+@site_manager_required
 def delete_shift(shift_id):
     db = SessionLocal()
     try:
@@ -10330,8 +11456,198 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/schedule/batch-release", methods=["POST"])
+@site_manager_required
+def batch_release_shifts():
+    db = SessionLocal()
+    try:
+        ids = request.form.getlist("shift_ids[]")
+        released = 0
+        blocked = 0
+        for raw_id in ids:
+            try:
+                shift = db.get(Shift, int(raw_id))
+            except (TypeError, ValueError):
+                continue
+            if not shift or shift.employee_id is None:
+                continue
+            if shift.clock_in_at or shift.clock_out_at:
+                blocked += 1
+                continue
+            shift.employee_id = None
+            released += 1
+        if released:
+            db.commit()
+            flash(f"{released} shift(s) are now open.")
+        if blocked:
+            flash(f"Could not release {blocked} shift(s) that have already started.", "warning")
+        if not released and not blocked:
+            flash("Select at least one shift first.", "warning")
+    except Exception:
+        db.rollback()
+        app.logger.exception("Could not release selected shifts")
+        flash("Could not release the selected shifts.", "warning")
+    finally:
+        db.close()
+    return redirect(request.referrer or url_for("schedule_dashboard"))
+
+
+@app.route("/schedule/batch-assign", methods=["POST"])
+@site_manager_required
+def batch_assign_shifts():
+    db = SessionLocal()
+    try:
+        employee_id = request.form.get("employee_id", type=int)
+        employee = db.get(Employee, employee_id) if employee_id else None
+        if not employee or employee.is_active is False:
+            flash("Select an active employee.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+        ids = request.form.getlist("shift_ids[]")
+        assigned = 0
+        conflicts = 0
+        for raw_id in ids:
+            try:
+                shift = db.get(Shift, int(raw_id))
+            except (TypeError, ValueError):
+                continue
+            if not shift:
+                continue
+            if shift.employee_id == employee.id:
+                continue
+            conflict = _find_employee_schedule_conflict(
+                db, employee_id=employee.id, day=shift.day,
+                start_time=shift.start_time, end_time=shift.end_time,
+                site_id=shift.site_id, exclude_shift_id=shift.id,
+            )
+            if conflict:
+                conflicts += 1
+            shift.employee_id = employee.id
+            assigned += 1
+        if assigned:
+            db.commit()
+            flash(f"Assigned {assigned} shift(s) to {employee.name}.")
+        if conflicts:
+            flash(f"{conflicts} shift(s) were assigned despite scheduling conflicts. Review the schedule.", "warning")
+        if not assigned and not conflicts:
+            flash("None of the selected shifts could be assigned.", "warning")
+    except Exception:
+        db.rollback()
+        app.logger.exception("Could not assign selected shifts")
+        flash("Could not assign the selected shifts.", "warning")
+    finally:
+        db.close()
+    return redirect(request.referrer or url_for("schedule_dashboard"))
+
+
+@app.route("/schedule/batch-duplicate", methods=["POST"])
+@site_manager_required
+def batch_duplicate_shifts():
+    db = SessionLocal()
+    try:
+        ids = request.form.getlist("shift_ids[]")[:200]
+        target_raw = (request.form.get("target_day") or "").strip()
+        try:
+            target_day = datetime.strptime(target_raw, "%Y-%m-%d").date()
+        except ValueError:
+            flash("Select a target date.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+        shifts = db.query(Shift).filter(Shift.id.in_([int(i) for i in ids if str(i).isdigit()])).all()
+        if not shifts:
+            flash("Select at least one shift first.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+        first_day = min(shift.day for shift in shifts)
+        created = 0
+        conflicts = 0
+        for source in shifts:
+            target = target_day + timedelta(days=(source.day - first_day).days)
+            conflict = _find_employee_schedule_conflict(
+                db, employee_id=source.employee_id, day=target,
+                start_time=source.start_time, end_time=source.end_time,
+                site_id=source.site_id,
+            ) if source.employee_id is not None else None
+            if conflict:
+                conflicts += 1
+            db.add(Shift(
+                employee_id=source.employee_id, site_id=source.site_id, day=target,
+                start_time=source.start_time, end_time=source.end_time,
+                instructions=source.instructions,
+            ))
+            created += 1
+        if created:
+            db.commit()
+            flash(f"Duplicated {created} shift(s).")
+        if conflicts:
+            flash(f"{conflicts} duplicate shift(s) were saved despite scheduling conflicts. Review the schedule.", "warning")
+    except Exception:
+        db.rollback()
+        app.logger.exception("Could not duplicate selected shifts")
+        flash("Could not duplicate the selected shifts.", "warning")
+    finally:
+        db.close()
+    return redirect(request.referrer or url_for("schedule_dashboard"))
+
+
+@app.route("/schedule/tours", methods=["POST"])
+@site_manager_required
+def create_schedule_tour():
+    db = SessionLocal()
+    try:
+        name = (request.form.get("tour_name") or "").strip()[:160]
+        ids = [int(i) for i in request.form.getlist("shift_ids[]") if str(i).isdigit()]
+        shifts = db.query(Shift).filter(Shift.id.in_(ids)).all()
+        if not name or not shifts:
+            flash("Enter a tour name and select at least one shift.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+        if any(shift.employee_id is None for shift in shifts):
+            flash("Assign open shifts to an employee before adding them to a tour.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+        days = {shift.day for shift in shifts}
+        if len(days) != 1:
+            flash("A tour can only contain shifts from the same day.", "warning")
+            return redirect(request.referrer or url_for("schedule_dashboard"))
+        tour = Tour(name=name, day=next(iter(days)))
+        db.add(tour)
+        for position, shift in enumerate(sorted(shifts, key=lambda item: (item.start_time, item.site.name if item.site else "")), 1):
+            tour.stops.append(TourStop(shift=shift, position=position))
+        db.commit()
+        flash(f"Tour '{tour.name}' created with {len(shifts)} stops.")
+        return redirect(url_for("schedule_dashboard", tour_id=tour.id))
+    except Exception:
+        db.rollback()
+        app.logger.exception("Could not create schedule tour")
+        flash("Could not create the tour.", "warning")
+    finally:
+        db.close()
+    return redirect(request.referrer or url_for("schedule_dashboard"))
+
+
+@app.route("/schedule/tours/<int:tour_id>", methods=["GET"])
+@site_manager_required
+def view_schedule_tour(tour_id: int):
+    db = SessionLocal()
+    try:
+        tour = db.get(Tour, tour_id)
+        if not tour:
+            return jsonify({"error": "Tour not found"}), 404
+        return jsonify({
+            "id": tour.id,
+            "name": tour.name,
+            "day": tour.day.isoformat(),
+            "stops": [{
+                "position": stop.position,
+                "employee": stop.shift.employee.name if stop.shift.employee else None,
+                "site": stop.shift.site.name if stop.shift.site else "",
+                "address": stop.shift.site.address if stop.shift.site else "",
+                "start": stop.shift.start_time.strftime("%H:%M"),
+                "end": stop.shift.end_time.strftime("%H:%M"),
+            } for stop in tour.stops],
+        })
+    finally:
+        db.close()
+
+
 @app.route("/schedule", methods=["GET", "POST"])
-@login_required
+@site_manager_required
 def schedule_dashboard():
     db = SessionLocal()
     try:
@@ -10355,6 +11671,7 @@ def schedule_dashboard():
             duration_hours_str = request.form.get("duration_hours")
             instructions_raw = (request.form.get("instructions") or "").strip()
             instructions_val = instructions_raw or None
+            create_open_shift = request.form.get("create_open_shift") == "on"
             day_values: list[date] = []
             seen_days: set[date] = set()
             for day_str in day_values_raw:
@@ -10368,7 +11685,50 @@ def schedule_dashboard():
                 continue
               seen_days.add(day_val)
               day_values.append(day_val)
-            if employee_ids and site_id and day_values and start_str and duration_hours_str:
+            repeat_weekly = request.form.get("repeat_weekly") == "on"
+            if repeat_weekly and day_values:
+              repeat_until_raw = (request.form.get("repeat_until") or "").strip()
+              try:
+                repeat_until = datetime.strptime(repeat_until_raw, "%Y-%m-%d").date()
+              except ValueError:
+                repeat_until = None
+              if not repeat_until:
+                flash("Choose an end date for the repeating schedule.", "warning")
+                return redirect(url_for("schedule_dashboard", **request.args.to_dict(flat=False)))
+              recurrence_start = min(day_values)
+              if repeat_until < recurrence_start or (repeat_until - recurrence_start).days > 364:
+                flash("The end date must be on or after the start date and within one year.", "warning")
+                return redirect(url_for("schedule_dashboard", **request.args.to_dict(flat=False)))
+              try:
+                repeat_interval = int(request.form.get("repeat_interval") or 1)
+              except (TypeError, ValueError):
+                repeat_interval = 0
+              if not 1 <= repeat_interval <= 52:
+                flash("Repeat interval must be between 1 and 52 weeks.", "warning")
+                return redirect(url_for("schedule_dashboard", **request.args.to_dict(flat=False)))
+              weekdays = set()
+              for weekday_raw in request.form.getlist("repeat_weekday"):
+                try:
+                  weekday = int(weekday_raw)
+                except (TypeError, ValueError):
+                  continue
+                if 0 <= weekday <= 6:
+                  weekdays.add(weekday)
+              if not weekdays:
+                weekdays = {recurrence_start.weekday()}
+              first_week = recurrence_start - timedelta(days=recurrence_start.weekday())
+              recurring_days = []
+              candidate = recurrence_start
+              while candidate <= repeat_until:
+                week_offset = (candidate - first_week).days // 7
+                if week_offset % repeat_interval == 0 and candidate.weekday() in weekdays:
+                  recurring_days.append(candidate)
+                candidate += timedelta(days=1)
+              if not recurring_days:
+                flash("No shifts match the selected weekdays and recurrence dates.", "warning")
+                return redirect(url_for("schedule_dashboard", **request.args.to_dict(flat=False)))
+              day_values = recurring_days
+            if (employee_ids or create_open_shift) and site_id and day_values and start_str and duration_hours_str:
               try:
                 start_val = datetime.strptime(start_str, "%H:%M").time()
               except ValueError:
@@ -10381,24 +11741,25 @@ def schedule_dashboard():
                 duration_delta = timedelta(hours=duration_hours)
                 created = 0
                 blocked_messages: list[str] = []
-                for employee_id in employee_ids:
-                  employee = db.get(Employee, employee_id)
-                  employee_label = employee.name if employee else f"Mitarbeiter {employee_id}"
+                for employee_id in (employee_ids or [None]):
+                  employee = db.get(Employee, employee_id) if employee_id is not None else None
+                  employee_label = employee.name if employee else "Open shift"
                   for day_val in day_values:
                     end_dt = datetime.combine(day_val, start_val) + duration_delta
                     end_val = end_dt.time()
 
-                    conflict_message = _find_employee_schedule_conflict(
-                      db,
-                      employee_id=employee_id,
-                      day=day_val,
-                      start_time=start_val,
-                      end_time=end_val,
-                      site_id=int(site_id),
-                    )
+                    conflict_message = None
+                    if employee_id is not None:
+                      conflict_message = _find_employee_schedule_conflict(
+                        db,
+                        employee_id=employee_id,
+                        day=day_val,
+                        start_time=start_val,
+                        end_time=end_val,
+                        site_id=int(site_id),
+                      )
                     if conflict_message:
                       blocked_messages.append(f"{employee_label} ({day_val.strftime('%d.%m.%Y')}): {conflict_message}")
-                      continue
 
                     shift = Shift(
                       employee_id=employee_id,
@@ -10407,21 +11768,31 @@ def schedule_dashboard():
                       start_time=start_val,
                       end_time=end_val,
                       instructions=instructions_val,
+                      is_recurring=repeat_weekly,
                     )
                     db.add(shift)
+                    db.flush()
                     created += 1
                 if created:
                   db.commit()
                   flash(f"{created} Einsatz/Einsätze wurden eingeplant.")
                 if blocked_messages:
-                  flash(blocked_messages[0], "warning")
+                  flash(f"{len(blocked_messages)} shift(s) were saved despite scheduling conflicts. Review: {blocked_messages[0]}", "warning")
                 if not created and not blocked_messages:
-                  flash("Es konnte kein Einsatz eingeplant werden.", "warning")
+                  flash("No shifts could be scheduled.", "warning")
             query_args = request.args.to_dict(flat=False)
+            query_args.pop("create", None)
+            if request.form.get("create_another") == "1":
+              query_args["create"] = ["1"]
             return redirect(url_for("schedule_dashboard", **query_args))
 
         selected_employee_id = request.args.get("employee_id", type=int)
         selected_site_id = request.args.get("site_id", type=int)
+        selected_schedule_split = request.args.get("split", "employees")
+        if selected_schedule_split not in {"employees", "objects", "orders"}:
+          selected_schedule_split = "employees"
+        selected_tour_id = request.args.get("tour_id", type=int)
+        current_tour = db.get(Tour, selected_tour_id) if selected_tour_id else None
         free_day_str = (request.args.get("free_day") or "").strip()
         free_week_start_str = (request.args.get("free_week_start") or "").strip()
         free_day = None
@@ -10437,13 +11808,10 @@ def schedule_dashboard():
             except ValueError:
                 free_week_start = None
 
-        # Support both weeks (legacy) and explicit days view: `?days=3` overrides weeks.
-        days = request.args.get("days", type=int)
-        weeks = request.args.get("weeks", default=8, type=int) or 8
-        weeks = max(1, min(weeks, 12))
-        if days:
-            # clamp days between 1 and 84 (12 weeks)
-            days = max(1, min(int(days), 84))
+        selected_period = request.args.get("period", "week")
+        if selected_period not in {"day", "week", "fortnight", "month", "custom"}:
+          legacy_days = request.args.get("days", type=int)
+          selected_period = "day" if legacy_days == 1 else "week"
         start_date_str = request.args.get("start_date")
         start_date_val = None
         if start_date_str:
@@ -10472,7 +11840,40 @@ def schedule_dashboard():
               if last_row and last_row[0]:
                 start_date_val = last_row[0]
 
-        week_days = _get_day_range(start=start_date_val, weeks=weeks, days=days)
+        if start_date_val is None:
+          start_date_val = date.today()
+
+        if selected_period == "custom":
+          end_date_str = request.args.get("end_date", "")
+          try:
+            requested_end = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+          except ValueError:
+            requested_end = start_date_val
+          if requested_end < start_date_val:
+            start_date_val, requested_end = requested_end, start_date_val
+          range_length = max(1, min((requested_end - start_date_val).days + 1, 84))
+          week_days = _get_day_range(start=start_date_val, days=range_length)
+          start_date_val = week_days[0]
+        elif selected_period == "day":
+          week_days = [start_date_val]
+          start_date_val = week_days[0]
+        elif selected_period == "month":
+          month_start = start_date_val.replace(day=1)
+          next_month_start = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+          week_days = _get_day_range(start=month_start, days=(next_month_start - month_start).days)
+          start_date_val = month_start
+        else:
+          weeks = 2 if selected_period == "fortnight" else 1
+          week_days = _get_day_range(start=start_date_val, weeks=weeks)
+          start_date_val = week_days[0]
+        weeks = max(1, (len(week_days) + 6) // 7)
+        display_days = week_days
+        schedule_weeks = []
+        for display_day in display_days:
+          week_key = display_day.isocalendar()[:2]
+          if not schedule_weeks or schedule_weeks[-1][0].isocalendar()[:2] != week_key:
+            schedule_weeks.append([])
+          schedule_weeks[-1].append(display_day)
         employees, sites, matrix = _load_schedule_context(db, week_days)
 
         selected_employee = None
@@ -10493,17 +11894,45 @@ def schedule_dashboard():
             if matched:
               filtered_matrix[key] = matched
 
+        # The Objects split groups employee assignments into one site/day/time card.
+        # Keep every underlying shift id so bulk actions still operate on each assignment.
+        site_cells = {}
+        site_slot_groups = {}
+        for (employee_id, shift_day), day_shifts in filtered_matrix.items():
+          if selected_schedule_split == "objects" and selected_employee_id and employee_id != selected_employee_id:
+            continue
+          for shift_info in day_shifts:
+            slot_key = (
+              shift_info.get("site_id"), shift_day, shift_info.get("start_time_str"),
+              shift_info.get("end_time_str"), employee_id is None,
+            )
+            grouped = site_slot_groups.get(slot_key)
+            if grouped is None:
+              grouped = dict(shift_info)
+              grouped["shift_ids"] = []
+              grouped["is_open"] = employee_id is None
+              grouped["assigned_people"] = list(shift_info.get("assigned_people") or [])
+              site_slot_groups[slot_key] = grouped
+            grouped["shift_ids"].append(shift_info["id"])
+            known_people = {person.get("id") for person in grouped["assigned_people"]}
+            for person in shift_info.get("assigned_people") or []:
+              if person.get("id") not in known_people:
+                grouped["assigned_people"].append(person)
+                known_people.add(person.get("id"))
+        for grouped in site_slot_groups.values():
+          site_cells.setdefault((grouped.get("site_id"), date.fromisoformat(grouped["day_iso"])), []).append(grouped)
+        for site_day_shifts in site_cells.values():
+          site_day_shifts.sort(key=lambda item: (item.get("start_time_str") or "", item.get("site_name") or ""))
+
         grid_employee_ids = {e.id for e in visible_employees}
-        shift_days_for_grid = {day for (emp_id, day) in filtered_matrix.keys() if emp_id in grid_employee_ids}
+        shift_days_for_grid = {day for (emp_id, day) in filtered_matrix.keys() if emp_id in grid_employee_ids or emp_id is None}
         # Keep the full selected period in the grid, even when some days are empty.
         visible_days = week_days
         has_any_shifts = bool(shift_days_for_grid)
 
-        if not selected_employee:
-          shift_employee_ids_for_grid = {emp_id for (emp_id, _day) in filtered_matrix.keys()}
-          visible_employees = [e for e in employees if e.id in shift_employee_ids_for_grid]
-
-        pdf_params = {"week": week_days[0].isoformat()}
+        pdf_params = {"week": week_days[0].isoformat(), "period": selected_period}
+        if selected_period == "custom":
+          pdf_params["end_date"] = week_days[-1].isoformat()
         pdf_params["weeks"] = weeks
         if selected_employee_id:
             pdf_params["employee_id"] = selected_employee_id
@@ -10519,17 +11948,25 @@ def schedule_dashboard():
           hours_params["employee_id"] = selected_employee_id
         hours_pdf_url = url_for("hours_pdf", **hours_params)
 
-        schedule_html = render_template_string(
-            SCHEDULE_TEMPLATE,
+        schedule_html = render_template(
+            "schedule.html",
             employees=employees,
             visible_employees=visible_employees,
             sites=sites,
+            visible_sites=[s for s in sites if not selected_site_id or s.id == selected_site_id],
             week_days=week_days,
             visible_days=visible_days,
+            display_days=display_days,
+            schedule_weeks=schedule_weeks,
+            schedule_period_start=week_days[0],
+            schedule_period_end=week_days[-1],
+            selected_period=selected_period,
             has_any_shifts=has_any_shifts,
             weeks=weeks,
             start_date=start_date_val.isoformat() if start_date_val else "",
             cells=filtered_matrix,
+            site_cells=site_cells,
+            selected_schedule_split=selected_schedule_split,
             reportlab_available=REPORTLAB_AVAILABLE,
             selected_employee_id=selected_employee_id,
             selected_site_id=selected_site_id,
@@ -10539,7 +11976,10 @@ def schedule_dashboard():
             hours_pdf_url=hours_pdf_url,
             free_day=free_day_str,
             free_week_start=free_week_start_str,
+            current_tour=current_tour,
+            open_create=request.args.get("create") == "1",
             active_page="schedule",
+            is_site_manager=session.get("role") == "site_manager",
         )
         return schedule_html
     finally:
@@ -10547,7 +11987,7 @@ def schedule_dashboard():
 
 
 @app.route("/schedule/preview-import-previous-month")
-@login_required
+@site_manager_required
 def schedule_preview_import_previous_month():
     db = SessionLocal()
     try:
@@ -10607,7 +12047,7 @@ def schedule_preview_import_previous_month():
 
 
 @app.route("/schedule/import-previous-month", methods=["POST"])
-@login_required
+@site_manager_required
 def schedule_import_previous_month():
     db = SessionLocal()
     try:
@@ -10642,7 +12082,7 @@ def schedule_import_previous_month():
             query = query.filter(Shift.id.in_(selected_ids))
         shifts = query.order_by(Shift.day.asc()).all()
         created = 0
-        skipped_conflict = 0
+        conflicts = 0
         skipped_existing = 0
         skipped_inactive = 0
         for s in shifts:
@@ -10670,8 +12110,7 @@ def schedule_import_previous_month():
               db, s.employee_id, td, s.start_time, s.end_time, s.site_id
             )
             if conflict_msg:
-              skipped_conflict += 1
-              continue
+              conflicts += 1
             new_shift = Shift(
               employee_id=s.employee_id,
               site_id=s.site_id,
@@ -10686,7 +12125,8 @@ def schedule_import_previous_month():
             db.commit()
         return jsonify({
             "created": created,
-            "skipped_conflict": skipped_conflict,
+            "skipped_conflict": 0,
+            "conflicts": conflicts,
             "skipped_existing": skipped_existing,
             "skipped_inactive": skipped_inactive,
         })
@@ -10695,7 +12135,7 @@ def schedule_import_previous_month():
 
 
 @app.route("/schedule/free-available")
-@login_required
+@site_manager_required
 def schedule_free_available():
     """Return JSON list of active employees who are free for the given date range and time interval.
 
@@ -10830,15 +12270,32 @@ def admin_dashboard_download_report():
 
 
 @app.route("/admin/employees", methods=["GET", "POST"])
-@login_required
+@site_or_sales_manager_required
 def admin_employees():
   db = SessionLocal()
+  is_main_admin = session.get("role") == "admin"
+  is_site_manager = session.get("role") == "site_manager"
+  is_sales_manager = session.get("role") == "sales_manager"
   lang = _get_admin_lang()
   i18n = _get_admin_i18n(lang)
   try:
     search_q = (request.args.get("q") or "").strip()
+    work_type_filter = (request.args.get("work_type") or "").strip()
+    if work_type_filter == "Geringfügige":
+      work_type_filter = "Intern"
+    role_filter = (request.args.get("role") or "").strip()
+    staff_type_filter = (request.args.get("staff_type_filter") or "").strip()
+    branch_filter = (request.args.get("branch_filter") or "").strip()
+    status_filter = (request.args.get("status_filter") or "all").strip().lower()
+    if status_filter not in {"all", "active", "passive"}:
+      status_filter = "all"
     if request.method == "POST":
+      if is_sales_manager:
+        abort(403)
       action = (request.form.get("action") or "create").strip().lower()
+      send_credentials_requested = request.form.get("send_credentials_email") == "1"
+      if send_credentials_requested and not is_main_admin:
+        abort(403)
       emp_id = request.form.get("id")
       redirect_q = (request.form.get("redirect_q") or "").strip()
       redirect_page_raw = (request.form.get("redirect_page") or "").strip()
@@ -10848,13 +12305,37 @@ def admin_employees():
       redirect_params: dict[str, int | str] = {}
       if redirect_q:
         redirect_params["q"] = redirect_q
+      redirect_work_type = (request.form.get("redirect_work_type") or "").strip()
+      redirect_role = (request.form.get("redirect_role") or "").strip()
+      redirect_staff_type = (request.form.get("redirect_staff_type") or "").strip()
+      redirect_branch = (request.form.get("redirect_branch") or "").strip()
+      redirect_status = (request.form.get("redirect_status") or "all").strip()
+      if redirect_work_type:
+        redirect_params["work_type"] = redirect_work_type
+      if redirect_role:
+        redirect_params["role"] = redirect_role
+      if redirect_staff_type:
+        redirect_params["staff_type_filter"] = redirect_staff_type
+      if redirect_branch in {"Wien", "Graz"}:
+        redirect_params["branch_filter"] = redirect_branch
+      if redirect_status in {"all", "active", "passive"} and redirect_status != "all":
+        redirect_params["status_filter"] = redirect_status
       if redirect_page_val and redirect_page_val > 1:
         redirect_params["page"] = redirect_page_val
       redirect_url = url_for("admin_employees", **redirect_params)
+      return_to = (request.form.get("return_to") or "").strip()
+      if return_to.startswith("/") and not return_to.startswith("//"):
+        redirect_url = return_to
 
       if action == "create":
         name = (request.form.get("name") or "").strip()
         role = (request.form.get("role") or "").strip()
+        create_has_access = request.form.get("has_platform_access") == "1" if is_main_admin else False
+        create_email = (request.form.get("login_email") or "").strip()
+        create_status = (request.form.get("worker_status") or "active").strip().lower()
+        if send_credentials_requested and (not create_has_access or create_status != "active" or not EMAIL_REGEX.fullmatch(create_email)):
+          flash("Enable platform access, set a valid email, and set the employee to Active before sending sign-in details.", "warning")
+          return redirect(redirect_url)
         is_active_val = request.form.get("is_active")
         is_active_bool = True
         if is_active_val is not None:
@@ -10862,19 +12343,54 @@ def admin_employees():
             is_active_bool = bool(int(is_active_val))
           except Exception:
             is_active_bool = True
+        if not name:
+          flash("Employee name is required.", "warning")
         if name:
-          employee = Employee(name=name, role=role or "Cleaner")
-          employee.is_active = is_active_bool
+          staff_functions = _normalize_staff_functions(request.form.get("staff_functions"), fallback=(request.form.get("staff_type") or "Cleaner").strip())
+          staff_type = staff_functions[0]
+          branch = (request.form.get("branch") or "Wien").strip()
+          if branch not in {"Wien", "Graz"}:
+            branch = "Wien"
+          has_platform_access = create_has_access if is_main_admin else False
+          worker_status = (request.form.get("worker_status") or "active").strip().lower()
+          if worker_status not in {"active", "passive"}:
+            worker_status = "active"
+          is_active_bool = worker_status == "active"
+          work_type = (request.form.get("profile_work_type") or "Teilzeit").strip()
+          if work_type not in {"Teilzeit", "Vollzeit", "Intern", "Geringfügige"}:
+            work_type = "Teilzeit"
+          group_type = (request.form.get("profile_group_type") or "Lohngruppe").strip()
+          if group_type not in {"Lohngruppe", "Verwendungsgruppe"}:
+            group_type = "Lohngruppe"
+          employee = Employee(
+            name=name, role=role or staff_type, is_active=is_active_bool, worker_status=worker_status,
+          staff_type=staff_type, staff_functions=json.dumps(staff_functions), branch=branch, has_platform_access=has_platform_access,
+          access_role=(request.form.get("access_role") or "employee").strip() if has_platform_access and is_main_admin and (request.form.get("access_role") or "employee").strip() in {"employee", "site_manager", "sales_manager", "admin"} else "employee",
+            login_email=create_email if has_platform_access and is_main_admin else None,
+            profile_phone=(request.form.get("profile_phone") or "").strip() or None,
+            profile_address=(request.form.get("profile_address") or "").strip() or None,
+            profile_zip_code=(request.form.get("profile_zip_code") or "").strip() or None,
+            profile_city=(request.form.get("profile_city") or "").strip() or None,
+            profile_contract_start_date=((request.form.get("profile_contract_start_date") or "").strip() or None) if is_main_admin else None,
+            profile_contract_end_date=((request.form.get("profile_contract_end_date") or "").strip() or None) if is_main_admin else None,
+            profile_employment_type=(request.form.get("profile_employment_type") or "").strip() or "Reinigungskraft",
+            profile_group_type=group_type if is_main_admin else None,
+            profile_group_number=(request.form.get("profile_group_number") or "").strip() or None if is_main_admin else None,
+            profile_euros_per_hour=(request.form.get("profile_euros_per_hour") or "").strip() or None if is_main_admin else None,
+            profile_working_hours=(request.form.get("profile_working_hours") or "").strip() or None,
+            profile_work_type=work_type,
+          )
           db.add(employee)
           db.commit()
-          existing_codes = _collect_existing_codes(db, exclude_id=employee.id)
           generated_pin = None
-          if not (employee.login_code or "").strip():
-            employee.login_code = _generate_employee_login_code(name, existing_codes)
-          if not (employee.login_pin_hash or "").strip():
-            generated_pin = _generate_employee_pin()
-            employee.login_pin_hash = generate_password_hash(generated_pin)
-            employee.login_pin_plain = generated_pin
+          if employee.has_platform_access:
+            existing_codes = _collect_existing_codes(db, exclude_id=employee.id)
+            if not (employee.login_code or "").strip():
+              employee.login_code = _generate_employee_login_code(name, existing_codes)
+            if not (employee.login_pin_hash or "").strip():
+              generated_pin = _generate_employee_pin()
+              employee.login_pin_hash = generate_password_hash(generated_pin)
+              employee.login_pin_plain = generated_pin
           # handle optional profile image upload
           file_obj = request.files.get("profile_image")
           if file_obj:
@@ -10883,70 +12399,141 @@ def admin_employees():
               employee.profile_image_path = saved
           db.commit()
           if generated_pin:
-            _remember_credentials_for_session(employee.id, employee.login_code, generated_pin)
-          flash(f"Mitarbeiter {name} erfolgreich hinzugefügt.", 'success')
+            if send_credentials_requested:
+              email_sent, email_message = send_employee_credentials_email(employee, generated_pin)
+              if email_sent:
+                flash(email_message, "success")
+              else:
+                _remember_credentials_for_session(employee.id, employee.login_code, generated_pin)
+                flash(email_message, "warning")
+            else:
+              _remember_credentials_for_session(employee.id, employee.login_code, generated_pin)
+          flash("Employee added.", "success")
       elif action == "update" and emp_id:
         emp = db.get(Employee, int(emp_id))
         if emp:
+          requested_access = request.form.get("has_platform_access") == "1" if is_main_admin else emp.has_platform_access
+          requested_email = (request.form.get("login_email") or "").strip()
+          requested_status = (request.form.get("worker_status") or emp.worker_status or "active").strip().lower()
+          if send_credentials_requested and (not requested_access or requested_status != "active" or not EMAIL_REGEX.fullmatch(requested_email)):
+            flash("Enable platform access, set a valid email, and set the employee to Active before sending sign-in details.", "warning")
+            return redirect(redirect_url)
           name = (request.form.get("name") or "").strip()
           role = (request.form.get("role") or "").strip()
           profile_zip_code = (request.form.get("profile_zip_code") or "").strip()
           profile_city = (request.form.get("profile_city") or "").strip()
           profile_contract_start_date = (request.form.get("profile_contract_start_date") or "").strip()
           profile_contract_end_date = (request.form.get("profile_contract_end_date") or "").strip()
-          profile_employment_type = (request.form.get("profile_employment_type") or "").strip()
           profile_euros_per_hour = (request.form.get("profile_euros_per_hour") or "").strip()
           profile_working_hours = (request.form.get("profile_working_hours") or "").strip()
           profile_work_type = (request.form.get("profile_work_type") or "").strip()
-          if profile_work_type not in {"Teilzeit", "Vollzeit"}:
+          if profile_work_type not in {"Teilzeit", "Vollzeit", "Intern", "Geringfügige"}:
             profile_work_type = "Teilzeit"
           profile_group_type = (request.form.get("profile_group_type") or "").strip()
           profile_group_number = (request.form.get("profile_group_number") or "").strip()
           if profile_group_type not in {"Lohngruppe", "Verwendungsgruppe"}:
             profile_group_type = "Lohngruppe"
-          if name:
+          if name and (is_main_admin or emp.access_role == "employee"):
+            generated_pin = None
             emp.name = name
             emp.role = role or None
+            worker_status = (request.form.get("worker_status") or emp.worker_status or "active").strip().lower()
+            if worker_status in {"active", "passive"}:
+              emp.worker_status = worker_status
+              emp.is_active = worker_status == "active"
+            submitted_staff_functions = _normalize_staff_functions(request.form.get("staff_functions"), fallback=emp.staff_type or "Cleaner")
+            submitted_staff_type = submitted_staff_functions[0]
+            emp.staff_functions = json.dumps(submitted_staff_functions)
+            emp.staff_type = submitted_staff_type
+            submitted_branch = (request.form.get("branch") or emp.branch or "Wien").strip()
+            emp.branch = submitted_branch if submitted_branch in {"Wien", "Graz"} else "Wien"
+            if is_main_admin:
+              emp.has_platform_access = requested_access
+              if not emp.has_platform_access:
+                emp.login_email = None
+                emp.login_code = None
+                emp.login_pin_hash = None
+                emp.login_pin_plain = None
+              else:
+                emp.login_email = requested_email or None
+                submitted_access_role = (request.form.get("access_role") or "employee").strip()
+                if submitted_access_role in {"employee", "site_manager", "sales_manager", "admin"}:
+                  emp.access_role = submitted_access_role
+            # Non-admin editors can change job functions but cannot grant or revoke platform access.
+            emp.profile_phone = (request.form.get("profile_phone") or "").strip() or None
+            emp.profile_address = (request.form.get("profile_address") or "").strip() or None
             emp.profile_zip_code = profile_zip_code or None
             emp.profile_city = profile_city or None
-            emp.profile_contract_start_date = profile_contract_start_date or None
-            emp.profile_contract_end_date = profile_contract_end_date or None
-            emp.profile_employment_type = profile_employment_type or "Reinigungskraft"
-            emp.profile_euros_per_hour = profile_euros_per_hour or None
+            if is_main_admin:
+              emp.profile_contract_start_date = profile_contract_start_date or None
+              emp.profile_contract_end_date = profile_contract_end_date or None
+            if is_main_admin:
+              emp.profile_euros_per_hour = profile_euros_per_hour or None
             emp.profile_working_hours = profile_working_hours or None
             emp.profile_work_type = profile_work_type or "Teilzeit"
-            emp.profile_group_type = profile_group_type or "Lohngruppe"
-            emp.profile_group_number = profile_group_number or None
+            if is_main_admin:
+              emp.profile_group_type = profile_group_type or "Lohngruppe"
+              emp.profile_group_number = profile_group_number or None
+              if emp.has_platform_access:
+                existing_codes = _collect_existing_codes(db, exclude_id=emp.id)
+                if not (emp.login_code or "").strip():
+                  emp.login_code = _generate_employee_login_code(emp.name, existing_codes)
+                if send_credentials_requested or not (emp.login_pin_hash or "").strip():
+                  generated_pin = _generate_employee_pin()
+                  emp.login_pin_hash = generate_password_hash(generated_pin)
+                  emp.login_pin_plain = generated_pin
             # handle optional profile image upload (replace existing)
             file_obj = request.files.get("profile_image")
             if file_obj:
               saved = _save_profile_image(file_obj, f"emp{emp.id}", replace_path=emp.profile_image_path)
               if saved:
                 emp.profile_image_path = saved
-            # handle is_active from form
-            try:
-              val = request.form.get("is_active")
-              if val is not None:
-                emp.is_active = bool(int(val))
-            except Exception:
-              pass
             db.commit()
-            flash(f"Mitarbeiter {name or emp.name} erfolgreich aktualisiert.", 'success')
+            if generated_pin:
+              if send_credentials_requested:
+                email_sent, email_message = send_employee_credentials_email(emp, generated_pin)
+                if email_sent:
+                  flash(email_message, "success")
+                else:
+                  _remember_credentials_for_session(emp.id, emp.login_code, generated_pin)
+                  flash(email_message, "warning")
+              else:
+                _remember_credentials_for_session(emp.id, emp.login_code, generated_pin)
+            flash("Employee updated.", "success")
+      elif action == "set_status" and emp_id:
+        emp = db.get(Employee, int(emp_id))
+        new_status = (request.form.get("worker_status") or "").strip().lower()
+        if emp and (is_main_admin or emp.access_role == "employee") and new_status in {"active", "passive"}:
+          emp.worker_status = new_status
+          emp.is_active = new_status == "active"
+          db.commit()
+          flash("Employee status updated.", "success")
       elif action == "delete" and emp_id:
         emp = db.get(Employee, int(emp_id))
-        if emp:
+        if emp and (is_main_admin or emp.access_role == "employee"):
           emp_name = emp.name
           # remove associated profile image from disk
+          for employee_document in db.query(EmployeeDocument).filter(EmployeeDocument.employee_id == emp.id).all():
+            try:
+              document_path = os.path.join(EMPLOYEE_DOCUMENT_FOLDER, employee_document.storage_name)
+              if os.path.isfile(document_path):
+                os.remove(document_path)
+            except OSError:
+              logging.exception("Failed removing document for deleted employee %s", emp.id)
+            db.delete(employee_document)
           try:
             _remove_photo(emp.profile_image_path)
           except Exception:
             logging.exception("Failed removing profile image for deleted employee %s", emp.id)
           db.delete(emp)
           db.commit()
-          flash(f"Mitarbeiter {emp_name} erfolgreich gelöscht.", 'success')
+          flash("Employee deleted.", "success")
       elif action == "credentials_share" and emp_id:
+        if not is_main_admin:
+          abort(403)
         emp = db.get(Employee, int(emp_id))
-        if emp:
+        if emp and (is_main_admin or emp.access_role == "employee"):
+          emp.has_platform_access = True
           existing_codes = _collect_existing_codes(db, exclude_id=emp.id)
           if not (emp.login_code or "").strip():
             emp.login_code = _generate_employee_login_code(emp.name, existing_codes)
@@ -10957,13 +12544,44 @@ def admin_employees():
             emp.login_pin_plain = new_pin
           db.commit()
           _remember_credentials_for_session(emp.id, emp.login_code, new_pin)
-          flash(f"Anmeldedaten geteilt für {emp.name}.", 'success')
+          flash("Login details are ready to share.", "success")
         else:
-          flash("Fehler beim Aktualisieren der Anmeldedaten.", 'warning')
+          flash("Could not update login details.", "warning")
+        return redirect(redirect_url)
+      elif action == "credentials_email" and emp_id:
+        if not is_main_admin:
+          abort(403)
+        emp = db.get(Employee, int(emp_id))
+        if not emp or not emp.has_platform_access or emp.worker_status != "active":
+          flash("Enable platform access and set the employee to Active before sending sign-in details.", "warning")
+          return redirect(redirect_url)
+        recipient = (emp.login_email or "").strip()
+        if not EMAIL_REGEX.fullmatch(recipient):
+          flash("Add a valid employee email address before sending sign-in details.", "warning")
+          return redirect(redirect_url)
+        existing_codes = _collect_existing_codes(db, exclude_id=emp.id)
+        login_code = (emp.login_code or "").strip() or _generate_employee_login_code(emp.name, existing_codes)
+        new_pin = _generate_employee_pin()
+        previous_code = emp.login_code
+        emp.login_code = login_code
+        email_sent, email_message = send_employee_credentials_email(emp, new_pin)
+        if email_sent:
+          emp.has_platform_access = True
+          emp.login_pin_hash = generate_password_hash(new_pin)
+          emp.login_pin_plain = new_pin
+          db.commit()
+          flash(email_message, "success")
+        else:
+          emp.login_code = previous_code
+          db.rollback()
+          flash(email_message, "warning")
         return redirect(redirect_url)
       elif action == "credentials_update" and emp_id:
+        if not is_main_admin:
+          abort(403)
         emp = db.get(Employee, int(emp_id))
-        if emp:
+        if emp and (is_main_admin or emp.access_role == "employee"):
+          emp.has_platform_access = True
           new_email = (request.form.get("login_email") or "").strip()
           new_code = (request.form.get("login_code") or "").strip().upper()
           new_pin = (request.form.get("login_pin") or "").strip()
@@ -10987,17 +12605,18 @@ def admin_employees():
           db.commit()
           if pin_snippet:
             _remember_credentials_for_session(emp.id, emp.login_code, pin_snippet)
-            flash(f"Anmeldedaten aktualisiert für {emp.name}.", 'success')
+            flash("Login details updated.", "success")
           else:
-            flash(f"Anmeldedaten gespeichert für {emp.name}.", 'success')
+            flash("Login details updated.", "success")
         else:
-          flash("Fehler beim Speichern der Anmeldedaten.", 'warning')
+          flash("Could not update login details.", "warning")
         return redirect(redirect_url)
 
       return redirect(redirect_url)
 
-    credential_snippets = session.pop("credential_snippets", {})
-    auto_generated = _generate_missing_employee_credentials(db)
+    saved_credential_snippets = session.pop("credential_snippets", {})
+    credential_snippets = saved_credential_snippets if is_main_admin else {}
+    auto_generated = _generate_missing_employee_credentials(db) if is_main_admin else {}
     for emp_id, data in auto_generated.items():
       key = str(emp_id)
       if key not in credential_snippets:
@@ -11007,14 +12626,53 @@ def admin_employees():
         }
 
     base_query = db.query(Employee)
+    if is_site_manager:
+      base_query = base_query.filter(Employee.access_role == "employee")
+    elif is_sales_manager:
+      base_query = base_query.filter(Employee.access_role == "employee")
+    status_counts = {"all": 0, "active": 0, "passive": 0}
+    for worker_status, count in base_query.with_entities(Employee.worker_status, func.count(Employee.id)).group_by(Employee.worker_status).all():
+      normalized_status = worker_status if worker_status in {"active", "passive"} else "active"
+      status_counts[normalized_status] += count
+      status_counts["all"] += count
+    if status_filter != "all":
+      base_query = base_query.filter(Employee.worker_status == status_filter)
     if search_q:
       like = f"%{search_q}%"
       base_query = base_query.filter(
         or_(
           Employee.name.ilike(like),
           Employee.role.ilike(like),
+          Employee.login_email.ilike(like),
+          Employee.profile_phone.ilike(like),
+          Employee.profile_address.ilike(like),
+          Employee.profile_zip_code.ilike(like),
+          Employee.profile_city.ilike(like),
+          Employee.staff_type.ilike(like),
+          Employee.staff_functions.ilike(like),
+          Employee.branch.ilike(like),
         )
       )
+    if work_type_filter:
+      if work_type_filter == "Intern":
+        base_query = base_query.filter(Employee.profile_work_type.in_(["Intern", "Geringfügige"]))
+      else:
+        base_query = base_query.filter(Employee.profile_work_type == work_type_filter)
+    if role_filter:
+      base_query = base_query.filter(Employee.role.ilike(f"%{role_filter}%"))
+    if staff_type_filter:
+      base_query = base_query.filter(_employee_staff_function_filter(staff_type_filter))
+    if branch_filter in {"Wien", "Graz"}:
+      base_query = base_query.filter(Employee.branch == branch_filter)
+    employee_staff_types = list(STAFF_FUNCTION_OPTIONS)
+    if staff_type_filter not in employee_staff_types:
+      staff_type_filter = ""
+    stored_work_types = [
+      row[0] for row in db.query(Employee.profile_work_type)
+      .filter(Employee.profile_work_type.isnot(None), Employee.profile_work_type != "")
+      .distinct().order_by(Employee.profile_work_type.asc()).all()
+    ]
+    employee_work_types = sorted({"Intern" if work_type == "Geringfügige" else work_type for work_type in stored_work_types})
 
     free_filter = request.args.get('free', default='0') == '1'
     free_day_str = (request.args.get('free_day') or '').strip()
@@ -11051,10 +12709,13 @@ def admin_employees():
         )
       base_query = base_query.filter(~Employee.id.in_(scheduled_employee_ids_subq))
 
-    total_employees = db.query(func.count(Employee.id)).scalar() or 0
+    total_employee_query = db.query(func.count(Employee.id))
+    if is_site_manager or is_sales_manager:
+      total_employee_query = total_employee_query.filter(Employee.access_role == "employee")
+    total_employees = total_employee_query.scalar() or 0
     filtered_employees = base_query.count()
 
-    per_page = 3
+    per_page = 25
     page = request.args.get("page", default=1, type=int)
     if page is None or page < 1:
       page = 1
@@ -11075,6 +12736,29 @@ def admin_employees():
       .limit(per_page)
       .all()
     )
+    employee_function_map = {emp.id: _employee_staff_functions(emp) for emp in employees}
+    show_shifts_column = any("Cleaner" in employee_function_map[emp.id] for emp in employees)
+    employee_column_count = 3 + int(not is_site_manager and not is_sales_manager) + int(show_shifts_column) + 1 + int(not is_sales_manager)
+    employee_to_edit_id = request.args.get("edit_employee", type=int)
+    edit_employee = db.get(Employee, employee_to_edit_id) if employee_to_edit_id else None
+    if edit_employee and not is_main_admin and edit_employee.access_role != "employee":
+      edit_employee = None
+    employee_to_edit_data = None
+    if edit_employee:
+      employee_to_edit_data = {
+        "id": edit_employee.id, "name": edit_employee.name, "role": edit_employee.role or "",
+        "active": "1" if edit_employee.is_active != 0 else "0", "workerStatus": edit_employee.worker_status or ("active" if edit_employee.is_active else "passive"), "phone": edit_employee.profile_phone or "",
+        "address": edit_employee.profile_address or "", "zip": edit_employee.profile_zip_code or "", "city": edit_employee.profile_city or "",
+        "start": edit_employee.profile_contract_start_date or "" if is_main_admin else "", "end": edit_employee.profile_contract_end_date or "" if is_main_admin else "",
+        "rate": edit_employee.profile_euros_per_hour or "" if is_main_admin else "",
+        "hours": edit_employee.profile_working_hours or "", "workType": "Intern" if edit_employee.profile_work_type == "Geringfügige" else edit_employee.profile_work_type or "Teilzeit",
+        "groupType": edit_employee.profile_group_type or "Lohngruppe" if is_main_admin else "", "groupNumber": edit_employee.profile_group_number or "" if is_main_admin else "",
+        "accessRole": edit_employee.access_role or "employee", "staffType": edit_employee.staff_type or "Cleaner",
+        "staffFunctions": _employee_staff_functions(edit_employee),
+        "branch": edit_employee.branch or "Wien", "platformAccess": "1" if edit_employee.has_platform_access else "0",
+        "loginEmail": edit_employee.login_email or "",
+        "image": edit_employee.profile_image_path or "",
+      }
 
     page_employees = len(employees)
     has_prev = page > 1 and filtered_employees > 0
@@ -11146,23 +12830,42 @@ def admin_employees():
     scheduled_emp_ids = {
       row[0]
       for row in db.query(Shift.employee_id)
-      .filter(Shift.day >= week_start, Shift.day < week_end)
+      .join(Employee, Employee.id == Shift.employee_id)
+      .filter(Shift.day >= week_start, Shift.day < week_end, _employee_staff_function_filter("Cleaner"))
       .distinct()
       .all()
       if row[0] is not None
     }
-    unassigned_employees = max(total_employees - len(scheduled_emp_ids), 0)
+    cleaner_query = db.query(func.count(Employee.id)).filter(_employee_staff_function_filter("Cleaner"))
+    if is_site_manager or is_sales_manager:
+      cleaner_query = cleaner_query.filter(Employee.access_role == "employee")
+    unassigned_employees = max((cleaner_query.scalar() or 0) - len(scheduled_emp_ids), 0)
 
     return render_template_string(
       ADMIN_EMPLOYEES_TEMPLATE,
       active_page="employees",
       lang=lang,
       i18n=i18n,
+      is_main_admin=is_main_admin,
+      is_site_manager=is_site_manager,
+      is_sales_manager=is_sales_manager,
       employees=employees,
+      employee_to_edit_data=employee_to_edit_data,
+      employee_function_map=employee_function_map,
       shift_counts=shift_counts,
       total_employees=total_employees,
       filtered_employees=filtered_employees,
       search_q=search_q,
+      work_type_filter=work_type_filter,
+      role_filter=role_filter,
+      staff_type_filter=staff_type_filter,
+      branch_filter=branch_filter,
+      employee_staff_types=employee_staff_types,
+      show_shifts_column=show_shifts_column,
+      employee_column_count=employee_column_count,
+      status_filter=status_filter,
+      status_counts=status_counts,
+      employee_work_types=employee_work_types,
       today_shifts=today_shifts,
       unassigned_employees=unassigned_employees,
       credential_snippets=credential_snippets,
@@ -11179,6 +12882,299 @@ def admin_employees():
       next_page=next_page,
       page_employees=page_employees,
     )
+  finally:
+    db.close()
+
+
+@app.route("/admin/employees/<int:employee_id>", methods=["GET", "POST"])
+@site_or_sales_manager_required
+def admin_employee_detail(employee_id: int):
+  db = SessionLocal()
+  is_site_manager = session.get("role") == "site_manager"
+  is_sales_manager = session.get("role") == "sales_manager"
+  try:
+    employee = db.get(Employee, employee_id)
+    if not employee:
+      flash("Employee not found.", "warning")
+      return redirect(url_for("admin_employees"))
+    if session.get("role") != "admin" and employee.access_role != "employee":
+      flash("You do not have access to this employee record.", "warning")
+      return redirect(url_for("admin_employees"))
+    if request.method == "POST":
+      if is_sales_manager:
+        abort(403)
+      action = (request.form.get("action") or "upload_employee_document").strip()
+      if action == "update_staff_access":
+        submitted_functions = _normalize_staff_functions(
+          request.form.get("staff_functions"), fallback=employee.staff_type or "Cleaner"
+        )
+        employee.staff_functions = json.dumps(submitted_functions)
+        employee.staff_type = submitted_functions[0]
+        if session.get("role") == "admin":
+          allowed_access_roles = {"employee", "site_manager", "sales_manager", "admin"}
+          submitted_access_role = (request.form.get("access_role") or employee.access_role or "employee").strip()
+          if submitted_access_role not in allowed_access_roles:
+            flash("Choose a valid system access level.", "warning")
+            return redirect(url_for("admin_employee_detail", employee_id=employee.id) + "#account")
+          employee.access_role = submitted_access_role
+          employee.has_platform_access = request.form.get("has_platform_access") == "1"
+          employee.login_email = (request.form.get("login_email") or "").strip() or None
+        # Non-admin editors can change functions but cannot grant or revoke platform access.
+        generated_pin = None
+        if employee.has_platform_access:
+          existing_codes = _collect_existing_codes(db, exclude_id=employee.id)
+          if not (employee.login_code or "").strip():
+            employee.login_code = _generate_employee_login_code(employee.name, existing_codes)
+          if not (employee.login_pin_hash or "").strip():
+            generated_pin = _generate_employee_pin()
+            employee.login_pin_hash = generate_password_hash(generated_pin)
+            employee.login_pin_plain = generated_pin
+        try:
+          db.commit()
+          if generated_pin:
+            _remember_credentials_for_session(employee.id, employee.login_code, generated_pin)
+          flash("Employee functions and platform access saved.", "success")
+        except Exception:
+          db.rollback()
+          app.logger.exception("Could not update employee functions employee_id=%s", employee.id)
+          flash("Platform access could not be saved. Please try again.", "warning")
+        return redirect(url_for("admin_employee_detail", employee_id=employee.id) + "#account")
+      if action == "update_profile":
+        if is_sales_manager:
+          abort(403)
+        name = (request.form.get("name") or "").strip()
+        if not name:
+          flash("Employee name is required.", "warning")
+          return redirect(url_for("admin_employee_detail", employee_id=employee.id) + "#general")
+        employee.name = name
+        employee.role = (request.form.get("role") or "").strip() or None
+        employee.profile_phone = (request.form.get("profile_phone") or "").strip() or None
+        employee.profile_address = (request.form.get("profile_address") or "").strip() or None
+        employee.profile_zip_code = (request.form.get("profile_zip_code") or "").strip() or None
+        employee.profile_city = (request.form.get("profile_city") or "").strip() or None
+        staff_types = {"Cleaner", "Office administrator", "IT", "Reception", "Intern", "Graphic designer", "Other"}
+        staff_type = (request.form.get("staff_type") or employee.staff_type or "Cleaner").strip()
+        if staff_type in staff_types:
+          employee.staff_type = staff_type
+        branch = (request.form.get("branch") or employee.branch or "Wien").strip()
+        employee.branch = branch if branch in {"Wien", "Graz"} else "Wien"
+        work_type = (request.form.get("profile_work_type") or "Teilzeit").strip()
+        employee.profile_work_type = work_type if work_type in {"Teilzeit", "Vollzeit", "Intern", "Geringfügige"} else "Teilzeit"
+        employee.profile_working_hours = (request.form.get("profile_working_hours") or "").strip() or None
+        worker_status = (request.form.get("worker_status") or employee.worker_status or "active").strip().lower()
+        if worker_status in {"active", "passive"}:
+          employee.worker_status = worker_status
+          employee.is_active = worker_status == "active"
+        if session.get("role") == "admin":
+          employee.profile_euros_per_hour = (request.form.get("profile_euros_per_hour") or "").strip() or None
+          employee.profile_group_type = (request.form.get("profile_group_type") or "Lohngruppe").strip()
+          employee.profile_group_number = (request.form.get("profile_group_number") or "").strip() or None
+        image = request.files.get("profile_image")
+        if image and image.filename:
+          saved_image = _save_profile_image(image, f"emp{employee.id}", replace_path=employee.profile_image_path)
+          if saved_image:
+            employee.profile_image_path = saved_image
+        try:
+          db.commit()
+          flash("Employee profile saved.", "success")
+        except Exception:
+          db.rollback()
+          app.logger.exception("Could not update employee profile employee_id=%s", employee.id)
+          flash("The employee profile could not be saved. Please try again.", "warning")
+        return redirect(url_for("admin_employee_detail", employee_id=employee.id) + "#information")
+      if action == "update_contract":
+        if session.get("role") != "admin":
+          abort(403)
+        start_value = (request.form.get("profile_contract_start_date") or "").strip()
+        end_value = (request.form.get("profile_contract_end_date") or "").strip()
+        try:
+          for date_value in (start_value, end_value):
+            if date_value:
+              datetime.strptime(date_value, "%Y-%m-%d")
+          employee.profile_contract_start_date = start_value or None
+          employee.profile_contract_end_date = end_value or None
+          db.commit()
+          flash("Contract dates saved.", "success")
+        except ValueError:
+          db.rollback()
+          flash("Enter contract dates in the correct format.", "warning")
+        except Exception:
+          db.rollback()
+          app.logger.exception("Could not update contract dates employee_id=%s", employee.id)
+          flash("Contract dates could not be saved. Please try again.", "warning")
+        return redirect(url_for("admin_employee_detail", employee_id=employee.id) + "#contract")
+      if action == "delete_employee_document":
+        document_id = request.form.get("document_id", type=int)
+        document = db.get(EmployeeDocument, document_id) if document_id else None
+        if not document or document.employee_id != employee.id:
+          abort(404)
+        try:
+          path = os.path.join(EMPLOYEE_DOCUMENT_FOLDER, document.storage_name)
+          if os.path.isfile(path):
+            os.remove(path)
+          db.delete(document)
+          db.commit()
+          flash("Employee document deleted.", "success")
+        except Exception:
+          db.rollback()
+          app.logger.exception("Could not delete employee document %s", document_id)
+          flash("The document could not be deleted. Please try again.", "warning")
+        return redirect(url_for("admin_employee_detail", employee_id=employee.id) + "#documents")
+      upload = request.files.get("employee_document")
+      raw_filename = secure_filename(upload.filename or "") if upload else ""
+      extension = raw_filename.rsplit(".", 1)[-1].lower() if "." in raw_filename else ""
+      allowed_extensions = {"pdf", "doc", "docx", "png", "jpg", "jpeg"}
+      if not upload or not raw_filename:
+        flash("Choose a document to upload.", "warning")
+      elif extension not in allowed_extensions:
+        flash("Upload a PDF, Word document, or image file.", "warning")
+      else:
+        storage_name = f"employee_{employee.id}_{secrets.token_hex(16)}.{extension}"
+        storage_path = os.path.join(EMPLOYEE_DOCUMENT_FOLDER, storage_name)
+        try:
+          upload.save(storage_path)
+          document = EmployeeDocument(
+            employee_id=employee.id,
+            original_filename=raw_filename[:255],
+            storage_name=storage_name,
+          )
+          db.add(document)
+          db.commit()
+          flash("Employee document uploaded.", "success")
+        except Exception:
+          db.rollback()
+          try:
+            if os.path.isfile(storage_path):
+              os.remove(storage_path)
+          except OSError:
+            app.logger.exception("Could not remove incomplete employee document upload")
+          app.logger.exception("Could not save employee document for employee_id=%s", employee.id)
+          flash("The document could not be uploaded. Please try again.", "warning")
+      return redirect(url_for("admin_employee_detail", employee_id=employee.id) + "#documents")
+    is_cleaner = _employee_has_staff_function(employee, "Cleaner")
+    shifts = []
+    shift_count = 0
+    schedule_week_start = date.today() - timedelta(days=date.today().weekday())
+    requested_week = (request.args.get("week") or "").strip()
+    if requested_week:
+      try:
+        requested_date = datetime.strptime(requested_week, "%Y-%m-%d").date()
+        schedule_week_start = requested_date - timedelta(days=requested_date.weekday())
+      except ValueError:
+        pass
+    schedule_week_end = schedule_week_start + timedelta(days=6)
+    schedule_days = []
+    schedule_hour_rows = list(range(5, 24))
+    week_start_label = schedule_week_start.strftime("%d.%m.%Y")
+    week_end_label = schedule_week_end.strftime("%d.%m.%Y")
+    schedule_week_range = f"{week_start_label} → {week_end_label}"
+    previous_week_url = url_for("admin_employee_detail", employee_id=employee.id, week=(schedule_week_start - timedelta(days=7)).isoformat()) + "#schedule"
+    next_week_url = url_for("admin_employee_detail", employee_id=employee.id, week=(schedule_week_start + timedelta(days=7)).isoformat()) + "#schedule"
+    current_week_url = url_for("admin_employee_detail", employee_id=employee.id, week=(date.today() - timedelta(days=date.today().weekday())).isoformat()) + "#schedule"
+    if is_cleaner:
+      shifts = (
+        db.query(Shift)
+        .filter(
+          Shift.employee_id == employee.id,
+          Shift.day >= schedule_week_start,
+          Shift.day <= schedule_week_end,
+        )
+        .order_by(Shift.day.asc(), Shift.start_time.asc())
+        .all()
+      )
+      shift_count = db.query(func.count(Shift.id)).filter(Shift.employee_id == employee.id).scalar() or 0
+      day_labels = ["Mo.", "Di.", "Mi.", "Do.", "Fr.", "Sa.", "So."] if _get_current_language() == "de" else ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+      for day_offset in range(7):
+        schedule_day = schedule_week_start + timedelta(days=day_offset)
+        schedule_days.append({
+          "date": schedule_day,
+          "weekday": day_labels[day_offset],
+          "day_label": schedule_day.strftime("%d.%m."),
+          "is_today": schedule_day == date.today(),
+          "events": [],
+        })
+      day_index = {item["date"]: index for index, item in enumerate(schedule_days)}
+      for shift in shifts:
+        shift_day_index = day_index.get(shift.day)
+        if shift_day_index is None:
+          continue
+        start_minutes = shift.start_time.hour * 60 + shift.start_time.minute
+        end_minutes = shift.end_time.hour * 60 + shift.end_time.minute
+        all_day = start_minutes == 0 and (end_minutes == 0 or end_minutes >= (23 * 60 + 30))
+        if end_minutes <= start_minutes:
+          end_minutes += 24 * 60
+        if all_day:
+          top_px, height_px = 4, 34
+        else:
+          visible_start = max(start_minutes, 5 * 60)
+          visible_end = min(end_minutes, 24 * 60)
+          if visible_end <= visible_start:
+            continue
+          top_px = 42 + (visible_start - 5 * 60) * 52 / 60
+          visible_minutes = visible_end - visible_start
+          height_px = max(44, visible_minutes * 52 / 60 - 3)
+        schedule_days[shift_day_index]["events"].append({
+          "top_px": round(top_px),
+          "height_px": round(height_px),
+          "all_day": all_day,
+          "time_window": f"{shift.start_time.strftime('%H:%M')}–{shift.end_time.strftime('%H:%M')}",
+          "site_name": (shift.site.profile_company_name or shift.site.name) if shift.site else "Scheduled shift",
+          "instructions": shift.instructions or "",
+        })
+    documents = db.query(EmployeeDocument).filter(
+      EmployeeDocument.employee_id == employee.id
+    ).order_by(EmployeeDocument.uploaded_at.desc(), EmployeeDocument.id.desc()).all() if not is_sales_manager else []
+    credential_email_reason = None
+    employee_login_status = employee.worker_status or ("active" if employee.is_active else "passive")
+    if not employee.has_platform_access:
+      credential_email_reason = "Enable platform access to send sign-in details."
+    elif employee_login_status != "active":
+      credential_email_reason = "Set the employee to Active to send sign-in details."
+    elif not EMAIL_REGEX.fullmatch((employee.login_email or "").strip()):
+      credential_email_reason = "Add a valid login email to send sign-in details."
+    return render_template_string(
+      EMPLOYEE_DETAIL_TEMPLATE,
+      employee=employee,
+      employee_staff_functions=_employee_staff_functions(employee),
+      employee_staff_types=list(STAFF_FUNCTION_OPTIONS),
+      shifts=shifts,
+      shift_count=shift_count,
+      is_cleaner=is_cleaner,
+      schedule_days=schedule_days,
+      schedule_hour_rows=schedule_hour_rows,
+      schedule_week_range=schedule_week_range,
+      schedule_week_start=schedule_week_start,
+      previous_week_url=previous_week_url,
+      next_week_url=next_week_url,
+      current_week_url=current_week_url,
+      documents=documents,
+      credential_email_reason=credential_email_reason,
+      active_page="employees",
+      is_site_manager=is_site_manager,
+      is_sales_manager=is_sales_manager,
+      is_main_admin=session.get("role") == "admin",
+    )
+  finally:
+    db.close()
+
+
+@app.route("/admin/employees/<int:employee_id>/documents/<int:document_id>", methods=["GET"])
+@site_or_sales_manager_required
+def admin_employee_document_download(employee_id: int, document_id: int):
+  if session.get("role") == "sales_manager":
+    abort(403)
+  db = SessionLocal()
+  try:
+    employee = db.get(Employee, employee_id)
+    document = db.get(EmployeeDocument, document_id)
+    if not employee or not document or document.employee_id != employee.id:
+      abort(404)
+    if session.get("role") != "admin" and employee.access_role != "employee":
+      abort(403)
+    path = os.path.join(EMPLOYEE_DOCUMENT_FOLDER, document.storage_name)
+    if not os.path.isfile(path):
+      abort(404)
+    return send_file(path, as_attachment=True, download_name=document.original_filename)
   finally:
     db.close()
 
@@ -11285,16 +13281,26 @@ def admin_employee_docx(employee_id: int):
 
 
 @app.route("/admin/sites", methods=["GET", "POST"])
-@login_required
+@site_or_sales_manager_required
 def admin_sites():
   db = SessionLocal()
+  is_main_admin = session.get("role") == "admin"
+  is_site_manager = session.get("role") == "site_manager"
+  is_sales_manager = session.get("role") == "sales_manager"
+  current_manager_id = session.get("employee_id") if is_site_manager else None
   try:
     search_q = (request.args.get("q") or "").strip()
+    status_filter = (request.args.get("status_filter") or "all").strip().lower()
+    if status_filter not in {"all", "active", "inactive"}:
+      status_filter = "all"
     if request.method == "POST":
       entity = (request.form.get("entity") or "site").strip()
       action = (request.form.get("action") or "").strip().lower()
+      profile_action = (request.form.get("profile_action") or "save").strip().lower()
+      contract_site = None
       redirect_q = (request.form.get("redirect_q") or "").strip()
       redirect_page_raw = (request.form.get("redirect_page") or "").strip()
+      redirect_status = (request.form.get("redirect_status") or "all").strip().lower()
       redirect_page_val = None
       if redirect_page_raw.isdigit():
         redirect_page_val = max(int(redirect_page_raw), 1)
@@ -11302,51 +13308,132 @@ def admin_sites():
       effective_q = redirect_q or search_q
       if effective_q:
         redirect_params["q"] = effective_q
+      if redirect_status in {"active", "inactive"}:
+        redirect_params["status_filter"] = redirect_status
       if redirect_page_val and redirect_page_val > 1:
         redirect_params["page"] = redirect_page_val
       redirect_url = url_for("admin_sites", **redirect_params)
       if entity == "site":
         site_id = request.form.get("id")
-        if action == "create":
-          name = (request.form.get("name") or "").strip()
-          address = (request.form.get("address") or "").strip()
-          hourly_rate = request.form.get("hourly_rate", type=float)
+        if action == "set_status" and site_id:
+          site = db.get(Site, int(site_id))
+          if site:
+            site.is_active = (request.form.get("is_active") or "1") != "0"
+            db.commit()
+            flash("Site status updated.", "success")
+        elif action == "create":
+          company_name = (request.form.get("profile_company_name") or "").strip()
+          name = (request.form.get("name") or "").strip() or company_name
+          address = (request.form.get("address") or "").strip() or None
+          contact_name = (request.form.get("profile_contact_name") or "").strip() or None
+          contact_email = (request.form.get("profile_contact_email") or "").strip() or None
+          default_rate = request.form.get("profile_default_hourly_rate", type=float) if is_main_admin else None
           is_active = (request.form.get("is_active", "1") or "1").strip() != "0"
-          if name and address:
-            if _site_exists(db, name, address):
-              flash(
-                "Site already exists with the same name and address.",
-                "warning",
-              )
+          if not name:
+            flash("Client name is required.", "warning")
+          else:
+            if _site_exists(db, name, address or ""):
+              flash("A client with the same name and service address already exists.", "warning")
             else:
-              db.add(
-                Site(
-                  name=name,
-                  address=address,
-                  hourly_rate=hourly_rate or 50.0,
-                  is_active=is_active,
-                )
+              site = Site(
+                name=name, address=address, hourly_rate=default_rate or 50.0,
+                is_active=is_active, profile_company_name=company_name or name,
+                profile_contact_name=contact_name, profile_contact_email=contact_email,
+                contact_name=contact_name, contact_email=contact_email,
+                profile_phone=(request.form.get("profile_phone") or "").strip() or None,
+                profile_billing_address=(request.form.get("profile_billing_address") or "").strip() or None if is_main_admin else None,
+                profile_vat_id=(request.form.get("profile_vat_id") or "").strip() or None if is_main_admin else None,
+                profile_default_hourly_rate=default_rate,
+                profile_notes=(request.form.get("profile_notes") or "").strip() or None,
+                contract_partner_name=(request.form.get("contract_partner_name") or "").strip() or None if is_main_admin else None,
+                contract_contact_details=(request.form.get("contract_contact_details") or "").strip() or None if is_main_admin else None,
+                manager_employee_id=current_manager_id,
               )
+              submitted_customer_id = (request.form.get("profile_tax_id") or "").strip() if is_main_admin else ""
+              site.profile_tax_id = submitted_customer_id or None
+              if is_main_admin:
+                manager_id = request.form.get("manager_employee_id", type=int)
+                manager = db.get(Employee, manager_id) if manager_id else None
+                site.manager_employee_id = manager.id if manager and manager.access_role == "site_manager" else None
+              for field_name in (("contract_start_date", "contract_end_date") if is_main_admin else ()):
+                raw_date = (request.form.get(field_name) or "").strip()
+                if raw_date:
+                  try:
+                    setattr(site, field_name, datetime.strptime(raw_date, "%Y-%m-%d").strftime("%d-%m-%Y"))
+                  except ValueError:
+                    flash("Enter contract dates in a valid format.", "warning")
+                    return redirect(redirect_url)
+              image_file = request.files.get("site_profile_image")
+              image_path = _save_profile_image(image_file, "site_new")
+              if image_file and getattr(image_file, "filename", "") and not image_path:
+                flash("Invalid client image. Use PNG, JPG, GIF, WEBP, or HEIC.", "warning")
+                return redirect(redirect_url)
+              site.profile_image_path = image_path
+              db.add(site)
+              db.flush()
+              _ensure_site_customer_id(db, site)
               db.commit()
+              flash("Client added.", "success")
+              if profile_action == "generate_contract" and is_main_admin:
+                contract_site = site
         elif action == "update" and site_id:
           site = db.get(Site, int(site_id))
           if site:
-            name = (request.form.get("name") or "").strip() or site.name
-            address = (request.form.get("address") or "").strip() or site.address
-            hourly_rate = request.form.get("hourly_rate", type=float)
+            company_name = (request.form.get("profile_company_name") or "").strip() or site.profile_company_name or site.name
+            name = (request.form.get("name") or "").strip() or company_name
+            address = (request.form.get("address") or "").strip() or None
+            default_rate = request.form.get("profile_default_hourly_rate", type=float) if is_main_admin else None
             is_active = (request.form.get("is_active", "1") or "1").strip() != "0"
-            if _site_exists(db, name, address, exclude_id=site.id):
-              flash(
-                "Another site already uses that name and address.",
-                "warning",
-              )
+            if _site_exists(db, name, address or "", exclude_id=site.id):
+              flash("Another client already uses that name and service address.", "warning")
             else:
               site.name = name
               site.address = address
-              if hourly_rate is not None:
-                site.hourly_rate = hourly_rate
+              site.profile_company_name = company_name
               site.is_active = is_active
+              if default_rate is not None:
+                site.profile_default_hourly_rate = default_rate
+                site.hourly_rate = default_rate
+              site.profile_contact_name = (request.form.get("profile_contact_name") or "").strip() or None
+              site.profile_contact_email = (request.form.get("profile_contact_email") or "").strip() or None
+              site.contact_name = site.profile_contact_name
+              site.contact_email = site.profile_contact_email
+              site.profile_phone = (request.form.get("profile_phone") or "").strip() or None
+              if is_main_admin:
+                site.profile_billing_address = (request.form.get("profile_billing_address") or "").strip() or None
+                site.profile_vat_id = (request.form.get("profile_vat_id") or "").strip() or None
+                submitted_customer_id = (request.form.get("profile_tax_id") or "").strip()
+                site.profile_tax_id = submitted_customer_id or site.profile_tax_id
+                _ensure_site_customer_id(db, site)
+              site.profile_notes = (request.form.get("profile_notes") or "").strip() or None
+              if is_main_admin:
+                site.contract_partner_name = (request.form.get("contract_partner_name") or "").strip() or None
+                site.contract_contact_details = (request.form.get("contract_contact_details") or "").strip() or None
+              for field_name in (("contract_start_date", "contract_end_date") if is_main_admin else ()):
+                raw_date = (request.form.get(field_name) or "").strip()
+                if raw_date:
+                  try:
+                    setattr(site, field_name, datetime.strptime(raw_date, "%Y-%m-%d").strftime("%d-%m-%Y"))
+                  except ValueError:
+                    flash("Enter contract dates in a valid format.", "warning")
+                    return redirect(redirect_url)
+                else:
+                  setattr(site, field_name, None)
+              image_file = request.files.get("site_profile_image")
+              image_path = _save_profile_image(image_file, f"site_{site.id}", replace_path=site.profile_image_path)
+              if image_file and getattr(image_file, "filename", "") and not image_path:
+                flash("Invalid client image. Use PNG, JPG, GIF, WEBP, or HEIC.", "warning")
+                return redirect(redirect_url)
+              if image_path:
+                site.profile_image_path = image_path
+              if is_main_admin:
+                manager_id = request.form.get("manager_employee_id", type=int)
+                manager = db.get(Employee, manager_id) if manager_id else None
+                site.manager_employee_id = manager.id if manager and manager.access_role == "site_manager" else None
               db.commit()
+              flash("Client updated.", "success")
+              if profile_action == "generate_contract" and is_main_admin:
+                contract_site = site
         elif action == "delete" and site_id:
           site = db.get(Site, int(site_id))
           if site:
@@ -11382,23 +13469,56 @@ def admin_sites():
               parsed_rate = float(rate)
             except (TypeError, ValueError):
               parsed_rate = None
-            if parsed_rate is not None:
+            if parsed_rate is not None and is_main_admin:
               site.hourly_rate = parsed_rate
             site.is_active = (active_flag or "1").strip() != "0"
         db.commit()
 
+      if contract_site is not None and is_main_admin:
+        partner_name = (contract_site.contract_partner_name or "").strip()
+        company_name = (contract_site.profile_company_name or contract_site.name or "").strip()
+        contact_details = (contract_site.contract_contact_details or "").strip()
+        if not partner_name or not company_name or not contact_details:
+          flash("Fill in the contract partner, company, and phone, fax, or email before generating the contract.", "warning")
+          return redirect(url_for("admin_sites", edit_client=contract_site.id, **redirect_params))
+        pdf_buffer = generate_contract_pdf(partner_name, company_name, contact_details)
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        return send_file(
+          pdf_buffer,
+          mimetype="application/pdf",
+          as_attachment=True,
+          download_name=f"client_contract_{contract_site.id}_{timestamp}.pdf",
+        )
       return redirect(redirect_url)
 
     query = db.query(Site)
     if search_q:
       like = f"%{search_q}%"
-      query = query.filter(
-        or_(Site.name.ilike(like), Site.address.ilike(like))
-      )
+      query = query.filter(or_(
+        Site.name.ilike(like), Site.address.ilike(like),
+        Site.profile_company_name.ilike(like), Site.profile_contact_name.ilike(like),
+        Site.profile_contact_email.ilike(like), Site.profile_phone.ilike(like),
+        Site.profile_billing_address.ilike(like), Site.profile_vat_id.ilike(like),
+        Site.profile_tax_id.ilike(like), Site.contact_name.ilike(like), Site.contact_email.ilike(like),
+      ))
+    if status_filter == "active":
+      query = query.filter(or_(Site.is_active.is_(True), Site.is_active.is_(None)))
+    elif status_filter == "inactive":
+      query = query.filter(Site.is_active.is_(False))
+
+    # Preserve the legacy profiles page behavior: make customer IDs available
+    # for existing client records as they are moved into the database UI.
+    missing_customer_ids = db.query(Site).filter(
+      or_(Site.profile_tax_id.is_(None), func.trim(Site.profile_tax_id) == "")
+    ).all()
+    if missing_customer_ids:
+      for site_without_id in missing_customer_ids:
+        _ensure_site_customer_id(db, site_without_id)
+      db.commit()
 
     filtered_sites = query.count()
 
-    per_page = 3
+    per_page = 25
     page = request.args.get("page", default=1, type=int)
     if page is None or page < 1:
       page = 1
@@ -11427,6 +13547,23 @@ def admin_sites():
     next_page = page + 1 if has_next else None
 
     total_sites = db.query(func.count(Site.id)).scalar() or 0
+    edit_client_id = request.args.get("edit_client", type=int)
+    edit_client = db.get(Site, edit_client_id) if edit_client_id else None
+    client_to_edit_data = None
+    if edit_client:
+      client_to_edit_data = {
+        "id": edit_client.id, "name": edit_client.name, "address": edit_client.address or "",
+        "rate": edit_client.hourly_rate or 0 if is_main_admin else "", "defaultRate": edit_client.profile_default_hourly_rate or "" if is_main_admin else "",
+        "active": "1" if edit_client.is_active != 0 else "0", "company": edit_client.profile_company_name or "",
+        "contact": edit_client.profile_contact_name or edit_client.contact_name or "",
+        "email": edit_client.profile_contact_email or edit_client.contact_email or "",
+        "phone": edit_client.profile_phone or "", "billing": edit_client.profile_billing_address or "" if is_main_admin else "",
+        "vat": edit_client.profile_vat_id or "" if is_main_admin else "", "customerId": edit_client.profile_tax_id or "" if is_main_admin else "",
+        "notes": edit_client.profile_notes or "", "contractStart": edit_client.contract_start_date or "" if is_main_admin else "",
+        "contractEnd": edit_client.contract_end_date or "" if is_main_admin else "", "contractPartner": edit_client.contract_partner_name or "" if is_main_admin else "",
+        "contractContact": edit_client.contract_contact_details or "" if is_main_admin else "", "managerId": edit_client.manager_employee_id or "" if is_main_admin else "", "logo": edit_client.profile_image_path or "",
+      }
+    site_managers = db.query(Employee).filter(Employee.access_role == "site_manager", Employee.is_active.is_(True)).order_by(Employee.name.asc()).all()
     active_sites_total = (
       db.query(func.count(Site.id))
       .filter(or_(Site.is_active.is_(True), Site.is_active.is_(None)))
@@ -11471,8 +13608,15 @@ def admin_sites():
       active_page="sites",
       sites=sites,
       search_q=search_q,
+      status_filter=status_filter,
+      is_main_admin=is_main_admin,
+      is_site_manager=is_site_manager or is_sales_manager,
+      is_sales_manager=is_sales_manager,
+      site_managers=site_managers,
       shift_counts=shift_counts,
       total_sites=total_sites,
+      active_sites_total=active_sites_total,
+      client_to_edit_data=client_to_edit_data,
       filtered_sites=filtered_sites,
       covered_sites=len(covered_active_site_ids),
       inactive_sites=inactive_sites_total,
@@ -11490,258 +13634,162 @@ def admin_sites():
     db.close()
 
 
-@app.route("/admin/profiles", methods=["GET", "POST"])
-@login_required
-def admin_profiles():
+@app.route("/admin/sites/<int:site_id>", methods=["GET", "POST"])
+@site_or_sales_manager_required
+def admin_site_detail(site_id: int):
   db = SessionLocal()
+  is_site_manager = session.get("role") == "site_manager"
+  is_sales_manager = session.get("role") == "sales_manager"
+  is_main_admin = session.get("role") == "admin"
   try:
-    active_tab = (request.args.get("tab") or request.form.get("tab") or "employees").strip().lower()
-    clients_page = request.args.get("clients_page", type=int)
-    if clients_page is None:
-      clients_page = request.form.get("clients_page", type=int)
-    clients_page = max(clients_page or 1, 1)
-
-    employees_page = request.args.get("employees_page", type=int)
-    if employees_page is None:
-      employees_page = request.form.get("employees_page", type=int)
-    employees_page = max(employees_page or 1, 1)
-
-    if active_tab not in {"employees", "clients"}:
-      active_tab = "employees"
-
-    # Get search and filter parameters
-    emp_search = (request.args.get("emp_search") or "").strip()
-    emp_work_type_filter = (request.args.get("emp_work_type") or "").strip()
-    emp_role_filter = (request.args.get("emp_role") or "").strip()
-    client_search = (request.args.get("client_search") or "").strip()
-    client_vat_filter = (request.args.get("client_vat") or "").strip()
-
+    site = db.get(Site, site_id)
+    if not site:
+      flash("Client not found.", "warning")
+      return redirect(url_for("admin_sites"))
     if request.method == "POST":
-      entity = (request.form.get("entity") or "").strip().lower()
-      target_id = request.form.get("id", type=int)
-      profile_action = (request.form.get("profile_action") or "save").strip().lower()
-
-      if entity == "employee_profile" and target_id:
-        emp = db.get(Employee, target_id)
-        if emp:
-          image_file = request.files.get("employee_profile_image")
-          saved_image = _save_profile_image(image_file, f"employee_{emp.id}", replace_path=emp.profile_image_path)
-          if image_file and getattr(image_file, "filename", "") and not saved_image:
-            flash("Invalid employee image format. Use png/jpg/jpeg/gif/webp/heic.", "warning")
-            return redirect(url_for("admin_profiles", tab=active_tab))
-          emp.profile_phone = (request.form.get("profile_phone") or "").strip() or None
-          emp.profile_address = (request.form.get("profile_address") or "").strip() or None
-          emp.profile_zip_code = (request.form.get("profile_zip_code") or "").strip() or None
-          emp.profile_city = (request.form.get("profile_city") or "").strip() or None
-          emp.profile_contract_start_date = (request.form.get("profile_contract_start_date") or "").strip() or None
-          emp.profile_contract_end_date = (request.form.get("profile_contract_end_date") or "").strip() or None
-          profile_employment_type = (request.form.get("profile_employment_type") or "").strip()
-          profile_work_type = (request.form.get("profile_work_type") or "").strip()
-          if profile_work_type not in {"Teilzeit", "Vollzeit", "Geringfügige"}:
-            profile_work_type = "Teilzeit"
-          profile_group_type = (request.form.get("profile_group_type") or "").strip()
-          if profile_group_type not in {"Lohngruppe", "Verwendungsgruppe"}:
-            profile_group_type = "Lohngruppe"
-          emp.profile_employment_type = profile_employment_type or "Reinigungskraft"
-          emp.profile_euros_per_hour = (request.form.get("profile_euros_per_hour") or "").strip() or None
-          emp.profile_working_hours = (request.form.get("profile_working_hours") or "").strip() or None
-          emp.profile_work_type = profile_work_type or "Teilzeit"
-          emp.profile_group_type = profile_group_type or "Lohngruppe"
-          emp.profile_group_number = (request.form.get("profile_group_number") or "").strip() or None
-          emp.profile_notes = (request.form.get("profile_notes") or "").strip() or None
-          if saved_image:
-            emp.profile_image_path = saved_image
-          db.commit()
-          flash(f"Profile updated for {emp.name}.")
-      elif entity == "site_profile" and target_id:
-        site = db.get(Site, target_id)
-        if site:
-          image_file = request.files.get("site_profile_image")
-          saved_image = _save_profile_image(image_file, f"site_{site.id}", replace_path=site.profile_image_path)
-          if image_file and getattr(image_file, "filename", "") and not saved_image:
-            flash("Invalid client logo format. Use png/jpg/jpeg/gif/webp/heic.", "warning")
-            return redirect(url_for("admin_profiles", tab=active_tab))
-          site.profile_company_name = (request.form.get("profile_company_name") or "").strip() or None
-          site.profile_contact_name = (request.form.get("profile_contact_name") or "").strip() or None
-          site.profile_contact_email = (request.form.get("profile_contact_email") or "").strip() or None
-          site.profile_phone = (request.form.get("profile_phone") or "").strip() or None
-          site.profile_vat_id = (request.form.get("profile_vat_id") or "").strip() or None
-          if "profile_billing_address" in request.form:
-            site.profile_billing_address = (request.form.get("profile_billing_address") or "").strip() or None
-          submitted_customer_id = (request.form.get("profile_tax_id") or "").strip()
-          site.profile_tax_id = submitted_customer_id or site.profile_tax_id
-          _ensure_site_customer_id(db, site)
-          site.profile_notes = (request.form.get("profile_notes") or "").strip() or None
-          site.contract_partner_name = (request.form.get("contract_partner_name") or "").strip() or None
-          site.contract_contact_details = (request.form.get("contract_contact_details") or "").strip() or None
-
-          contract_start_val, contract_start_ok = _coerce_optional_dmy_date(request.form.get("contract_start_date"))
-          if contract_start_ok:
-            site.contract_start_date = contract_start_val
+      if (request.form.get("action") or "") != "update_site_profile":
+        abort(400)
+      company_name = (request.form.get("profile_company_name") or "").strip()
+      site_name = (request.form.get("name") or "").strip() or company_name
+      address = (request.form.get("address") or "").strip() or None
+      if not company_name or not site_name:
+        flash("Company and service location names are required.", "warning")
+        return redirect(url_for("admin_site_detail", site_id=site.id) + "#general")
+      if _site_exists(db, site_name, address or "", exclude_id=site.id):
+        flash("Another site already uses that name and service address.", "warning")
+        return redirect(url_for("admin_site_detail", site_id=site.id) + "#general")
+      site.profile_company_name = company_name
+      site.name = site_name
+      site.address = address
+      site.is_active = (request.form.get("is_active") or "1") != "0"
+      site.profile_contact_name = (request.form.get("profile_contact_name") or "").strip() or None
+      site.profile_contact_email = (request.form.get("profile_contact_email") or "").strip() or None
+      site.contact_name = site.profile_contact_name
+      site.contact_email = site.profile_contact_email
+      site.profile_phone = (request.form.get("profile_phone") or "").strip() or None
+      site.profile_notes = (request.form.get("profile_notes") or "").strip() or None
+      if is_main_admin:
+        rate = request.form.get("profile_default_hourly_rate", type=float)
+        if rate is not None:
+          site.profile_default_hourly_rate = rate
+          site.hourly_rate = rate
+        site.profile_billing_address = (request.form.get("profile_billing_address") or "").strip() or None
+        site.profile_vat_id = (request.form.get("profile_vat_id") or "").strip() or None
+        site.profile_tax_id = (request.form.get("profile_tax_id") or "").strip() or site.profile_tax_id
+        site.contract_partner_name = (request.form.get("contract_partner_name") or "").strip() or None
+        site.contract_contact_details = (request.form.get("contract_contact_details") or "").strip() or None
+        date_error = False
+        for field_name in ("contract_start_date", "contract_end_date"):
+          raw_value = (request.form.get(field_name) or "").strip()
+          if not raw_value:
+            setattr(site, field_name, None)
           else:
-            flash("Ungültiges Datum für Vertragsbeginn. Bitte TT-MM-JJJJ verwenden.", "warning")
-
-          contract_end_val, contract_end_ok = _coerce_optional_dmy_date(request.form.get("contract_end_date"))
-          if contract_end_ok:
-            site.contract_end_date = contract_end_val
-          else:
-            flash("Ungültiges Datum für Vertragsende. Bitte TT-MM-JJJJ verwenden.", "warning")
-          if "profile_default_hourly_rate" in request.form:
-            default_rate_raw = request.form.get("profile_default_hourly_rate")
-            parsed_rate = _coerce_float(default_rate_raw)
-            site.profile_default_hourly_rate = parsed_rate
-          if saved_image:
-            site.profile_image_path = saved_image
-
-          if profile_action == "generate_contract":
-            partner_name = (site.contract_partner_name or "").strip()
-            company_name = (site.profile_company_name or site.name or "").strip()
-            contact_details = (site.contract_contact_details or "").strip()
-            if not partner_name or not company_name or not contact_details:
-              flash("Please fill Name des partners, Firma, and Tel./ Fax / E-Mail before generating contract.", "warning")
-              return redirect(url_for("admin_profiles", tab=active_tab))
-
-            session_date = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-            db.commit()
-            pdf_buffer = generate_contract_pdf(
-              partner_name,
-              company_name,
-              contact_details,
-            )
-            return send_file(
-              pdf_buffer,
-              mimetype="application/pdf",
-              as_attachment=True,
-              download_name=f"client_contract_{site.id}_{session_date}.pdf",
-            )
-
-          db.commit()
-          flash(f"Client profile updated for {site.name}.")
-
-      redirect_args = {"tab": active_tab}
-      if active_tab == "clients":
-        redirect_args["clients_page"] = clients_page
-      if active_tab == "employees":
-        redirect_args["employees_page"] = employees_page
-      # Preserve search/filter parameters
-      if emp_search:
-        redirect_args["emp_search"] = emp_search
-      if emp_work_type_filter:
-        redirect_args["emp_work_type"] = emp_work_type_filter
-      if emp_role_filter:
-        redirect_args["emp_role"] = emp_role_filter
-      if client_search:
-        redirect_args["client_search"] = client_search
-      if client_vat_filter:
-        redirect_args["client_vat"] = client_vat_filter
-      return redirect(url_for("admin_profiles", **redirect_args))
-
-    # Build employee query with filters
-    emp_query = db.query(Employee)
-    if emp_search:
-      like = f"%{emp_search}%"
-      emp_query = emp_query.filter(
-        or_(
-          Employee.name.ilike(like),
-          Employee.profile_phone.ilike(like),
-          Employee.profile_address.ilike(like),
-          Employee.profile_city.ilike(like)
-        )
-      )
-    if emp_work_type_filter:
-      emp_query = emp_query.filter(Employee.profile_work_type == emp_work_type_filter)
-    if emp_role_filter:
-      emp_query = emp_query.filter(Employee.role.ilike(f"%{emp_role_filter}%"))
-
-    employees_per_page = 5
-    employees_total_count = emp_query.count()
-    employees_total_pages = max(1, math.ceil(employees_total_count / employees_per_page))
-    if employees_page > employees_total_pages:
-      employees_page = employees_total_pages
-    employees_offset = (employees_page - 1) * employees_per_page
-    employees = (
-      emp_query
-      .order_by(Employee.name.asc())
-      .offset(employees_offset)
-      .limit(employees_per_page)
+            try:
+              setattr(site, field_name, datetime.strptime(raw_value, "%Y-%m-%d").strftime("%d-%m-%Y"))
+            except ValueError:
+              date_error = True
+        if date_error:
+          db.rollback()
+          flash("Enter contract dates in a valid format.", "warning")
+          return redirect(url_for("admin_site_detail", site_id=site.id) + "#contract")
+        manager_id = request.form.get("manager_employee_id", type=int)
+        manager = db.get(Employee, manager_id) if manager_id else None
+        site.manager_employee_id = manager.id if manager and manager.access_role == "site_manager" else None
+      image_file = request.files.get("site_profile_image")
+      image_path = _save_profile_image(image_file, f"site_{site.id}", replace_path=site.profile_image_path)
+      if image_file and image_file.filename and not image_path:
+        db.rollback()
+        flash("Invalid site image. Use PNG, JPG, GIF, WEBP, or HEIC.", "warning")
+        return redirect(url_for("admin_site_detail", site_id=site.id) + "#general")
+      if image_path:
+        site.profile_image_path = image_path
+      site_saved = False
+      try:
+        db.commit()
+        _ensure_site_customer_id(db, site)
+        db.commit()
+        site_saved = True
+        flash("Site profile saved.", "success")
+      except Exception:
+        db.rollback()
+        app.logger.exception("Could not update site profile site_id=%s", site.id)
+        flash("The site profile could not be saved. Please try again.", "warning")
+      if site_saved and (request.form.get("profile_action") or "") == "generate_contract" and is_main_admin:
+        partner_name = (site.contract_partner_name or "").strip()
+        company_name = (site.profile_company_name or site.name or "").strip()
+        contact_details = (site.contract_contact_details or "").strip()
+        if not partner_name or not company_name or not contact_details:
+          flash("Fill in the contract partner, company, and contact details before generating the contract.", "warning")
+          return redirect(url_for("admin_site_detail", site_id=site.id) + "#contract")
+        pdf_buffer = generate_contract_pdf(partner_name, company_name, contact_details)
+        return send_file(pdf_buffer, mimetype="application/pdf", as_attachment=True, download_name=f"client_contract_{site.id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf")
+      return redirect(url_for("admin_site_detail", site_id=site.id) + "#information")
+    shifts = (
+      db.query(Shift)
+      .filter(Shift.site_id == site.id)
+      .order_by(Shift.day.desc(), Shift.start_time.desc())
+      .limit(20)
       .all()
     )
-
-    employees_has_prev = employees_page > 1
-    employees_has_next = employees_page < employees_total_pages
-    employees_prev_page = employees_page - 1 if employees_has_prev else 1
-    employees_next_page = employees_page + 1 if employees_has_next else employees_total_pages
-
-    # Build sites query with filters
-    sites_query = db.query(Site)
-    if client_search:
-      like = f"%{client_search}%"
-      sites_query = sites_query.filter(
-        or_(
-          Site.name.ilike(like),
-          Site.address.ilike(like),
-          Site.profile_company_name.ilike(like),
-          Site.profile_contact_name.ilike(like),
-          Site.profile_contact_email.ilike(like)
-        )
-      )
-    if client_vat_filter:
-      sites_query = sites_query.filter(Site.profile_vat_id.ilike(f"%{client_vat_filter}%"))
-    sites_all = sites_query.order_by(Site.name.asc()).all()
-    generated_any_customer_ids = False
-    for site in sites_all:
-      if not (site.profile_tax_id or "").strip():
-        _ensure_site_customer_id(db, site)
-        generated_any_customer_ids = True
-    if generated_any_customer_ids:
-      db.commit()
-
-    clients_per_page = 5
-    clients_total_count = len(sites_all)
-    clients_total_pages = max(1, math.ceil(clients_total_count / clients_per_page))
-    if clients_page > clients_total_pages:
-      clients_page = clients_total_pages
-    clients_start = (clients_page - 1) * clients_per_page
-    clients_end = clients_start + clients_per_page
-    sites = sites_all[clients_start:clients_end]
-
-    clients_has_prev = clients_page > 1
-    clients_has_next = clients_page < clients_total_pages
-    clients_prev_page = clients_page - 1 if clients_has_prev else 1
-    clients_next_page = clients_page + 1 if clients_has_next else clients_total_pages
-
+    invoices = (
+      db.query(Invoice)
+      .filter(Invoice.site_id == site.id)
+      .order_by(Invoice.issued_date.desc(), Invoice.id.desc())
+      .limit(20)
+      .all()
+    ) if not is_site_manager and not is_sales_manager else []
+    shift_count = db.query(func.count(Shift.id)).filter(Shift.site_id == site.id).scalar() or 0
+    def site_contract_date_input(raw_value: str | None) -> str:
+      if not raw_value:
+        return ""
+      for date_format in ("%d-%m-%Y", "%Y-%m-%d"):
+        try:
+          return datetime.strptime(raw_value, date_format).strftime("%Y-%m-%d")
+        except ValueError:
+          continue
+      return ""
     return render_template_string(
-      ADMIN_PROFILES_TEMPLATE,
-      active_page="profiles",
-      active_tab=active_tab,
-      employees=employees,
-      sites=sites,
-      employees_page=employees_page,
-      employees_total_pages=employees_total_pages,
-      employees_total_count=employees_total_count,
-      employees_has_prev=employees_has_prev,
-      employees_has_next=employees_has_next,
-      employees_prev_page=employees_prev_page,
-      employees_next_page=employees_next_page,
-      clients_page=clients_page,
-      clients_total_pages=clients_total_pages,
-      clients_total_count=clients_total_count,
-      clients_has_prev=clients_has_prev,
-      clients_has_next=clients_has_next,
-      clients_prev_page=clients_prev_page,
-      clients_next_page=clients_next_page,
-      emp_search=emp_search,
-      emp_work_type_filter=emp_work_type_filter,
-      emp_role_filter=emp_role_filter,
-      client_search=client_search,
-      client_vat_filter=client_vat_filter,
+      CLIENT_DETAIL_TEMPLATE,
+      active_page="sites",
+      site=site,
+      shifts=shifts,
+      invoices=invoices,
+      shift_count=shift_count,
+      is_site_manager=is_site_manager or is_sales_manager,
+      is_main_admin=session.get("role") == "admin",
+      is_sales_manager=is_sales_manager,
+      site_managers=db.query(Employee).filter(Employee.access_role == "site_manager", Employee.is_active.is_(True)).order_by(Employee.name.asc()).all(),
+      contract_start_input=site_contract_date_input(site.contract_start_date),
+      contract_end_input=site_contract_date_input(site.contract_end_date),
     )
   finally:
     db.close()
 
 
-@app.route("/leads", methods=["GET", "POST"])
+@app.route("/admin/profiles", methods=["GET", "POST"])
 @login_required
+def admin_profiles():
+  """Redirect legacy profile URLs to the current employee/client databases."""
+  tab = (request.args.get("tab") or request.form.get("tab") or "employees").strip().lower()
+  if tab == "clients":
+    params = {
+      "q": (request.args.get("client_search") or request.form.get("client_search") or "").strip(),
+      "page": request.args.get("clients_page", type=int) or request.form.get("clients_page", type=int),
+    }
+    vat = (request.args.get("client_vat") or request.form.get("client_vat") or "").strip()
+    if vat:
+      params["q"] = " ".join(part for part in (params["q"], vat) if part)
+    return redirect(url_for("admin_sites", **{key: value for key, value in params.items() if value}))
+
+  params = {
+    "q": (request.args.get("emp_search") or request.form.get("emp_search") or "").strip(),
+    "page": request.args.get("employees_page", type=int) or request.form.get("employees_page", type=int),
+    "work_type": (request.args.get("emp_work_type") or request.form.get("emp_work_type") or "").strip(),
+    "role": (request.args.get("emp_role") or request.form.get("emp_role") or "").strip(),
+  }
+  return redirect(url_for("admin_employees", **{key: value for key, value in params.items() if value}))
+@app.route("/leads", methods=["GET", "POST"])
+@site_or_sales_manager_required
 def leads_dashboard():
     db = SessionLocal()
     try:
@@ -11832,7 +13880,7 @@ def leads_dashboard():
 
 
 @app.route("/leads/stage", methods=["POST"])
-@login_required
+@site_or_sales_manager_required
 def leads_stage():
     data = request.get_json(silent=True) or {}
     lead_id = data.get("id")
@@ -11852,7 +13900,7 @@ def leads_stage():
 
 
 @app.route("/schedule/pdf")
-@login_required
+@site_manager_required
 def schedule_pdf():
     if not REPORTLAB_AVAILABLE:
         return jsonify({"error": "reportlab not installed"}), 503
@@ -11861,13 +13909,34 @@ def schedule_pdf():
     employee_id = request.args.get("employee_id", type=int)
     weeks = request.args.get("weeks", default=1, type=int) or 1
     weeks = max(1, min(weeks, 12))
+    period = request.args.get("period", "week")
     ref_date = None
     if week_param:
         try:
             ref_date = datetime.strptime(week_param, "%Y-%m-%d").date()
         except ValueError:
             ref_date = None
-    week_days = _get_day_range(ref_date, weeks=weeks)
+    ref_date = ref_date or date.today()
+    if period == "month":
+        month_start = ref_date.replace(day=1)
+        next_month_start = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+        week_days = _get_day_range(month_start, days=(next_month_start - month_start).days)
+    elif period == "custom":
+        end_date_str = request.args.get("end_date", "")
+        try:
+            range_end = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            range_end = ref_date
+        if range_end < ref_date:
+            ref_date, range_end = range_end, ref_date
+        range_length = max(1, min((range_end - ref_date).days + 1, 84))
+        week_days = _get_day_range(ref_date, days=range_length)
+    elif period == "day":
+        week_days = [ref_date]
+    elif period == "fortnight":
+        week_days = _get_day_range(ref_date, weeks=2)
+    else:
+        week_days = _get_day_range(ref_date, weeks=weeks)
 
     db = SessionLocal()
     try:
@@ -11948,13 +14017,14 @@ def home():
 
 
 @app.route("/crawler", methods=["GET", "POST"])
-@login_required
+@sales_manager_or_admin_required
 def index():
     if request.method == "GET":
         return render_template_string(
             HTML_TEMPLATE,
             gpt_enabled=bool(openai_client),
             active_page="crawler",
+            is_sales_manager=session.get("role") == "sales_manager",
         )
 
     if not REPORTLAB_AVAILABLE:
@@ -11989,7 +14059,7 @@ def index():
 
 
 @app.route("/gpt", methods=["POST"])
-@login_required
+@sales_manager_or_admin_required
 def gpt_assistant():
     if openai_client is None:
         return (
@@ -12300,20 +14370,20 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     """Generate a professional PDF invoice matching German invoice format."""
     if not REPORTLAB_AVAILABLE:
         raise ValueError("reportlab is required for PDF generation")
-    
+
     pdf_buffer = io.BytesIO()
     doc = SimpleDocTemplate(
-        pdf_buffer, 
+        pdf_buffer,
         pagesize=A4,
         leftMargin=0.75*inch,
         rightMargin=0.75*inch,
         topMargin=0.75*inch,
         bottomMargin=0.75*inch
     )
-    
+
     # Styles
     styles = getSampleStyleSheet()
-    
+
     # Custom styles matching the invoice design
     sender_style = ParagraphStyle(
         'SenderStyle',
@@ -12322,7 +14392,7 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
         textColor=colors.HexColor('#666666'),
         leading=9
     )
-    
+
     address_style = ParagraphStyle(
         'AddressStyle',
         parent=styles['Normal'],
@@ -12330,7 +14400,7 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
         leading=12,
         textColor=colors.HexColor('#000000')
     )
-    
+
     invoice_header_style = ParagraphStyle(
       'InvoiceHeader',
       parent=styles['Normal'],
@@ -12357,7 +14427,7 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
       textColor=colors.HexColor('#000000'),
       alignment=2
     )
-    
+
     invoice_number_style = ParagraphStyle(
         'InvoiceNumber',
         parent=styles['Normal'],
@@ -12366,7 +14436,7 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
         textColor=colors.HexColor('#000000'),
         spaceAfter=30
     )
-    
+
     greeting_style = ParagraphStyle(
         'GreetingStyle',
         parent=styles['Normal'],
@@ -12374,7 +14444,7 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
         leading=14,
         textColor=colors.HexColor('#000000')
     )
-    
+
     table_header_style = ParagraphStyle(
         'TableHeader',
         parent=styles['Normal'],
@@ -12382,7 +14452,7 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
         fontName='Helvetica-Bold',
         textColor=colors.HexColor('#000000')
     )
-    
+
     footer_style = ParagraphStyle(
         'FooterStyle',
         parent=styles['Normal'],
@@ -12390,17 +14460,17 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
         leading=9,
         textColor=colors.HexColor('#666666')
     )
-    
+
     # Content
     elements = []
-    
+
     # Top section with sender info and invoice details
     sender_text = "Staffconnecting • Simmeringer Hauptstraße 24 - 1110 Wien"
     # Use current date for invoice and delivery date
     current_date = datetime.now().strftime("%d.%m.%Y")
     invoice_date = current_date
     delivery_date = current_date
-    
+
     # Customer number from profile-generated customer ID
     customer_number = (
       (invoice.site_tax_id or "").strip()
@@ -12449,14 +14519,14 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
       recipient_address_lines.append("Österreich")
 
     recipient_extra_lines: list[str] = []
-    
+
     # Logo path (drawn on canvas to avoid layout shifts)
     logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'stafflogo.png')
     logo_flowable = None
     if os.path.exists(logo_path):
       logo_flowable = Image(logo_path, width=1.6 * inch, height=0.4 * inch)
       logo_flowable.hAlign = "LEFT"
-    
+
     vat_id = ((invoice.site.profile_vat_id or "").strip() if invoice.site else "")
     contract_start = ((invoice.site.contract_start_date or "").strip() if invoice.site else "")
     contract_end = ((invoice.site.contract_end_date or "").strip() if invoice.site else "")
@@ -12523,20 +14593,20 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     ]))
     elements.append(header_table)
     elements.append(Spacer(1, 0.4*inch))
-    
+
     # Invoice title
     elements.append(Paragraph(f'Rechnung Nr. {_format_invoice_number(invoice.invoice_number)}', invoice_number_style))
     elements.append(Spacer(1, 0.15*inch))
-    
+
     # Greeting
     elements.append(Paragraph('Sehr geehrte Damen und Herren,', greeting_style))
     elements.append(Spacer(1, 0.1*inch))
-    
+
     # Intro text
     intro_text = "vielen Dank für Ihren Auftrag und das damit verbundene Vertrauen!<br/>Hiermit stelle ich Ihnen die folgenden Leistungen in Rechnung."
     elements.append(Paragraph(intro_text, greeting_style))
     elements.append(Spacer(1, 0.2*inch))
-    
+
     # Calculate totals (no discount shown)
     unit_price = invoice.hourly_rate
     quantity = invoice.total_hours
@@ -12544,7 +14614,7 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     original_total = unit_price * quantity
     discount_amount = original_total * discount_rate
     discounted_total = original_total - discount_amount
-    
+
     # Items table
     table_data = [
         [
@@ -12562,9 +14632,9 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
             f'{original_total:.2f} €'
         ]
     ]
-    
+
     # No discount row
-    
+
     invoice_table = Table(table_data, colWidths=[0.5*inch, 2.5*inch, 0.8*inch, 1.2*inch, 1.5*inch])
     invoice_table.setStyle(TableStyle([
         # Header row
@@ -12589,19 +14659,19 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     ]))
     elements.append(invoice_table)
     elements.append(Spacer(1, 0.15*inch))
-    
+
     # Totals section
     net_total = invoice.subtotal if invoice.subtotal else discounted_total
     tax_amount = invoice.tax_amount if invoice.tax_amount else 0
     tax_rate_percent = invoice.tax_rate * 100 if invoice.tax_rate else 20
     gross_total = invoice.total_amount if invoice.total_amount else (net_total + tax_amount)
-    
+
     totals_data = [
       ['', '', '', 'Gesamtbetrag netto', f'{net_total:.2f} €'],
       ['', '', '', f'zzgl. Umsatzsteuer {tax_rate_percent:.0f}%', f'{tax_amount:.2f} €'],
       ['', '', '', 'Gesamtbetrag brutto', f'{gross_total:.2f} €']
     ]
-    
+
     totals_table = Table(totals_data, colWidths=[0.5*inch, 2.5*inch, 0.8*inch, 1.2*inch, 1.5*inch])
     totals_table.setStyle(TableStyle([
         ('ALIGN', (3, 0), (4, -1), 'RIGHT'),
@@ -12616,30 +14686,30 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     ]))
     elements.append(totals_table)
     elements.append(Spacer(1, 0.2*inch))
-    
+
     # Payment terms
     due_days = 31
     if invoice.due_date:
         due_days = (invoice.due_date - invoice.issued_date).days if invoice.issued_date else 31
-    
+
     payment_text = f'Zahlungsbedingungen: Zahlung innerhalb von {due_days} Tagen ab Rechnungseingang ohne Abzüge.'
     elements.append(Paragraph(payment_text, greeting_style))
     elements.append(Spacer(1, 0.1*inch))
-    
+
     bank_info_text = f'Bitte überweisen Sie den Rechnungsbetrag unter Angabe der Rechnungsnummer auf das unten angegebene Konto.'
     elements.append(Paragraph(bank_info_text, greeting_style))
     elements.append(Spacer(1, 0.05*inch))
-    
+
     # Due date
     due_date_str = invoice.due_date.strftime("%d.%m.%Y") if invoice.due_date else (datetime.now() + timedelta(days=31)).strftime("%d.%m.%Y")
     due_date_text = f'Der Rechnungsbetrag ist bis zum {due_date_str} fällig.'
     elements.append(Paragraph(due_date_text, greeting_style))
     elements.append(Spacer(1, 0.15*inch))
-    
+
     # Closing
     elements.append(Paragraph('Mit freundlichen Grüßen<br/>Sebastijan Kerculj', greeting_style))
     elements.append(Spacer(1, 0.5*inch))
-    
+
     # Build PDF
     def _draw_header_footer(canvas_obj, doc_obj):
       canvas_obj.saveState()
@@ -12709,7 +14779,7 @@ def send_invoice_email(invoice: Invoice, pdf_buffer: io.BytesIO) -> Tuple[bool, 
         from email.mime.base import MIMEBase
         from email.mime.text import MIMEText
         from email import encoders
-        
+
         smtp_server = (os.getenv("SMTP_SERVER") or os.getenv("SMTP_HOST") or "smtp.gmail.com").strip()
         smtp_port = int(os.getenv("SMTP_PORT", "587"))
 
@@ -12740,7 +14810,7 @@ def send_invoice_email(invoice: Invoice, pdf_buffer: io.BytesIO) -> Tuple[bool, 
             msg = "Email configuration missing. Set sender email and SMTP password."
             app.logger.warning(msg)
             return False, msg
-        
+
         recipient_email = (
           (invoice.site_contact_email or "").strip()
           or ((invoice.site.profile_contact_email or "").strip() if invoice.site else "")
@@ -12749,13 +14819,13 @@ def send_invoice_email(invoice: Invoice, pdf_buffer: io.BytesIO) -> Tuple[bool, 
             msg = f"No recipient email set for invoice {invoice.invoice_number}."
             app.logger.warning(msg)
             return False, msg
-        
+
         # Create message
         msg = MIMEMultipart()
         msg['From'] = f"{sender_name} <{sender_email}>" if sender_name else sender_email
         msg['To'] = recipient_email
         msg['Subject'] = f'Invoice {invoice.invoice_number} - {(invoice.site_company_name or invoice.site.name)}'
-        
+
         # Body
         body = f"""
 Dear {invoice.site_contact_name or invoice.site_company_name or 'Customer'},
@@ -12778,16 +14848,16 @@ Thank you for your business!
 Best regards,
 Your Company
         """
-        
+
         msg.attach(MIMEText(body, 'plain'))
-        
+
         # Attach PDF
         attachment = MIMEBase('application', 'octet-stream')
         attachment.set_payload(pdf_buffer.getvalue())
         encoders.encode_base64(attachment)
         attachment.add_header('Content-Disposition', f'attachment; filename= invoice_{invoice.invoice_number}.pdf')
         msg.attach(attachment)
-        
+
         # Send email
         if smtp_use_ssl:
             server = smtplib.SMTP_SSL(smtp_server, smtp_port)
@@ -12799,13 +14869,70 @@ Your Company
                 server.starttls()
             server.login(smtp_username, smtp_password)
             server.send_message(msg)
-        
+
         app.logger.info(f"Invoice {invoice.invoice_number} sent to {recipient_email}")
         return True, f"Invoice {invoice.invoice_number} sent to {recipient_email}"
-        
+
     except Exception as e:
         app.logger.error(f"Failed to send invoice email: {e}")
         return False, str(e)
+
+
+def send_employee_credentials_email(employee: Employee, pin: str) -> Tuple[bool, str]:
+  """Email employee sign-in details using the app's configured SMTP account."""
+  import smtplib
+  from email.message import EmailMessage
+
+  smtp_server = (os.getenv("SMTP_SERVER") or os.getenv("SMTP_HOST") or "smtp.gmail.com").strip()
+  try:
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+  except ValueError:
+    return False, "Email server configuration is invalid."
+  sender_email = (os.getenv("EMPLOYEE_CREDENTIALS_FROM_EMAIL") or "office@putzelf.com").strip()
+  sender_name = (os.getenv("EMPLOYEE_CREDENTIALS_FROM_NAME") or os.getenv("SMTP_FROM_NAME") or "Elf's Plan").strip()
+  smtp_username = (os.getenv("SMTP_USERNAME") or os.getenv("SMTP_USER") or os.getenv("SENDER_EMAIL") or sender_email).strip()
+  smtp_password = (os.getenv("SMTP_PASSWORD") or os.getenv("SMTP_PASS") or os.getenv("SENDER_PASSWORD") or "").strip()
+  recipient = (employee.login_email or "").strip()
+  if not sender_email or not smtp_password:
+    return False, "Email is not configured. Set SMTP_USERNAME and SMTP_PASSWORD for office@putzelf.com first."
+  if not recipient or not EMAIL_REGEX.fullmatch(recipient):
+    return False, "Enter a valid employee email address first."
+
+  tls_setting = (os.getenv("SMTP_SECURE") or "").strip().lower()
+  if tls_setting:
+    use_ssl = tls_setting in {"1", "true", "yes", "on"}
+    use_tls = not use_ssl
+  else:
+    use_tls = (os.getenv("SMTP_USE_TLS", "true") or "").strip().lower() in {"1", "true", "yes", "on"}
+    use_ssl = (os.getenv("SMTP_USE_SSL", "false") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+  public_url = (app.config.get("PUBLIC_APP_URL") or request.url_root.rstrip("/")).rstrip("/")
+  login_url = f"{public_url}{url_for('login')}"
+  message = EmailMessage()
+  message["From"] = f"{sender_name} <{sender_email}>" if sender_name else sender_email
+  message["To"] = recipient
+  message["Subject"] = "Your Elf's Plan sign-in details"
+  message.set_content(
+    f"Hello {employee.name},\n\n"
+    "Your Elf's Plan account is ready. Use these details to sign in:\n\n"
+    f"Login page: {login_url}\n"
+    f"Login code: {employee.login_code}\n"
+    f"PIN: {pin}\n\n"
+    "Please keep your PIN private.\n\n"
+    "Elf's Plan"
+  )
+  try:
+    smtp_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
+    with smtp_class(smtp_server, smtp_port) as server:
+      if use_tls and not use_ssl:
+        server.starttls()
+      server.login(smtp_username, smtp_password)
+      server.send_message(message)
+    app.logger.info("Employee sign-in details sent to employee_id=%s", employee.id)
+    return True, f"Sign-in details sent to {recipient}."
+  except Exception:
+    app.logger.exception("Failed to email sign-in details to employee_id=%s", employee.id)
+    return False, "Could not send the email. Check SMTP settings and try again."
 
 
 def _resolve_contract_template_path() -> str | None:
@@ -13457,12 +15584,12 @@ def admin_create_invoice():
                 month_end,
             )
             hourly_rate = site.hourly_rate or site.profile_default_hourly_rate or 50.0
-            
+
             # Calculate totals
             subtotal = total_hours * hourly_rate
             tax_amount = subtotal * (tax_rate / 100)
             total_amount = subtotal + tax_amount
-            
+
             invoice = Invoice(
               invoice_number=_generate_invoice_number(session_obj),
                 site_id=site.id,
@@ -13482,13 +15609,13 @@ def admin_create_invoice():
                 due_date=datetime.utcnow() + timedelta(days=days_until_due),
                 notes=notes
             )
-            
+
             session_obj.add(invoice)
             session_obj.commit()
-            
+
             flash(f"Invoice {invoice.invoice_number} created successfully!", "success")
             return redirect(url_for("admin_invoices"))
-        
+
         sites = session_obj.query(Site).all()
         generated_any_customer_ids = False
         for site in sites:
@@ -13516,7 +15643,7 @@ def admin_view_invoice(invoice_id):
         invoice = session_obj.query(Invoice).get(invoice_id)
         if not invoice:
             return "Invoice not found", 404
-        
+
         return render_template_string(
           INVOICE_VIEW_TEMPLATE,
           invoice=invoice,
@@ -13672,7 +15799,7 @@ def admin_invoice_pdf(invoice_id):
         invoice = session_obj.query(Invoice).get(invoice_id)
         if not invoice:
             return "Invoice not found", 404
-        
+
         pdf_buffer = generate_invoice_pdf(invoice)
         return send_file(
             pdf_buffer,
@@ -13693,17 +15820,17 @@ def admin_send_invoice_email(invoice_id):
         invoice = session_obj.query(Invoice).get(invoice_id)
         if not invoice:
             return "Invoice not found", 404
-        
+
         pdf_buffer = generate_invoice_pdf(invoice)
         success, detail = send_invoice_email(invoice, pdf_buffer)
-        
+
         if success:
             invoice.status = "sent"
             session_obj.commit()
             flash(f"Invoice {invoice.invoice_number} sent to {invoice.site_contact_email}", "success")
         else:
           flash(f"Failed to send email: {detail}", "error")
-        
+
         return redirect(url_for("admin_view_invoice", invoice_id=invoice_id))
     finally:
         session_obj.close()
@@ -13907,6 +16034,28 @@ def _run_monthly_invoice_generation_from_cli() -> int:
         return 1
     finally:
         session_obj.close()
+
+
+# Operations pages: public document library, QR code, and monthly inspections.
+from service_portal import create_service_portal_blueprint
+
+app.register_blueprint(create_service_portal_blueprint(
+    session_factory=SessionLocal,
+    Employee=Employee,
+    Site=Site,
+    SiteInspectionArea=SiteInspectionArea,
+    SiteInspection=SiteInspection,
+    InspectionItem=InspectionItem,
+    PublicDocument=PublicDocument,
+    manager_required=site_manager_required,
+    login_required=login_required,
+    public_document_folder=PUBLIC_DOCUMENT_FOLDER,
+    inspection_photo_folder=INSPECTION_PHOTO_FOLDER,
+    public_app_url=app.config["PUBLIC_APP_URL"],
+    reportlab_available=REPORTLAB_AVAILABLE,
+    pdf_canvas=canvas,
+    page_size=A4,
+))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,325 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — URL Contact Crawler</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-info: linear-gradient(135deg,#38bdf8 0%,#0ea5e9 50%,#2563eb 100%);
+      --btn-grad-info-hover: linear-gradient(135deg,#0ea5e9 0%,#2563eb 50%,#1d4ed8 100%);
+      --btn-grad-light: linear-gradient(135deg,#ffffff 0%,#f8fafc 100%);
+      --btn-grad-light-hover: linear-gradient(135deg,#f1f5f9 0%,#e2e8f0 100%);
+    }
+    body { background:#f1f5f9; color:#0f172a; font-size:1.05rem; min-height:100vh; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); background:#ffffff; transition:grid-template-columns 0.2s ease; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; color:#0f172a; display:flex; flex-direction:column; padding:1.5rem 1.25rem; gap:1.5rem; width:260px; transition:width 0.2s ease, padding 0.2s ease; }
+    .sidebar-brand { display:flex; align-items:center; gap:0.75rem; }
+    .sidebar-logo { height:40px; width:40px; border-radius:12px; background:radial-gradient(circle at 10% 0, #22c55e 0%, #0ea5e9 45%, #1d4ed8 100%); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .sidebar-logo img { max-width:80%; max-height:80%; object-fit:contain; }
+    .sidebar-title { font-weight:600; letter-spacing:0.03em; font-size:0.95rem; text-transform:uppercase; color:#0f172a; }
+    .sidebar-sub { font-size:0.78rem; color:#475569; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; margin-bottom:0.4rem; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; display:flex; align-items:center; gap:0.5rem; text-decoration:none; border:1px solid transparent; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill:hover, .nav-pill.active { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
+    .nav-pill-icon { width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:#ecfdf5; color:#0f766e; font-size:0.9rem; }
+    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .sidebar-footer { margin-top:auto; font-size:0.75rem; color:#475569; }
+    .main-shell { background:#ffffff; padding:1.6rem 1.75rem; display:flex; flex-direction:column; gap:1rem; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+    .topbar-title { color:#64748b; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; font-size:0.78rem; }
+    .topbar-heading { color:#0f172a; margin:0.05rem 0 0.2rem; font-size:1.4rem; font-weight:600; }
+    .topbar-subtitle { color:#475569; font-size:0.9rem; max-width:480px; }
+    .topbar-chip { font-size:0.72rem; padding:0.2rem 0.55rem; border-radius:999px; border:1px solid rgba(15,118,110,0.35); color:#0f766e; background:#ecfdf5; text-transform:uppercase; letter-spacing:0.08em; }
+    .topbar-user { display:flex; align-items:center; gap:0.75rem; color:#0f172a; }
+    .user-avatar { width:32px; height:32px; border-radius:999px; background:radial-gradient(circle at 10% 0, #0ea5e9 0%, #6366f1 60%, #4f46e5 100%); display:inline-flex; align-items:center; justify-content:center; font-size:0.9rem; font-weight:600; color:#ffffff; }
+    .user-meta { font-size:0.8rem; text-align:right; }
+    .user-meta span { display:block; }
+    .user-meta span:first-child { color:#0f172a; font-weight:600; }
+    .user-meta span:nth-child(2) { color:#0f766e; }
+    .user-meta span:last-child { color:#64748b; }
+    .content-shell { margin-top:0.25rem; border-radius:1rem; background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 24px 48px rgba(15,23,42,0.08); padding:1.25rem 1.35rem 1.4rem; display:flex; flex-direction:column; gap:1.1rem; }
+    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.15rem; color:#0f172a; box-shadow:0 12px 24px rgba(15,23,42,0.06); }
+    .card-header-line { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-bottom:0.9rem; }
+    .card-title { font-size:0.95rem; font-weight:600; color:#0f172a; }
+    .card-subtitle { font-size:0.82rem; color:#64748b; margin-bottom:0; }
+    .badge-soft { border-radius:999px; border:1px solid #cbd5f5; color:#4c51bf; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
+    .btn { font-size:1rem; padding:0.65rem 1.1rem; border-radius:0.75rem; min-height:2.7rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; box-shadow:0 10px 20px rgba(15,23,42,0.08); transition:transform 0.15s ease, box-shadow 0.15s ease; }
+    .btn-sm { font-size:0.92rem; padding:0.5rem 0.9rem; border-radius:0.7rem; min-height:2.4rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 16px 28px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-link { background:none; box-shadow:none; color:#0f766e; }
+    .btn-link:hover { color:#0c615b; }
+    .small-note { font-size:0.82rem; color:#64748b; }
+    .divider-label { text-transform:uppercase; font-size:0.72rem; letter-spacing:0.08em; color:#94a3b8; }
+    .chat-bubble { border-radius:0.75rem; background:#f8fafc; padding:0.65rem 0.8rem; font-size:0.86rem; border:1px dashed #cbd5f5; color:#475569; }
+    .assistant-badge { font-size:0.78rem; padding:0.15rem 0.6rem; border-radius:999px; background:#eef2ff; color:#4c51bf; border:1px solid #cbd5f5; }
+    .chat-output { white-space:pre-wrap; font-size:0.86rem; color:#0f172a; background:#f8fafc; border:1px solid #e2e8f0; border-radius:0.75rem; }
+    .sidebar-collapsed .app-shell { grid-template-columns:72px minmax(0,1fr); }
+    .sidebar-collapsed .sidebar { width:72px; padding:1.1rem 0.6rem; }
+    .sidebar-collapsed .nav-text,
+    .sidebar-collapsed .sidebar-title,
+    .sidebar-collapsed .sidebar-sub,
+    .sidebar-collapsed .sidebar-section-title,
+    .sidebar-collapsed .sidebar-footer { display:none; }
+    .sidebar-collapsed .nav-pill { justify-content:center; padding:0.45rem; }
+    .sidebar-collapsed .nav-pill-icon { margin:0 auto; }
+    .sidebar-collapsed .sidebar-logo { margin:0 auto; }
+    @media (max-width: 992px) {
+      .app-shell { grid-template-columns:minmax(0,1fr); }
+      .sidebar { display:none; }
+      .main-shell { padding:1.25rem; }
+      .content-shell { padding:1rem; }
+    }
+    @media (max-width: 640px) {
+      .topbar { flex-direction:column; align-items:flex-start; }
+      .topbar-user { align-self:stretch; justify-content:space-between; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+{% include "partials/admin_sidebar.html" %}
+    <div class="main-shell">
+      <header class="topbar">
+        <div>
+          <div class="topbar-title">Dashboard</div>
+          <div class="d-flex align-items-center gap-2">
+            <h1 class="topbar-heading mb-0">URL Contact Crawler</h1>
+            <span class="topbar-chip">Live • Internal tool</span>
+          </div>
+          <p class="topbar-subtitle mb-0">
+            Crawl websites for verified emails and phone numbers, then let GPT draft tailored outreach — all in one place.
+          </p>
+        </div>
+        <div class="topbar-user">
+          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-secondary">☰</button>
+          <div class="text-end user-meta">
+            <span>Prospecting workspace</span>
+            <span>{{ 'GPT connected' if gpt_enabled else 'GPT not configured' }}</span>
+            <span><a href="{{ url_for('logout') }}" class="link-secondary small-note text-decoration-none">Logout</a></span>
+          </div>
+          <div class="user-avatar">PM</div>
+        </div>
+      </header>
+      <main class="content-shell">
+        <section class="row g-3 mt-1">
+          <div class="col-12 col-lg-6">
+            <div class="card-surface h-100">
+              <div class="card-header-line">
+                <div>
+                  <div class="card-title">1. Crawl new contacts</div>
+                  <div class="card-subtitle">
+                    Start from any page on a domain and collect emails and phone numbers into a polished PDF report.
+                  </div>
+                </div>
+                <span class="badge-soft">Crawler</span>
+              </div>
+              <form id="crawl-form" class="needs-validation" novalidate>
+                <div class="mb-3">
+                  <label for="start_url" class="form-label small-note text-uppercase">Start URL</label>
+                  <input type="url" class="form-control form-control-sm" id="start_url" name="start_url" placeholder="https://example.com" required>
+                  <div class="invalid-feedback">Please enter a valid URL to start crawling.</div>
+                </div>
+                <div class="mb-3">
+                  <label for="max_pages" class="form-label small-note text-uppercase">Max pages</label>
+                  <input type="number" class="form-control form-control-sm" id="max_pages" name="max_pages" min="1" max="200" value="100" required>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <button id="submit-btn" type="submit" class="btn btn-sm btn-primary">
+                    <span id="btn-spinner" class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+                    Crawl &amp; download PDF
+                  </button>
+                  <button id="reset-btn" type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('crawl-form').reset()">
+                    Reset
+                  </button>
+                  <div id="status" class="ms-1 small-note" aria-live="polite"></div>
+                </div>
+              </form>
+            </div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="card-surface h-100 d-flex flex-column">
+              <div class="card-header-line">
+                <div>
+                  <div class="card-title">2. AI outreach assistant</div>
+                  <div class="card-subtitle">
+                    Turn your crawled contacts into warm outreach sequences and summaries.
+                  </div>
+                </div>
+                <div class="text-end">
+                  <div class="assistant-badge mb-1">GPT-powered</div>
+                  <div class="small-note" id="gpt-status-info">
+                    {% if gpt_enabled %}Connected{% else %}API key missing{% endif %}
+                  </div>
+                </div>
+              </div>
+              <form id="gpt-form" class="d-flex flex-column flex-grow-1">
+                <div class="mb-2">
+                  <label for="gpt_prompt" class="form-label small-note text-uppercase">Prompt</label>
+                  <textarea id="gpt_prompt" class="form-control form-control-sm" name="gpt_prompt" rows="4" placeholder="Describe what you want GPT to generate, e.g. 'Draft a warm intro email for these contacts...'" required></textarea>
+                </div>
+                <div class="mb-3">
+                  <label for="gpt_context" class="form-label small-note text-uppercase">Optional: contacts / notes</label>
+                  <textarea id="gpt_context" class="form-control form-control-sm" name="gpt_context" rows="3" placeholder="Paste a few rows from your CSV or describe your ideal customer profile..."></textarea>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                  <button id="gpt-submit-btn" type="submit" class="btn btn-sm btn-outline-primary">
+                    <span id="gpt-spinner" class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+                    Ask GPT
+                  </button>
+                  <button id="gpt-clear-btn" type="button" class="btn btn-sm btn-link text-decoration-none small-note">
+                    Clear output
+                  </button>
+                  <div id="gpt-status" class="small-note" aria-live="polite"></div>
+                </div>
+                <div class="divider-label mb-2">GPT response</div>
+                <div id="gpt-output" class="chat-output border rounded-3 p-2 flex-grow-1" style="min-height:120px; max-height:260px; overflow:auto;"></div>
+              </form>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    (function () {
+      const KEY = 'pm-sidebar-collapsed';
+      const body = document.body;
+      const btn = document.getElementById('sidebar-toggle');
+      const setState = (val) => {
+        body.classList.toggle('sidebar-collapsed', val);
+        try { localStorage.setItem(KEY, val ? '1' : '0'); } catch (e) {}
+      };
+      const initial = (() => {
+        try {
+          const raw = localStorage.getItem(KEY);
+          if (raw === null) return true; // default: collapsed (icons only)
+          return raw === '1';
+        } catch (e) {
+          return true;
+        }
+      })();
+      setState(initial);
+      if (btn) {
+        btn.addEventListener('click', () => setState(!body.classList.contains('sidebar-collapsed')));
+      }
+    })();
+    (function () {
+      'use strict'
+      const form = document.getElementById('crawl-form');
+      form.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!form.checkValidity()) {
+          form.classList.add('was-validated');
+          return;
+        }
+        const btn = document.getElementById('submit-btn');
+        const spinner = document.getElementById('btn-spinner');
+        const status = document.getElementById('status');
+        btn.disabled = true;
+        spinner.classList.remove('d-none');
+        status.textContent = 'Crawling… this may take a while';
+        try {
+          const formData = new FormData(form);
+          const resp = await fetch('/crawler', { method: 'POST', body: formData });
+          if (!resp.ok) {
+            const errText = await resp.text();
+            throw new Error('Server returned ' + resp.status + (errText ? ' – ' + errText : ''));
+          }
+          const blob = await resp.blob();
+          let filename = 'contacts.pdf';
+          const cd = resp.headers.get('content-disposition');
+          if (cd) {
+            const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/);
+            if (m) filename = decodeURIComponent((m[1] || m[2]).replace(/["']/g, ''));
+          }
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          status.textContent = 'Download started';
+        } catch (err) {
+          console.error(err);
+          status.textContent = 'Error: ' + (err.message || 'Unexpected error');
+        } finally {
+          btn.disabled = false;
+          spinner.classList.add('d-none');
+          setTimeout(() => { status.textContent = ''; }, 6000);
+        }
+      }, false);
+    })();
+    (function () {
+      'use strict';
+      const form = document.getElementById('gpt-form');
+      if (!form) return;
+      const promptEl = document.getElementById('gpt_prompt');
+      const contextEl = document.getElementById('gpt_context');
+      const outputEl = document.getElementById('gpt-output');
+      const statusEl = document.getElementById('gpt-status');
+      const btn = document.getElementById('gpt-submit-btn');
+      const spinner = document.getElementById('gpt-spinner');
+      const clearBtn = document.getElementById('gpt-clear-btn');
+      clearBtn.addEventListener('click', function () {
+        outputEl.textContent = '';
+        statusEl.textContent = '';
+      });
+      form.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const prompt = (promptEl.value || '').trim();
+        const context = (contextEl.value || '').trim();
+        if (!prompt) {
+          promptEl.focus();
+          return;
+        }
+        btn.disabled = true;
+        spinner.classList.remove('d-none');
+        statusEl.textContent = 'Asking GPT...';
+        try {
+          const resp = await fetch('/gpt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, context })
+          });
+          if (!resp.ok) {
+            const errText = await resp.text();
+            throw new Error('Server returned ' + resp.status + ' – ' + errText);
+          }
+          const data = await resp.json();
+          outputEl.textContent = data.reply || '(No response text returned)';
+          statusEl.textContent = 'Done';
+        } catch (err) {
+          console.error(err);
+          statusEl.textContent = 'Error: ' + (err.message || 'Unexpected error');
+        } finally {
+          btn.disabled = false;
+          spinner.classList.add('d-none');
+          setTimeout(() => { statusEl.textContent = ''; }, 6000);
+        }
+      });
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

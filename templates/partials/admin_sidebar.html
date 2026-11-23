@@ -1,0 +1,33 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='admin-sidebar.css') }}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+{% set sidebar_role = session.get('role', 'admin') %}
+{% set sidebar_de = current_lang|default('en') == 'de' %}
+{% set sidebar_home = url_for('ops.site_manager_home') if sidebar_role == 'site_manager' else (url_for('admin_sites') if sidebar_role == 'sales_manager' else url_for('admin_dashboard')) %}
+<button class="ep-sidebar-mobile-toggle" type="button" aria-label="{{ 'Menü öffnen' if sidebar_de else 'Open menu' }}" aria-expanded="false"><i class="bi bi-list"></i></button>
+<div class="ep-sidebar-scrim" aria-hidden="true"></div>
+<aside id="admin-sidebar" class="sidebar admin-sidebar ep-admin-sidebar" aria-label="{{ 'Hauptnavigation' if sidebar_de else 'Main navigation' }}">
+  <a class="ep-sidebar-brand" href="{{ sidebar_home }}"><span class="ep-sidebar-logo"><img src="{{ url_for('static', filename='employee-icon-192.png') }}" alt=""></span><span class="ep-sidebar-brand-copy"><strong>Elf's Plan</strong><small>{{ 'Verwaltungsbereich' if sidebar_de else 'Management workspace' }}</small></span></a>
+  <div class="ep-sidebar-section">{{ 'Arbeitsbereich' if sidebar_de else 'Workspace' }}</div>
+  {% if sidebar_role != 'sales_manager' %}<a href="{{ sidebar_home }}" title="{{ 'Übersicht' if sidebar_de else 'Overview' }}" class="nav-pill {% if active_page == 'dashboard' %}active{% endif %}"><span class="ep-sidebar-icon"><i class="bi bi-grid-1x2-fill"></i></span><span class="nav-text">{{ 'Übersicht' if sidebar_de else 'Overview' }}</span></a>{% endif %}
+  <a href="{{ url_for('admin_employees') }}" title="{{ 'Mitarbeiter' if sidebar_de else 'Employees' }}" class="nav-pill {% if active_page == 'employees' %}active{% endif %}"><span class="ep-sidebar-icon"><i class="bi bi-people-fill"></i></span><span class="nav-text">{{ 'Mitarbeiter' if sidebar_de else 'Employees' }}</span></a>
+  <a href="{{ url_for('admin_sites') }}" title="{{ 'Kunden & Standorte' if sidebar_de else 'Clients & sites' }}" class="nav-pill {% if active_page == 'sites' %}active{% endif %}"><span class="ep-sidebar-icon"><i class="bi bi-buildings-fill"></i></span><span class="nav-text">{{ 'Kunden & Standorte' if sidebar_de else 'Clients & sites' }}</span></a>
+  {% if sidebar_role != 'sales_manager' %}<a href="{{ url_for('schedule_dashboard') }}" title="{{ 'Schichtplanung' if sidebar_de else 'Scheduling' }}" class="nav-pill {% if active_page == 'schedule' %}active{% endif %}"><span class="ep-sidebar-icon"><i class="bi bi-calendar3"></i></span><span class="nav-text">{{ 'Schichtplanung' if sidebar_de else 'Scheduling' }}</span></a>{% endif %}
+  {% if sidebar_role in ['admin', 'main_admin', 'site_manager'] %}
+  <details class="ep-sidebar-group" {% if active_page in ['inspection', 'inspection_report', 'inspection_areas', 'resources', 'qr'] %}open{% endif %}>
+    <summary title="{{ 'Prüfungen' if sidebar_de else 'Inspections' }}"><span class="ep-sidebar-icon"><i class="bi bi-clipboard2-check-fill"></i></span><span class="nav-text">{{ 'Prüfungen' if sidebar_de else 'Inspections' }}</span><i class="bi bi-chevron-down ep-sidebar-chevron"></i></summary>
+    {% if sidebar_role == 'site_manager' %}<a href="{{ url_for('ops.manager_inspections') }}" class="ep-sidebar-subitem {% if active_page == 'inspection' %}active{% endif %}">{{ 'Monatliche Prüfung' if sidebar_de else 'Monthly inspections' }}</a>{% else %}<a href="{{ url_for('ops.admin_inspection_report') }}" class="ep-sidebar-subitem {% if active_page == 'inspection_report' %}active{% endif %}">{{ 'Prüfberichte' if sidebar_de else 'Inspection reports' }}</a><a href="{{ url_for('ops.admin_inspection_areas') }}" class="ep-sidebar-subitem {% if active_page == 'inspection_areas' %}active{% endif %}">{{ 'Prüfbereiche' if sidebar_de else 'Inspection areas' }}</a><a href="{{ url_for('ops.admin_public_documents') }}" class="ep-sidebar-subitem {% if active_page == 'resources' %}active{% endif %}">{{ 'Öffentliche Dokumente' if sidebar_de else 'Public documents' }}</a><a href="{{ url_for('ops.admin_qr_code') }}" class="ep-sidebar-subitem {% if active_page == 'qr' %}active{% endif %}">{{ 'QR-Code' if sidebar_de else 'QR code' }}</a>{% endif %}
+  </details>
+  {% endif %}
+  {% if sidebar_role in ['admin', 'main_admin', 'site_manager', 'sales_manager'] %}
+  <details class="ep-sidebar-group ep-sidebar-coming-soon" {% if active_page in ['leads', 'crawler', 'invoices'] %}open{% endif %}>
+    <summary title="{{ 'Demn&auml;chst' if sidebar_de else 'Coming soon' }}"><span class="ep-sidebar-icon"><i class="bi bi-stars"></i></span><span class="nav-text">{{ 'Demn&auml;chst' if sidebar_de else 'Coming soon' }}</span><i class="bi bi-chevron-down ep-sidebar-chevron"></i></summary>
+    {% if sidebar_role in ['admin', 'main_admin', 'site_manager', 'sales_manager'] %}<a href="{{ url_for('leads_dashboard') }}" title="{{ 'Lead-Center' if sidebar_de else 'Lead Center' }}" class="ep-sidebar-subitem {% if active_page == 'leads' %}active{% endif %}"><i class="bi bi-funnel-fill"></i> {{ 'Lead-Center' if sidebar_de else 'Lead Center' }}</a>{% endif %}
+    {% if sidebar_role in ['admin', 'main_admin', 'sales_manager'] %}<a href="{{ url_for('index') }}" title="Crawler" class="ep-sidebar-subitem {% if active_page == 'crawler' %}active{% endif %}"><i class="bi bi-search"></i> Crawler</a>{% endif %}
+    {% if sidebar_role in ['admin', 'main_admin'] %}<a href="{{ url_for('admin_invoices') }}" title="{{ 'Rechnungen' if sidebar_de else 'Invoices' }}" class="ep-sidebar-subitem {% if active_page == 'invoices' %}active{% endif %}"><i class="bi bi-receipt-cutoff"></i> {{ 'Rechnungen' if sidebar_de else 'Invoices' }}</a>{% endif %}
+  </details>
+  {% endif %}
+  <div class="ep-sidebar-spacer"></div>
+  <div class="ep-sidebar-section">{{ 'Konto' if sidebar_de else 'Account' }}</div>
+  <a href="{{ url_for('logout') }}" title="{{ 'Abmelden' if sidebar_de else 'Log out' }}" class="nav-pill nav-pill-logout"><span class="ep-sidebar-icon"><i class="bi bi-box-arrow-left"></i></span><span class="nav-text">{{ 'Abmelden' if sidebar_de else 'Log out' }}</span></a>
+</aside>
+<script defer src="{{ url_for('static', filename='admin-sidebar.js') }}"></script>

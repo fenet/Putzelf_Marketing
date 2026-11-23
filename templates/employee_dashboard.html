@@ -1,0 +1,410 @@
+
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Putzelf Marketing — {{ ui.your_missions }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/logo.png">
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #f1f5f9; font-family: 'Inter', sans-serif; color: #0f172a; min-height: 100vh; display: flex; justify-content: center; }
+    a { color: #0f766e; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .app-shell { width: min(520px, 100%); min-height: 100vh; display: flex; flex-direction: column; background: #ffffff; box-shadow: 0 28px 80px rgba(15,23,42,0.12); position: relative; }
+    .app-header { position: sticky; top: 0; z-index: 20; padding: calc(env(safe-area-inset-top, 0px) + 1rem) 1.35rem 1rem; background: rgba(255,255,255,0.95); backdrop-filter: blur(16px); border-bottom: 1px solid #e2e8f0; }
+    .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .brand-group { display: flex; align-items: center; gap: 0.75rem; }
+    .brand-mark { width: 2.75rem; height: 2.75rem; border-radius: 1rem; display: inline-flex; align-items: center; justify-content: center; background: #0f766e; font-size: 1.5rem; color: #ffffff; }
+    .brand-text { display: grid; gap: 0.1rem; }
+    .brand-label { font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.82rem; color: #0f172a; }
+    .brand-sub { font-size: 0.76rem; color: #475569; letter-spacing: 0.04em; text-transform: uppercase; }
+    .logout-chip { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.55rem 1.05rem; border-radius: 999px; background: #f1f5f9; color: #0f172a; text-decoration: none; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.05em; border: 1px solid #cbd5f5; transition: transform 0.16s ease, background 0.16s ease; }
+    .logout-chip:hover { transform: translateY(-1px); background: #e0f2fe; }
+    .date-line { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: center; }
+    .welcome { font-size: 1.05rem; font-weight: 600; letter-spacing: 0.01em; color: #0f172a; }
+    .date-chip { padding: 0.35rem 0.85rem; border-radius: 999px; background: #ecfdf5; border: 1px solid #a7f3d0; font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; color: #047857; }
+    .profile-info-card { border:1px solid #e2e8f0; border-radius:1rem; background:#fff; box-shadow:0 8px 22px rgba(15,23,42,.05); overflow:hidden; }
+    .profile-info-card summary { display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:.85rem 1rem; color:#23324b; font-size:.9rem; font-weight:650; cursor:pointer; list-style:none; }
+    .profile-info-card summary::-webkit-details-marker { display:none; }
+    .profile-info-card summary .summary-label { display:flex; align-items:center; gap:.55rem; }
+    .profile-info-card summary i { color:#2563eb; }
+    .profile-info-body { display:grid; grid-template-columns:1fr; gap:.55rem; padding:0 1rem 1rem; }
+    .profile-info-row { display:flex; justify-content:space-between; gap:1rem; padding-top:.5rem; border-top:1px solid #eef1f5; font-size:.84rem; }
+    .profile-info-row span:first-child { color:#718096; }
+    .profile-info-row strong { color:#25344d; font-weight:600; text-align:right; }
+    .app-content { flex: 1; overflow-y: auto; padding: 1.25rem 1.35rem calc(84px + env(safe-area-inset-bottom, 14px)); display: grid; gap: 1.6rem; background: #f8fafc; }
+    .section { display: grid; gap: 1rem; }
+    .section-head { display: grid; gap: 0.4rem; }
+    .section-eyebrow { font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: #64748b; }
+    .section-title { font-size: 1.35rem; font-weight: 700; margin: 0; color: #0f172a; }
+    .section-subtitle { margin: 0; color: #475569; font-size: 0.95rem; }
+    .flash-stack { display: grid; gap: 0.6rem; }
+    .flash-card { border-radius: 1rem; background: #fef9c3; color: #854d0e; padding: 0.85rem 1rem; border: 1px solid #facc15; font-weight: 600; }
+    .job-list { display: grid; gap: 1.1rem; }
+    .job-card { border-radius: 1.2rem; background: #ffffff; border: 1px solid #e2e8f0; box-shadow: 0 12px 28px rgba(15,23,42,0.08); padding: 1.25rem; display: grid; gap: 0.95rem; }
+    .job-card--complete { background: #ecfdf5; border-color: #bbf7d0; box-shadow: 0 12px 28px rgba(15,118,110,0.12); }
+    .job-head { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: space-between; align-items: baseline; }
+    .job-title { font-size: 1.18rem; font-weight: 600; letter-spacing: 0.015em; color: #0f172a; }
+    .status-pill { padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; border: 1px solid #cbd5f5; color: #0f172a; background: #f8fafc; }
+    .status-pill[data-state="scheduled"] { border-color: #38bdf8; background: #e0f2fe; color: #0369a1; }
+    .status-pill[data-state="in_progress"] { border-color: #fb923c; background: #ffedd5; color: #9a3412; }
+    .status-pill[data-state="completed"] { border-color: #4ade80; background: #dcfce7; color: #166534; }
+    .job-meta { display: grid; gap: 0.5rem; font-size: 0.95rem; color: #0f172a; }
+    .meta-label { font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: #64748b; margin-bottom: 0.25rem; }
+    .meta-chip-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .meta-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; border: 1px solid #bae6fd; background: #f0f9ff; color: #0369a1; }
+    .meta-chip--accent { border-color: #bbf7d0; background: #ecfdf5; color: #047857; }
+    .checkpoint-row { display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.85rem; color: #475569; }
+    .map-link { color: #0f766e; font-weight: 600; }
+    .job-actions { display: grid; gap: 0.75rem; }
+    @media (min-width: 420px) {
+      .job-actions { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    .job-actions form, .job-actions label { width: 100%; }
+    .action-button, .upload-tile { width: 100%; border: none; border-radius: 1rem; padding: 1rem 1.1rem; font-size: 1.05rem; font-weight: 600; letter-spacing: 0.04em; display: inline-flex; justify-content: center; align-items: center; gap: 0.55rem; cursor: pointer; transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease; text-align: center; }
+    .action-button:disabled { opacity: 0.55; cursor: default; }
+    .action-button:not(:disabled):hover, .upload-tile:hover { transform: translateY(-2px); box-shadow: 0 18px 32px rgba(15,23,42,0.18); }
+    .btn-clock { background: linear-gradient(135deg, #38bdf8, #0ea5e9); color: #041725; }
+    .btn-complete { background: linear-gradient(135deg, #22c55e, #14b8a6); color: #022c22; }
+    .upload-tile { background: #f0f9ff; border: 1px dashed #bae6fd; color: #0f172a; position: relative; }
+    .upload-tile[data-type="after"] { background: #ecfdf5; border-color: #bbf7d0; color: #0f172a; }
+    .upload-tile input[type="file"] { display: none; }
+    .photo-grid { display: flex; flex-wrap: wrap; gap: 0.9rem; }
+    .photo-item { display: grid; gap: 0.4rem; }
+    .photo-item img { width: 160px; max-width: 44vw; border-radius: 0.8rem; border: 2px solid #cbd5f5; object-fit: cover; }
+    .timeline { display: grid; gap: 0.8rem; }
+    .timeline-card { border-radius: 1rem; border: 1px solid #e2e8f0; background: #ffffff; padding: 0.95rem 1rem; display: grid; gap: 0.45rem; box-shadow: 0 10px 24px rgba(15,23,42,0.08); }
+    .timeline-card h3 { font-size: 1rem; margin: 0; font-weight: 600; color: #0f172a; }
+    .timeline-meta { font-size: 0.88rem; color: #475569; }
+    .empty-state { border-radius: 1rem; border: 1px dashed #cbd5f5; background: #ffffff; padding: 2.2rem 1.4rem; text-align: center; color: #64748b; }
+    .bottom-nav { position: sticky; bottom: 0; z-index: 30; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; padding: 0.55rem 1rem calc(env(safe-area-inset-bottom, 12px) + 0.55rem); background: rgba(255,255,255,0.95); border-top: 1px solid #e2e8f0; backdrop-filter: blur(16px); }
+    .nav-link { display: grid; gap: 0.15rem; justify-items: center; padding: 0.45rem 0.35rem; border-radius: 0.85rem; text-decoration: none; color: #475569; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600; transition: background 0.16s ease, color 0.16s ease; }
+    .nav-link .icon { font-size: 1.15rem; }
+    .nav-link.active { background: #e0f2fe; color: #0f172a; border: 1px solid #bae6fd; }
+    @media (min-width: 880px) {
+      body { padding: 2rem 0; }
+      .app-shell { border-radius: 1.6rem; overflow: hidden; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand-row">
+        <div class="brand-group">
+          <span class="brand-mark" aria-hidden="true">🧽</span>
+          <div class="brand-text">
+            <span class="brand-label">{{ ui.dashboard_title }}</span>
+            <span class="brand-sub">Putzelf Marketing</span>
+          </div>
+        </div>
+        <a class="logout-chip" href="{{ url_for('logout') }}">{{ ui.sign_out }}</a>
+      </div>
+      <div class="date-line">
+        <span class="welcome">{{ welcome_message }}</span>
+        <span class="date-chip">{{ today_label }}</span>
+      </div>
+    </header>
+    <main class="app-content" id="content">
+      <details class="profile-info-card"><summary><span class="summary-label"><i class="bi bi-person-vcard"></i>{{ ui.my_profile }}</span><i class="bi bi-chevron-down" aria-hidden="true"></i></summary><div class="profile-info-body"><div class="profile-info-row"><span>{{ ui.staff_type }}</span><strong>{{ profile_info.staff_type }}</strong></div><div class="profile-info-row"><span>{{ ui.branch_office }}</span><strong>{{ profile_info.branch }}</strong></div><div class="profile-info-row"><span>{{ ui.contact_phone }}</span><strong>{{ profile_info.phone }}</strong></div></div></details>
+      <section id="today" class="section">
+        <div class="section-head">
+          <span class="section-eyebrow">{{ ui.today }}</span>
+          <h1 class="section-title">{{ ui.your_missions }}</h1>
+          <p class="section-subtitle">{{ friendly_message }}</p>
+        </div>
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="flash-stack">
+              {% for message in messages %}
+                <div class="flash-card">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+        {% if shifts %}
+          <div class="job-list">
+            {% for shift in shifts %}
+              <article class="job-card {% if shift.clocked_out %}job-card--complete{% endif %}">
+                <div class="job-head">
+                  <div>
+                    <div class="job-title">{{ shift.site_name }}</div>
+                    <div class="timeline-meta">{{ shift.time_window }}</div>
+                  </div>
+                  <span class="status-pill" data-state="{{ shift.status_key }}">{{ shift.status_label }}</span>
+                </div>
+                <div class="job-meta">
+                  <div>
+                    <div class="meta-label">{{ ui.location }}</div>
+                    <div>{{ shift.address }}</div>
+                    {% if shift.map_url %}
+                      <a class="map-link" href="{{ shift.map_url }}" target="_blank" rel="noopener">{{ ui.open_maps }}</a>
+                    {% endif %}
+                  </div>
+                  <div>
+                    <div class="meta-label">{{ ui.instructions }}</div>
+                    <div>{{ shift.instructions }}</div>
+                  </div>
+                  <div>
+                    <div class="meta-label">{{ ui.duration }}</div>
+                    <div class="meta-chip-row">
+                      <span class="meta-chip">{{ ui.scheduled }} · {{ shift.scheduled_duration }}</span>
+                      {% if shift.has_actual_duration %}
+                        <span class="meta-chip meta-chip--accent">{{ ui.actual }} · {{ shift.actual_duration }}</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                  <div>
+                    <div class="meta-label">{{ ui.checkpoints }}</div>
+                    <div class="checkpoint-row">
+                      <span>{{ ui.clock_in }}: {{ shift.clock_in_display }}</span>
+                      <span>{{ ui.clock_out }}: {{ shift.clock_out_display }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="job-actions">
+                  <form class="geo-form" method="post" action="{{ shift.clock_in_url }}" data-action="clock-in" data-requires-geo="true">
+                    <input type="hidden" name="lat" value="">
+                    <input type="hidden" name="lng" value="">
+                    <button type="submit" class="action-button btn-clock" {% if shift.clocked_in %}disabled{% endif %}>
+                      {% if shift.clocked_in %}{{ ui.clocked_in }}{% else %}{{ ui.clock_in }}{% endif %}
+                    </button>
+                  </form>
+                  <form method="post" action="{{ shift.upload_url }}" enctype="multipart/form-data">
+                    <input type="hidden" name="photo_type" value="before">
+                    <label class="upload-tile" data-type="before">
+                      <span class="icon" aria-hidden="true">📸</span>
+                      <span>{% if shift.before_photo_url %}{{ ui.replace_before }}{% else %}{{ ui.upload_before }}{% endif %}</span>
+                      <input type="file" name="photo" accept="image/*" onchange="this.form.submit()">
+                    </label>
+                  </form>
+                  <form method="post" action="{{ shift.upload_url }}" enctype="multipart/form-data">
+                    <input type="hidden" name="photo_type" value="after">
+                    <label class="upload-tile" data-type="after">
+                      <span class="icon" aria-hidden="true">✨</span>
+                      <span>{% if shift.after_photo_url %}{{ ui.replace_after }}{% else %}{{ ui.upload_after }}{% endif %}</span>
+                      <input type="file" name="photo" accept="image/*" onchange="this.form.submit()">
+                    </label>
+                  </form>
+                  <form class="geo-form celebrate-form" method="post" action="{{ shift.complete_url }}" data-action="complete" data-requires-geo="true">
+                    <input type="hidden" name="lat" value="">
+                    <input type="hidden" name="lng" value="">
+                    <button type="submit" class="action-button btn-complete" {% if shift.clocked_out %}disabled{% endif %}>
+                      {% if shift.clocked_out %}{{ ui.completed }}{% else %}{{ ui.mark_complete }}{% endif %}
+                    </button>
+                  </form>
+                </div>
+                {% if shift.before_photo_url or shift.after_photo_url %}
+                  <div class="photo-grid">
+                    {% if shift.before_photo_url %}
+                      <div class="photo-item">
+                        <div class="meta-label">{{ ui.before }}</div>
+                        <img src="{{ shift.before_photo_url }}" alt="Before photo for {{ shift.site_name }}">
+                      </div>
+                    {% endif %}
+                    {% if shift.after_photo_url %}
+                      <div class="photo-item">
+                        <div class="meta-label">{{ ui.after }}</div>
+                        <img src="{{ shift.after_photo_url }}" alt="After photo for {{ shift.site_name }}">
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <h2 class="h5 text-dark mb-2">{{ ui.today_empty_title }}</h2>
+            <p class="mb-0">{{ ui.today_empty_message }}</p>
+          </div>
+        {% endif %}
+      </section>
+
+      <section id="upcoming" class="section">
+        <div class="section-head">
+          <span class="section-eyebrow">{{ ui.next }}</span>
+          <h2 class="section-title">{{ ui.upcoming_jobs }}</h2>
+        </div>
+        <div class="timeline">
+          {% if upcoming_jobs %}
+            {% for job in upcoming_jobs %}
+              <article class="timeline-card">
+                <h3>{{ job.site_name }}</h3>
+                <div class="timeline-meta">{{ job.day_label }} · {{ job.time_window }}</div>
+                {% if job.address %}
+                  <div class="timeline-meta">{{ job.address }}</div>
+                {% endif %}
+                {% if job.instructions %}
+                  <div class="timeline-meta">{{ job.instructions }}</div>
+                {% endif %}
+                <span class="status-pill" data-state="{{ job.status_key }}">{{ job.status_label }}</span>
+              </article>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state">{{ ui.upcoming_empty }}</div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section id="history" class="section">
+        <div class="section-head">
+          <span class="section-eyebrow">{{ ui.history }}</span>
+          <h2 class="section-title">{{ ui.recent_missions }}</h2>
+        </div>
+        <div class="timeline">
+          {% if history %}
+            {% for item in history %}
+              <article class="timeline-card">
+                <h3>{{ item.site_name }}</h3>
+                <div class="timeline-meta">{{ item.day_label }} · {{ item.time_window }}</div>
+                <div class="meta-chip-row">
+                  <span class="meta-chip">{{ ui.scheduled }} · {{ item.scheduled_duration }}</span>
+                  {% if item.has_actual_duration %}
+                    <span class="meta-chip meta-chip--accent">{{ ui.actual }} · {{ item.actual_duration }}</span>
+                  {% endif %}
+                </div>
+                <span class="status-pill" data-state="{{ item.status_key }}">{{ item.status_label }}</span>
+                {% if item.instructions %}
+                  <div class="timeline-meta">{{ item.instructions }}</div>
+                {% endif %}
+              </article>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state">{{ ui.history_empty }}</div>
+          {% endif %}
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <a class="nav-link active" href="#today" data-target="today">
+        <span class="icon" aria-hidden="true">🗓</span>
+        <span>{{ ui.today }}</span>
+      </a>
+      <a class="nav-link" href="#upcoming" data-target="upcoming">
+        <span class="icon" aria-hidden="true">⏭</span>
+        <span>{{ ui.next }}</span>
+      </a>
+      <a class="nav-link" href="#history" data-target="history">
+        <span class="icon" aria-hidden="true">📜</span>
+        <span>{{ ui.history }}</span>
+      </a>
+    </nav>
+  </div>
+
+  <script>
+    (function() {
+      const navLinks = Array.from(document.querySelectorAll('.bottom-nav .nav-link'));
+      const sections = navLinks.map(link => document.getElementById(link.dataset.target));
+      const content = document.getElementById('content');
+
+      const setActive = (targetId) => {
+        navLinks.forEach(link => {
+          link.classList.toggle('active', link.dataset.target === targetId);
+        });
+      };
+
+      navLinks.forEach(link => {
+        link.addEventListener('click', () => setActive(link.dataset.target));
+      });
+
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              setActive(entry.target.id);
+            }
+          });
+        }, { root: content, threshold: 0.4 });
+        sections.forEach(section => section && observer.observe(section));
+      }
+    })();
+  </script>
+  <script>
+    (function() {
+      const gatherGeo = (form) => {
+        const latField = form.querySelector('input[name="lat"]');
+        const lngField = form.querySelector('input[name="lng"]');
+        if (!navigator.geolocation || !latField || !lngField) {
+          return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+          navigator.geolocation.getCurrentPosition((position) => {
+            latField.value = position.coords.latitude.toFixed(6);
+            lngField.value = position.coords.longitude.toFixed(6);
+            resolve();
+          }, () => resolve(), { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 });
+        });
+      };
+
+      const celebrateAndSubmit = (form) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'confetti-overlay';
+        const message = document.createElement('div');
+        message.className = 'confetti-message';
+        message.textContent = {{ (ui.confetti_complete|default('Done!'))|tojson }};
+        overlay.appendChild(message);
+
+        const colors = ['#bef264', '#f97316', '#22d3ee', '#facc15', '#fb7185'];
+        for (let i = 0; i < 28; i++) {
+          const piece = document.createElement('span');
+          piece.className = 'confetti-piece';
+          piece.style.background = colors[i % colors.length];
+          const startX = (Math.random() * 100 - 50).toFixed(1) + 'vw';
+          const endX = (Math.random() * 120 - 60).toFixed(1) + 'vw';
+          const rotate = (Math.random() * 720 - 360).toFixed(1) + 'deg';
+          piece.style.setProperty('--x-start', startX);
+          piece.style.setProperty('--x-end', endX);
+          piece.style.setProperty('--rotate', rotate);
+          overlay.appendChild(piece);
+        }
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => { message.style.opacity = '1'; });
+        setTimeout(() => { document.body.removeChild(overlay); }, 1400);
+        setTimeout(() => { HTMLFormElement.prototype.submit.call(form); }, 750);
+      };
+
+      document.querySelectorAll('form[data-action]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+          const requiresGeo = form.dataset.requiresGeo === 'true';
+          const action = form.dataset.action;
+          if (requiresGeo || action === 'complete') {
+            event.preventDefault();
+            gatherGeo(form).finally(() => {
+              if (action === 'complete') {
+                celebrateAndSubmit(form);
+              } else {
+                HTMLFormElement.prototype.submit.call(form);
+              }
+            });
+          }
+        });
+      });
+    })();
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/employee-sw.js', { scope: '/employee/' }).catch(() => {});
+      });
+    }
+  </script>
+  <style>
+    .confetti-overlay { position: fixed; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; z-index: 9999; overflow: hidden; }
+    .confetti-piece { position: absolute; width: 12px; height: 18px; border-radius: 4px; opacity: 0; animation: confetti-fall 1.05s ease-out forwards; }
+    .confetti-message { position: relative; font-size: clamp(1.5rem, 4vw, 2.2rem); font-weight: 700; color: #f1f5f9; text-shadow: 0 8px 18px rgba(15,23,42,0.62); animation: pop-in 0.5s ease-out forwards; opacity: 0; }
+    @keyframes confetti-fall { 0% { transform: translate3d(var(--x-start), -20vh, 0) rotate(0deg); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate3d(var(--x-end), 110vh, 0) rotate(var(--rotate)); opacity: 0; } }
+    @keyframes pop-in { 0% { opacity: 0; transform: scale(0.82); } 60% { opacity: 1; transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
+  </style>
+</body>
+</html>

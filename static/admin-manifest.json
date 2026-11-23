@@ -1,14 +1,14 @@
 {
-  "name": "Putzelf Admin Console",
-  "short_name": "Admin",
+  "name": "Elf's Plan Manager",
+  "short_name": "Manager",
   "id": "/admin",
   "start_url": "/admin",
   "scope": "/admin",
   "display": "browser",
   "orientation": "portrait",
   "background_color": "#020617",
-  "theme_color": "#0f172a",
-  "description": "Administer schedules, employees, and sites for Putzelf Marketing on the go.",
+  "theme_color": "#014D4E",
+  "description": "Manage schedules, employees, clients, and site inspections with Elf's Plan.",
   "icons": [
     {
       "src": "/static/logo.png",

@@ -1,0 +1,51 @@
+/* Shared Elf's Plan navigation for admin and manager pages. */
+.ep-admin-sidebar { position:sticky; top:40px; z-index:30; display:flex !important; flex-direction:column; gap:.42rem; width:auto; min-width:0; height:calc(100vh - 40px); height:calc(100dvh - 40px); overflow-y:auto; padding:1rem .75rem; color:#f3f7f8; background:linear-gradient(180deg,#315664 0%,#3b6874 52%,#477782 100%); border:0; border-right:1px solid #527580; box-shadow:6px 0 22px rgba(16,38,50,.07); transition:padding .2s ease; }
+.ep-admin-sidebar .ep-sidebar-brand { display:flex; align-items:center; gap:.68rem; min-height:54px; padding:.35rem .35rem .65rem; color:#fff; text-decoration:none; }
+.ep-sidebar-logo { display:grid; place-items:center; flex:none; width:40px; height:40px; overflow:hidden; border-radius:13px; background:rgba(255,255,255,.13); }
+.ep-sidebar-logo img { width:29px; height:29px; object-fit:contain; }
+.ep-sidebar-brand-copy { display:flex; flex-direction:column; min-width:0; line-height:1.2; }
+.ep-sidebar-brand-copy strong { color:#fff; font-size:1.08rem; font-weight:800; letter-spacing:-.025em; }
+.ep-sidebar-brand-copy small { margin-top:.2rem; color:#9eacc5; font-size:.68rem; }
+.ep-sidebar-section { padding:.68rem .6rem .25rem; color:#9eacc5; font-size:.64rem; font-weight:750; letter-spacing:.12em; text-transform:uppercase; }
+.ep-admin-sidebar .nav-pill,.ep-sidebar-group summary { display:flex; align-items:center; gap:.68rem; min-height:41px; padding:.52rem .65rem; color:#d4dced; border:0; border-radius:10px; background:transparent; box-shadow:none; font-size:.84rem; font-weight:550; text-decoration:none; cursor:pointer; transition:background .15s,color .15s; }
+.ep-admin-sidebar .nav-pill:hover,.ep-sidebar-group summary:hover { color:#fff; background:rgba(255,255,255,.12); box-shadow:none; }
+.ep-admin-sidebar .nav-pill.active,.ep-sidebar-subitem.active { color:#fff; background:linear-gradient(100deg,rgba(1,77,78,.55),rgba(1,77,78,.24)); box-shadow:inset 3px 0 #67b6b0; }
+.ep-sidebar-icon { display:inline-grid; place-items:center; flex:none; width:1.3rem; color:#aebbd2; font-size:1rem; }
+.ep-admin-sidebar .nav-pill.active .ep-sidebar-icon { color:#9dd4cf; }
+.ep-sidebar-group { min-width:0; }
+.ep-sidebar-group summary { list-style:none; }
+.ep-sidebar-group summary::-webkit-details-marker { display:none; }
+.ep-sidebar-coming-soon summary { border:1px dashed rgba(226,232,240,.16); background:rgba(226,232,240,.035); }
+.ep-sidebar-coming-soon summary:hover { border-color:rgba(157,212,207,.32); }
+.ep-sidebar-coming-soon .ep-sidebar-subitem { display:flex; align-items:center; gap:.55rem; }
+.ep-sidebar-coming-soon .ep-sidebar-subitem i { width:1rem; color:#9eacc5; text-align:center; }
+.ep-sidebar-chevron { margin-left:auto; color:#93a3bc; font-size:.7rem; transition:transform .15s; }
+.ep-sidebar-group[open] .ep-sidebar-chevron { transform:rotate(180deg); }
+.ep-sidebar-subitem { display:block; margin:.15rem 0 .15rem 1rem; padding:.48rem .6rem .48rem 1rem; color:#b9c6da; border-radius:8px; font-size:.77rem; line-height:1.3; text-decoration:none; }
+.ep-sidebar-subitem:hover { color:white; background:rgba(255,255,255,.11); }
+.ep-sidebar-spacer { flex:1 0 1rem; }
+.ep-admin-sidebar .nav-pill-logout { border:1px solid rgba(255,255,255,.2); background:rgba(255,255,255,.08); color:#f3f7f8; }
+.ep-admin-sidebar .nav-pill-logout:hover { background:rgba(255,255,255,.16); }
+.ep-sidebar-mobile-toggle,.ep-sidebar-scrim { display:none; }
+body.ep-sidebar-collapsed .app-shell,body.ep-sidebar-collapsed .ep-portal-shell { grid-template-columns:78px minmax(0,1fr) !important; transition:grid-template-columns .2s ease; }
+body:not(.ep-sidebar-collapsed) .app-shell:has(.ep-admin-sidebar),body:not(.ep-sidebar-collapsed) .ep-portal-shell:has(.ep-admin-sidebar) { grid-template-columns:240px minmax(0,1fr) !important; transition:grid-template-columns .2s ease; }
+body.ep-sidebar-collapsed .ep-admin-sidebar { padding-inline:.6rem; }
+body.ep-sidebar-collapsed .ep-sidebar-brand { justify-content:center; padding-inline:0; }
+body.ep-sidebar-collapsed .ep-sidebar-brand-copy,body.ep-sidebar-collapsed .ep-sidebar-section,body.ep-sidebar-collapsed .ep-sidebar-footer,body.ep-sidebar-collapsed .ep-admin-sidebar .nav-text,body.ep-sidebar-collapsed .ep-sidebar-chevron,body.ep-sidebar-collapsed .ep-sidebar-subitem { display:none; }
+body.ep-sidebar-collapsed .ep-admin-sidebar .nav-pill,body.ep-sidebar-collapsed .ep-sidebar-group summary { justify-content:center; padding-inline:.35rem; }
+body.ep-sidebar-collapsed .ep-sidebar-icon { width:auto; }
+@media(max-width:850px) {
+  .ep-sidebar-mobile-toggle { position:fixed; z-index:1060; top:calc(40px + .7rem); left:.7rem; display:grid; place-items:center; width:40px; height:40px; color:white; border:1px solid #527580; border-radius:12px; background:linear-gradient(145deg,#315664,#477782); box-shadow:0 5px 18px rgba(15,23,42,.14); font-size:1.25rem; }
+  .ep-admin-sidebar { position:fixed; left:0; top:40px; z-index:1062; width:min(84vw,290px); height:calc(100dvh - 40px); transform:translateX(-105%); transition:transform .2s ease; }
+  body.ep-mobile-nav-open .ep-admin-sidebar { transform:translateX(0); }
+  .ep-sidebar-scrim { position:fixed; inset:40px 0 0; z-index:1061; background:rgba(10,19,35,.45); }
+  body.ep-mobile-nav-open .ep-sidebar-scrim { display:block; }
+  body.ep-sidebar-collapsed .app-shell,body.ep-sidebar-collapsed .ep-portal-shell { grid-template-columns:1fr !important; }
+  .app-shell:has(.ep-admin-sidebar) > main,.app-shell:has(.ep-admin-sidebar) > .main,.ep-portal-shell > main { padding-top:4rem; }
+  body.ep-sidebar-collapsed .ep-sidebar-brand-copy { display:flex; }
+  body.ep-sidebar-collapsed .ep-sidebar-section,body.ep-sidebar-collapsed .ep-sidebar-footer { display:block; }
+  body.ep-sidebar-collapsed .ep-admin-sidebar .nav-text { display:inline; }
+  body.ep-sidebar-collapsed .ep-sidebar-group[open] .ep-sidebar-subitem { display:block; }
+  body.ep-sidebar-collapsed .ep-admin-sidebar .nav-pill,body.ep-sidebar-collapsed .ep-sidebar-group summary { justify-content:flex-start; padding-inline:.65rem; }
+  body.ep-sidebar-collapsed .ep-sidebar-icon { width:1.3rem; }
+}

@@ -1,0 +1,565 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — Lead-Center</title>
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/logo.png">
+  <link rel="manifest" href="/static/admin-manifest.json">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-danger: linear-gradient(135deg,#f87171 0%,#ef4444 50%,#dc2626 100%);
+      --btn-grad-danger-hover: linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);
+      --btn-grad-light: linear-gradient(135deg,#ffffff 0%,#f1f5f9 100%);
+      --btn-grad-light-hover: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+    }
+    body { min-height: 100vh; background: #f1f5f9; color:#0f172a; font-size:1.05rem; }
+    body.mobile-nav-open { overflow:hidden; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition: grid-template-columns 0.2s ease; background:#ffffff; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; color:#0f172a; display:flex; flex-direction:column; padding:1.5rem 1.25rem; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; }
+    .sidebar-brand { display:flex; align-items:center; gap:0.75rem; }
+    .sidebar-logo { height:40px; width:40px; border-radius:12px; background:linear-gradient(135deg,#0f766e,#0ea5e9); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .sidebar-logo img { max-width:80%; max-height:80%; object-fit:contain; }
+    .sidebar-title { font-weight:600; letter-spacing:0.03em; font-size:0.95rem; text-transform:uppercase; color:#0f172a; }
+    .sidebar-sub { font-size:0.78rem; color:#475569; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#64748b; margin-bottom:0.4rem; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; display:flex; align-items:center; gap:0.5rem; text-decoration:none; border:1px solid transparent; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill.active,
+    .nav-pill:hover { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
+    .nav-pill-icon { width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:#ecfdf5; color:#0f766e; font-size:0.9rem; }
+    .nav-text { display:inline; }
+    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .sidebar-footer { margin-top:auto; font-size:0.75rem; color:#64748b; }
+    .main-shell { padding:1.25rem 1.5rem; background:#ffffff; }
+    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1rem; box-shadow:0 12px 24px rgba(15,23,42,0.08); }
+    .badge-soft { border-radius:999px; border:1px solid #cbd5f5; color:#0f172a; padding:0.15rem 0.6rem; font-size:0.75rem; background:#e0f2fe; }
+    .small-note { font-size:0.82rem; color:#64748b; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; box-shadow:0 10px 20px rgba(15,23,42,0.08); transition:transform 0.15s ease, box-shadow 0.15s ease; }
+    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 16px 28px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-outline-danger,
+    .btn-danger { background-image:var(--btn-grad-danger); color:#ffffff; box-shadow:0 12px 24px rgba(220,38,38,0.25); }
+    .btn-outline-danger:hover,
+    .btn-danger:hover { background-image:var(--btn-grad-danger-hover); color:#ffffff; }
+    .btn-link { background:none; box-shadow:none; color:#0f766e; }
+    .btn-link:hover { color:#0c615b; }
+    .sidebar-collapsed .app-shell { grid-template-columns: 72px minmax(0, 1fr); }
+    .sidebar-collapsed .sidebar { width: 72px; padding: 1.1rem 0.6rem; }
+    .sidebar-collapsed .nav-text,
+    .sidebar-collapsed .sidebar-title,
+    .sidebar-collapsed .sidebar-sub,
+    .sidebar-collapsed .sidebar-section-title,
+    .sidebar-collapsed .sidebar-footer { display: none; }
+    .sidebar-collapsed .nav-pill { justify-content: center; padding: 0.45rem; }
+    .sidebar-collapsed .nav-pill-icon { margin: 0 auto; }
+    .sidebar-collapsed .sidebar-logo { margin: 0 auto; }
+    .kanban { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }
+    .kanban-column { border:1px solid #e2e8f0; border-radius:0.9rem; background:#f8fafc; padding:0.75rem; min-height:240px; box-shadow:0 8px 16px rgba(15,23,42,0.08); }
+    .kanban-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem; color:#0f172a; font-weight:600; font-size:0.95rem; }
+    .lead-card { border:1px solid #cbd5f5; border-radius:0.7rem; padding:0.65rem; background:#ffffff; color:#0f172a; margin-bottom:0.5rem; cursor:grab; box-shadow:0 4px 12px rgba(15,23,42,0.08); }
+    .lead-card.dragging { opacity:0.6; }
+    .kanban-column.drop-target { border-color:#0f766e; box-shadow:inset 0 0 0 2px rgba(15,118,110,0.35); }
+    .lead-meta { font-size:0.8rem; color:#64748b; }
+    .lead-email-copy { border:0; background:none; padding:0; color:#0f766e; text-decoration:underline; cursor:pointer; font-size:0.8rem; }
+    .lead-email-copy:hover { color:#0c615b; }
+    .copy-status { min-height:1.2rem; }
+    .mobile-nav-toggle { display:none; }
+    .mobile-nav-backdrop { display:none; }
+    @media (max-width: 992px) {
+      .app-shell { grid-template-columns:minmax(0, 1fr); }
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: min(82vw, 300px);
+        max-width: 320px;
+        z-index: 1050;
+        display: flex;
+        transform: translateX(-100%);
+        transition: transform 0.2s ease;
+        box-shadow: 0 24px 48px rgba(15,23,42,0.18);
+      }
+      body.mobile-nav-open .sidebar { transform: translateX(0); }
+      .mobile-nav-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.35);
+        z-index: 1040;
+      }
+      body.mobile-nav-open .mobile-nav-backdrop { display: block; }
+      .mobile-nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        border-radius: 0.75rem;
+        border: 0;
+        background-image: var(--btn-grad-accent);
+        color: #ffffff;
+        padding: 0.45rem 0.85rem;
+        font-size: 0.95rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 12px 24px rgba(15,118,110,0.25);
+      }
+      .mobile-nav-toggle:focus { outline: 2px solid rgba(15,118,110,0.4); outline-offset: 2px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+{% include "partials/admin_sidebar.html" %}
+    <main class="main-shell">
+      
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+          <div class="badge-soft mb-2">Leads</div>
+          <h1 class="h4 mb-1 text-dark">Lead-Center</h1>
+          <p class="small-note mb-0">Website bookings arrive as new leads. Move each lead through Contacted to Converted.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-primary">☰</button>
+          <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Logout</a>
+        </div>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-lg-4">
+          <div class="card-surface h-100">
+            <h2 class="h6 text-uppercase text-secondary">Add lead</h2>
+            <form method="post" class="small needs-validation" novalidate>
+              <input type="hidden" name="action" value="create">
+              <div class="mb-2">
+                <label class="form-label small-note text-uppercase" for="lead_name">Name</label>
+                <input type="text" class="form-control form-control-sm" id="lead_name" name="name" required>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small-note text-uppercase" for="lead_email">Email</label>
+                <input type="email" class="form-control form-control-sm" id="lead_email" name="email">
+              </div>
+              <div class="mb-2">
+                <label class="form-label small-note text-uppercase" for="lead_phone">Phone</label>
+                <input type="text" class="form-control form-control-sm" id="lead_phone" name="phone">
+              </div>
+              <div class="mb-2">
+                <label class="form-label small-note text-uppercase" for="lead_source">Source</label>
+                <input type="text" class="form-control form-control-sm" id="lead_source" name="source" placeholder="e.g. Web form, Import">
+              </div>
+              <div class="mb-2">
+                <label class="form-label small-note text-uppercase" for="lead_notes">Notes</label>
+                <textarea class="form-control form-control-sm" id="lead_notes" name="notes" rows="2"></textarea>
+              </div>
+              <div class="mb-3">
+                <label class="form-label small-note text-uppercase" for="lead_stage">Stage</label>
+                <select class="form-select form-select-sm" id="lead_stage" name="stage">
+                  {% for s in stages %}
+                    <option value="{{ s }}">{{ s }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <button type="submit" class="btn btn-sm btn-primary">Save lead</button>
+            </form>
+          </div>
+        </div>
+        <div class="col-12 col-lg-8">
+          <div class="card-surface h-100">
+            <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+              <div>
+                <label class="form-label small-note text-uppercase mb-1" for="filter_stage">Stage</label>
+                <select class="form-select form-select-sm" id="filter_stage" name="stage" form="filters-form">
+                  <option value="">All stages</option>
+                  {% for s in stages %}
+                    <option value="{{ s }}" {% if stage_filter==s %}selected{% endif %}>{{ s }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <label class="form-label small-note text-uppercase mb-1" for="filter_start">From</label>
+                <input type="date" class="form-control form-control-sm" id="filter_start" name="start" form="filters-form" value="{{ start_filter or '' }}">
+              </div>
+              <div>
+                <label class="form-label small-note text-uppercase mb-1" for="filter_end">To</label>
+                <input type="date" class="form-control form-control-sm" id="filter_end" name="end" form="filters-form" value="{{ end_filter or '' }}">
+              </div>
+              <div>
+                <label class="form-label small-note text-uppercase mb-1" for="filter_sort">Sort</label>
+                <select class="form-select form-select-sm" id="filter_sort" name="sort" form="filters-form">
+                  <option value="desc" {% if sort=='desc' %}selected{% endif %}>Newest first</option>
+                  <option value="asc" {% if sort=='asc' %}selected{% endif %}>Oldest first</option>
+                </select>
+              </div>
+              <div class="ms-auto d-flex gap-2">
+                <form id="filters-form" method="get" class="d-flex gap-2">
+                  <button class="btn btn-sm btn-outline-primary" type="submit">Apply</button>
+                  <a href="{{ url_for('leads_dashboard') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                </form>
+                <button id="copy-page-emails-btn" type="button" class="btn btn-sm btn-outline-primary">Copy page emails</button>
+              </div>
+            </div>
+            <div id="copy-status" class="small-note copy-status mb-2" aria-live="polite"></div>
+            <div class="kanban">
+              {% for stage, stage_leads in grouped_leads.items() %}
+                <div class="kanban-column" data-stage="{{ stage }}">
+                  <div class="kanban-header">
+                    <span>{{ stage }}</span>
+                    <span class="badge bg-secondary">{{ stage_leads|length }}</span>
+                  </div>
+                  <div class="kanban-body" data-stage="{{ stage }}">
+                    {% for lead in stage_leads %}
+                      <div class="lead-card" draggable="true" data-lead-id="{{ lead.id }}" data-lead-name="{{ lead.name|e }}" data-lead-email="{{ (lead.email or '')|e }}" data-lead-phone="{{ (lead.phone or '')|e }}" data-lead-source="{{ (lead.source or '')|e }}" data-lead-notes="{{ (lead.notes or '')|e }}" data-lead-stage="{{ lead.stage|e }}">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                          <div>
+                            <strong>{{ lead.name }}</strong><br>
+                            {% if lead.email %}
+                              <button type="button" class="lead-email-copy" data-email="{{ lead.email|e }}" title="Copy email">{{ lead.email }}</button>
+                            {% else %}
+                              <span class="lead-meta">—</span>
+                            {% endif %}
+                          </div>
+                          <div class="text-end">
+                            <span class="small-note d-block">{{ lead.created_at.strftime('%d.%m.%Y') }}</span>
+                            <div class="btn-group btn-group-sm mt-1" role="group" aria-label="Lead actions">
+                              <button type="button" class="btn btn-outline-primary btn-sm py-0 lead-edit" data-bs-toggle="modal" data-bs-target="#leadModal" title="Edit lead">
+                                ✎
+                              </button>
+                              <button type="button" class="btn btn-outline-danger btn-sm py-0 lead-delete" data-lead-id="{{ lead.id }}" title="Delete lead">
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        {% if lead.phone %}
+                          <div class="lead-meta mt-1">📞 {{ lead.phone }}</div>
+                        {% endif %}
+                        {% if lead.source %}
+                          <div class="lead-meta">Source: {{ lead.source }}</div>
+                        {% endif %}
+                        {% if lead.notes %}
+                          <div class="lead-meta">Notes: {{ lead.notes }}</div>
+                        {% endif %}
+                      </div>
+                    {% else %}
+                      <div class="small-note text-secondary">No leads</div>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <form id="lead-delete-form" method="post" action="{{ url_for('leads_dashboard') }}" class="d-none">
+        <input type="hidden" name="action" value="delete">
+        <input type="hidden" name="id" id="lead-delete-id">
+      </form>
+      <div class="modal fade" id="leadModal" tabindex="-1" aria-labelledby="leadModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content border border-light-subtle">
+            <form id="lead-edit-form" method="post" action="{{ url_for('leads_dashboard') }}" class="needs-validation" novalidate>
+              <input type="hidden" name="action" value="update">
+              <input type="hidden" name="id" id="lead-edit-id">
+              <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title" id="leadModalLabel">Edit lead</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body pb-0">
+                <div class="mb-2">
+                  <label for="lead-edit-name" class="form-label small-note text-uppercase">Name</label>
+                  <input type="text" class="form-control form-control-sm" id="lead-edit-name" name="name" required>
+                </div>
+                <div class="mb-2">
+                  <label for="lead-edit-email" class="form-label small-note text-uppercase">Email</label>
+                  <input type="email" class="form-control form-control-sm" id="lead-edit-email" name="email">
+                </div>
+                <div class="mb-2">
+                  <label for="lead-edit-phone" class="form-label small-note text-uppercase">Phone</label>
+                  <input type="text" class="form-control form-control-sm" id="lead-edit-phone" name="phone">
+                </div>
+                <div class="mb-2">
+                  <label for="lead-edit-source" class="form-label small-note text-uppercase">Source</label>
+                  <input type="text" class="form-control form-control-sm" id="lead-edit-source" name="source">
+                </div>
+                <div class="mb-2">
+                  <label for="lead-edit-notes" class="form-label small-note text-uppercase">Notes</label>
+                  <textarea class="form-control form-control-sm" id="lead-edit-notes" name="notes" rows="3"></textarea>
+                </div>
+                <div class="mb-2">
+                  <label for="lead-edit-stage" class="form-label small-note text-uppercase">Stage</label>
+                  <select class="form-select form-select-sm" id="lead-edit-stage" name="stage">
+                    {% for s in stages %}
+                      <option value="{{ s }}">{{ s }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="modal-footer border-0 d-flex justify-content-between">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" title="Cancel"><i class="bi bi-x-circle"></i></button>
+                <button type="submit" class="btn btn-sm btn-primary">Save changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    (function() {
+      const body = document.body;
+      const toggle = document.getElementById('mobile-nav-toggle');
+      const sidebar = document.getElementById('admin-sidebar');
+      const backdrop = document.getElementById('mobile-nav-backdrop');
+      if (!toggle || !sidebar || !backdrop) {
+        return;
+      }
+      const closeNav = () => {
+        body.classList.remove('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      };
+      const openNav = () => {
+        body.classList.add('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'true');
+      };
+      toggle.addEventListener('click', () => {
+        if (body.classList.contains('mobile-nav-open')) {
+          closeNav();
+        } else {
+          openNav();
+        }
+      });
+      backdrop.addEventListener('click', closeNav);
+      sidebar.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeNav));
+    })();
+    (function () {
+      const KEY = 'pm-sidebar-collapsed';
+      const body = document.body;
+      const btn = document.getElementById('sidebar-toggle');
+      const setState = (val) => {
+        body.classList.toggle('sidebar-collapsed', val);
+        try { localStorage.setItem(KEY, val ? '1' : '0'); } catch (e) {}
+      };
+      const initial = (() => {
+        try {
+          const raw = localStorage.getItem(KEY);
+          if (raw === null) return true; // default: collapsed (icons only)
+          return raw === '1';
+        } catch (e) {
+          return true;
+        }
+      })();
+      setState(initial);
+      if (btn) btn.addEventListener('click', () => setState(!body.classList.contains('sidebar-collapsed')));
+    })();
+
+    // Drag & drop
+    (() => {
+      const cards = document.querySelectorAll('.lead-card');
+      const columns = document.querySelectorAll('.kanban-body');
+      let dragged = null;
+      cards.forEach(card => {
+        card.addEventListener('dragstart', e => {
+          dragged = card;
+          card.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          try { e.dataTransfer.setData('text/plain', card.dataset.leadId || '0'); } catch (err) {}
+        });
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+          dragged = null;
+          columns.forEach(c => c.classList.remove('drop-target'));
+        });
+      });
+      columns.forEach(col => {
+        const highlight = () => col.classList.add('drop-target');
+        const removeHighlight = () => col.classList.remove('drop-target');
+        col.addEventListener('dragenter', e => {
+          if (!dragged) return;
+          e.preventDefault();
+          highlight();
+        });
+        col.addEventListener('dragover', e => {
+          if (!dragged) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          highlight();
+          const siblings = [...col.querySelectorAll('.lead-card:not(.dragging)')];
+          const afterEl = siblings.find(el => {
+            const box = el.getBoundingClientRect();
+            return e.clientY < box.top + box.height / 2;
+          });
+          if (afterEl) {
+            col.insertBefore(dragged, afterEl);
+          } else {
+            col.appendChild(dragged);
+          }
+        });
+        col.addEventListener('dragleave', () => {
+          if (!dragged) removeHighlight();
+        });
+        col.addEventListener('drop', async e => {
+          e.preventDefault();
+          removeHighlight();
+          if (!dragged) return;
+          const stage = col.dataset.stage;
+          const id = dragged.dataset.leadId;
+          dragged.dataset.leadStage = stage;
+          try {
+            await fetch('{{ url_for("leads_stage") }}', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id, stage })
+            });
+          } catch (err) {
+            console.error('Failed to update stage', err);
+          }
+        });
+      });
+    })();
+
+    // Lead modals and actions
+    (() => {
+      const copyStatus = document.getElementById('copy-status');
+      const showCopyStatus = (text) => {
+        if (!copyStatus) return;
+        copyStatus.textContent = text;
+        setTimeout(() => {
+          if (copyStatus.textContent === text) copyStatus.textContent = '';
+        }, 2500);
+      };
+      const copyToClipboard = async (text) => {
+        const payload = (text || '').trim();
+        if (!payload) return false;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(payload);
+            return true;
+          }
+        } catch (err) {
+          console.warn('Clipboard API failed', err);
+        }
+        try {
+          const area = document.createElement('textarea');
+          area.value = payload;
+          area.setAttribute('readonly', '');
+          area.style.position = 'absolute';
+          area.style.left = '-9999px';
+          document.body.appendChild(area);
+          area.select();
+          const ok = document.execCommand('copy');
+          area.remove();
+          return ok;
+        } catch (err) {
+          console.warn('execCommand copy failed', err);
+          return false;
+        }
+      };
+
+      document.querySelectorAll('.lead-email-copy').forEach(btn => {
+        btn.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          const email = (btn.dataset.email || '').trim();
+          if (!email) return;
+          const ok = await copyToClipboard(email);
+          showCopyStatus(ok ? `Copied: ${email}` : 'Unable to copy email');
+        });
+      });
+
+      const copyAllBtn = document.getElementById('copy-page-emails-btn');
+      if (copyAllBtn) {
+        copyAllBtn.addEventListener('click', async () => {
+          const emails = [...document.querySelectorAll('.lead-card[data-lead-email]')]
+            .map(card => (card.dataset.leadEmail || '').trim())
+            .filter(Boolean);
+          const uniqueEmails = [...new Set(emails)];
+          if (!uniqueEmails.length) {
+            showCopyStatus('No emails on this page');
+            return;
+          }
+          const payload = uniqueEmails.join(';');
+          const ok = await copyToClipboard(payload);
+          showCopyStatus(ok ? `Copied ${uniqueEmails.length} emails` : 'Unable to copy emails');
+        });
+      }
+
+      const editForm = document.getElementById('lead-edit-form');
+      const deleteForm = document.getElementById('lead-delete-form');
+      if (!editForm || !deleteForm) return;
+      const editModalEl = document.getElementById('leadModal');
+      const stageSelect = document.getElementById('lead-edit-stage');
+      const nameInput = document.getElementById('lead-edit-name');
+      const emailInput = document.getElementById('lead-edit-email');
+      const phoneInput = document.getElementById('lead-edit-phone');
+      const sourceInput = document.getElementById('lead-edit-source');
+      const notesInput = document.getElementById('lead-edit-notes');
+      const idInput = document.getElementById('lead-edit-id');
+      document.querySelectorAll('.lead-edit').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const card = btn.closest('.lead-card');
+          if (!card) return;
+          idInput.value = card.dataset.leadId || '';
+          nameInput.value = card.dataset.leadName || '';
+          emailInput.value = card.dataset.leadEmail || '';
+          phoneInput.value = card.dataset.leadPhone || '';
+          sourceInput.value = card.dataset.leadSource || '';
+          notesInput.value = card.dataset.leadNotes || '';
+          const currentStage = card.dataset.leadStage || '';
+          if (stageSelect) {
+            [...stageSelect.options].forEach(opt => {
+              opt.selected = opt.value === currentStage;
+            });
+          }
+        });
+      });
+      document.querySelectorAll('.lead-delete').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const id = btn.dataset.leadId;
+          if (!id) return;
+          if (!confirm('Delete this lead?')) return;
+          const hiddenId = document.getElementById('lead-delete-id');
+          hiddenId.value = id;
+          deleteForm.submit();
+        });
+      });
+      editForm.addEventListener('submit', function (event) {
+        if (!editForm.checkValidity()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        editForm.classList.add('was-validated');
+      });
+      if (editModalEl) {
+        editModalEl.addEventListener('shown.bs.modal', () => {
+          nameInput && nameInput.focus();
+        });
+      }
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,22 +1,22 @@
 {
-  "name": "Putzelf Crew Dashboard",
-  "short_name": "Crew",
+  "name": "Elf's Plan Team",
+  "short_name": "Elf's Plan",
   "id": "/employee/dashboard",
   "start_url": "/employee/dashboard",
   "scope": "/employee/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#020617",
-  "theme_color": "#0f172a",
-  "description": "Track today's missions, upcoming jobs, and completed work for the Putzelf field team.",
+  "theme_color": "#014D4E",
+  "description": "View schedules, manage assigned work, and record completed shifts with Elf's Plan.",
   "icons": [
     {
-      "src": "/static/logo.png",
+      "src": "/static/employee-icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/static/logo.png",
+      "src": "/static/employee-icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }

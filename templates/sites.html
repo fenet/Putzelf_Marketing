@@ -1,0 +1,420 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Putzelf Marketing — Standortübersicht</title>
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/logo.png">
+  <link rel="manifest" href="/static/admin-manifest.json">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-danger: linear-gradient(135deg,#f87171 0%,#ef4444 50%,#dc2626 100%);
+      --btn-grad-danger-hover: linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);
+      --btn-grad-info: linear-gradient(135deg,#38bdf8 0%,#0ea5e9 50%,#2563eb 100%);
+      --btn-grad-info-hover: linear-gradient(135deg,#0ea5e9 0%,#2563eb 50%,#1d4ed8 100%);
+      --btn-grad-success: linear-gradient(135deg,#22c55e 0%,#16a34a 50%,#15803d 100%);
+      --btn-grad-success-hover: linear-gradient(135deg,#16a34a 0%,#15803d 50%,#166534 100%);
+      --btn-grad-light: linear-gradient(135deg,#ffffff 0%,#f1f5f9 100%);
+      --btn-grad-light-hover: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+    }
+    body { background:#f1f5f9; color:#0f172a; font-size:1.05rem; }
+    body.mobile-nav-open { overflow:hidden; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition:grid-template-columns 0.2s ease; background:#ffffff; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; padding:1.5rem 1.25rem; display:flex; flex-direction:column; gap:1.5rem; width:260px; transition: width 0.2s ease, padding 0.2s ease; color:#0f172a; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; text-decoration:none; border:1px solid transparent; display:flex; align-items:center; gap:0.5rem; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill.active, .nav-pill:hover { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
+    .nav-text { display:inline; }
+    .badge-soft { border-radius:999px; border:1px solid #d6d3f0; color:#6366f1; padding:0.2rem 0.65rem; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; background:#eef2ff; }
+    .main-shell { padding:1.75rem; background:#ffffff; }
+    .card-surface { border-radius:0.9rem; border:1px solid #e2e8f0; background:#ffffff; padding:1.25rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .form-label { text-transform:uppercase; font-size:0.75rem; letter-spacing:0.08em; color:#475569; }
+    .form-control, .form-select, .input-group-text {
+      background:#ffffff;
+      color:#0f172a;
+      border:1.5px solid #94a3b8;
+    }
+    .form-control::placeholder { color:#64748b; opacity:1; }
+    .form-control:focus, .form-select:focus {
+      border-color:#0f766e;
+      box-shadow:0 0 0 3px rgba(15,118,110,0.15);
+      background:#ffffff;
+      color:#0f172a;
+    }
+    .little-card { border-radius:0.85rem; border:1px solid #e2e8f0; background:#f8fafc; }
+    .placeholder { color:#94a3b8; font-size:0.85rem; }
+    .table thead th { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.08em; color:#475569; background:#f1f5f9; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.75rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; transition:transform 0.15s ease, box-shadow 0.15s ease; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .btn { border:1px solid rgba(15,23,42,0.18); }
+    .btn i { font-size:1.05rem; }
+    .btn-sm { font-size:0.95rem; padding:0.55rem 0.95rem; border-radius:0.7rem; min-height:2.5rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 14px 26px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-outline-light { background-image:var(--btn-grad-light); color:#0f172a; }
+    .btn-outline-light:hover { background-image:var(--btn-grad-light-hover); color:#0f172a; }
+    .btn-outline-info,
+    .btn-info { background-image:var(--btn-grad-info); color:#ffffff; box-shadow:0 12px 24px rgba(14,165,233,0.25); }
+    .btn-outline-info:hover,
+    .btn-info:hover { background-image:var(--btn-grad-info-hover); color:#ffffff; }
+    .btn-outline-danger,
+    .btn-danger { background-image:var(--btn-grad-danger); color:#ffffff; box-shadow:0 12px 24px rgba(220,38,38,0.25); }
+    .btn-outline-danger:hover,
+    .btn-danger:hover { background-image:var(--btn-grad-danger-hover); color:#ffffff; }
+    .btn-success { background-image:var(--btn-grad-success); color:#ffffff; box-shadow:0 12px 24px rgba(34,197,94,0.25); }
+    .btn-success:hover { background-image:var(--btn-grad-success-hover); color:#ffffff; }
+    .btn-link { background:none; box-shadow:none; color:#0f766e; }
+    .btn-link:hover { color:#0c615b; }
+    .btn-clear-sites {
+      min-height:2rem;
+      padding:0.35rem 0.55rem;
+      border-radius:0.65rem;
+      background-image:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 100%);
+      color:#0c4a6e;
+      border:1px solid #7dd3fc;
+      box-shadow:0 6px 12px rgba(14,116,144,0.12);
+    }
+    .btn-clear-sites:hover {
+      background-image:linear-gradient(135deg,#bae6fd 0%,#7dd3fc 100%);
+      color:#083344;
+    }
+    .site-row-actions .btn {
+      min-height:2rem;
+      padding:0.35rem 0.55rem;
+      border-radius:0.6rem;
+    }
+    .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+    .stat-card { border-radius:0.85rem; border:1px solid #e2e8f0; background:#ffffff; padding:1rem; box-shadow:0 10px 20px rgba(15,23,42,0.06); }
+    .stat-label { font-size:0.75rem; letter-spacing:0.08em; text-transform:uppercase; color:#475569; margin-bottom:0.35rem; }
+    .stat-value { font-size:1.6rem; font-weight:600; color:#0f172a; }
+    .mobile-nav-toggle { display:none; }
+    .mobile-nav-backdrop { display:none; }
+    @media(max-width:992px){
+      .app-shell{ grid-template-columns:minmax(0,1fr);} 
+      .sidebar{
+        position:fixed;
+        top:0;
+        left:0;
+        height:100vh;
+        width:min(82vw,300px);
+        max-width:320px;
+        z-index:1050;
+        display:flex;
+        transform:translateX(-100%);
+        transition:transform 0.2s ease;
+        box-shadow:0 24px 48px rgba(15,23,42,0.12);
+      }
+      body.mobile-nav-open .sidebar{ transform:translateX(0); }
+      .mobile-nav-backdrop{
+        position:fixed;
+        inset:0;
+        background:rgba(15,23,42,0.35);
+        z-index:1040;
+      }
+      body.mobile-nav-open .mobile-nav-backdrop{ display:block; }
+      .mobile-nav-toggle{
+        display:inline-flex;
+        align-items:center;
+        gap:0.4rem;
+        border-radius:0.75rem;
+        border:0;
+        background-image:var(--btn-grad-accent);
+        color:#ffffff;
+        padding:0.45rem 0.85rem;
+        font-size:0.95rem;
+        margin-bottom:1rem;
+        box-shadow:0 12px 24px rgba(15,118,110,0.25);
+      }
+      .mobile-nav-toggle:focus{ outline:2px solid rgba(15,118,110,0.4); outline-offset:2px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+{% include "partials/admin_sidebar.html" %}
+    <main class="main-shell">
+      
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'warning' if category=='warning' else 'info' }} border-0 text-dark">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+        <div>
+          <div class="badge-soft mb-2">Standortübersicht</div>
+          <h1 class="h3 mb-1 text-dark">Kundenstandorte verwalten</h1>
+          <p class="text-secondary mb-0">
+            {% if filtered_sites %}
+              Zeigt {{ page_sites }} von {{ filtered_sites }} Treffern
+            {% else %}
+              Keine Standorte entsprechen den aktuellen Filtern
+            {% endif %}
+            · {{ total_sites }} Standorte gesamt
+          </p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-outline-primary">Kundendatenbank</a>
+          <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Zurück zur Übersicht</a>
+          <a href="{{ url_for('schedule_dashboard') }}" class="btn btn-sm btn-outline-primary">Plan öffnen</a>
+        </div>
+      </div>
+      <section class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Standorte gesamt</div>
+          <div class="stat-value">{{ total_sites }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Aktive Standorte mit Einsätzen diese Woche</div>
+          <div class="stat-value">{{ covered_sites }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Unzugewiesene aktive Standorte</div>
+          <div class="stat-value">{{ unassigned_active_sites }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Inaktive Kunden</div>
+          <div class="stat-value">{{ inactive_sites }}</div>
+        </div>
+      </section>
+      <form method="get" class="row g-2 align-items-end mb-4">
+        <div class="col-sm-8">
+          <label class="form-label" for="site_search">Standorte suchen</label>
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control" id="site_search" name="q" value="{{ search_q or '' }}" placeholder="Nach Name oder Adresse suchen">
+              <button class="btn btn-outline-primary" type="submit" title="Suchen"><i class="bi bi-search"></i></button>
+          </div>
+        </div>
+        <div class="col-sm-4">
+          <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-clear-sites w-100" title="Filter zurücksetzen"><i class="bi bi-x-circle"></i></a>
+        </div>
+      </form>
+      <div class="row g-3">
+        <div class="col-12 col-lg-4">
+          <div class="card-surface mb-3">
+            <h2 class="h6 text-uppercase text-secondary mb-3">Standort hinzufügen</h2>
+            <form method="post" class="row g-3">
+              <input type="hidden" name="entity" value="site">
+              <input type="hidden" name="action" value="create">
+              <div class="col-12">
+                <label class="form-label" for="new_site_name">Standortname</label>
+                <input type="text" class="form-control form-control-sm" id="new_site_name" name="name" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="new_site_address">Adresse</label>
+                <input type="text" class="form-control form-control-sm" id="new_site_address" name="address" placeholder="Straße, Stadt" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="new_site_hourly_rate">Stundensatz (€)</label>
+                <input type="number" class="form-control form-control-sm" id="new_site_hourly_rate" name="hourly_rate" step="0.01" min="0" value="50.00" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="new_site_is_active">Status</label>
+                <select class="form-select form-select-sm" id="new_site_is_active" name="is_active">
+                  <option value="1" selected>Aktiv</option>
+                  <option value="0">Inaktiv</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <a href="{{ url_for('admin_sites') }}" class="btn btn-sm btn-outline-secondary w-100">Kundendatenbank öffnen</a>
+              </div>
+              <div class="col-12">
+                <button type="submit" class="btn btn-sm btn-primary w-100" title="Standort hinzufügen"><i class="bi bi-building-add"></i></button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div class="col-12 col-lg-8">
+          {% if sites %}
+            <div class="card-surface mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h6 text-uppercase text-secondary mb-0">Sammelbearbeitung</h2>
+                <button form="bulk-site-update" type="submit" class="btn btn-sm btn-success">Alle speichern</button>
+              </div>
+              <form id="bulk-site-update" method="post" class="table-responsive" style="max-height:260px;">
+                <input type="hidden" name="entity" value="site_bulk">
+                <input type="hidden" name="action" value="bulk_update">
+                {% if search_q %}
+                  <input type="hidden" name="redirect_q" value="{{ search_q }}">
+                {% endif %}
+                <input type="hidden" name="redirect_page" value="{{ page }}">
+                <table class="table table-sm table-striped align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th scope="col">Name</th>
+                      <th scope="col">Adresse</th>
+                      <th scope="col">Stundensatz</th>
+                      <th scope="col">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for site in sites %}
+                      <tr>
+                        <td>
+                          <input type="hidden" name="site_id" value="{{ site.id }}">
+                          <input type="text" class="form-control form-control-sm" name="site_name" value="{{ site.name }}" required>
+                        </td>
+                        <td>
+                          <input type="text" class="form-control form-control-sm" name="site_address" value="{{ site.address or '' }}" required>
+                        </td>
+                        <td>
+                          <input type="number" class="form-control form-control-sm" name="site_hourly_rate" value="{{ '%.2f'|format(site.hourly_rate or 0) }}" step="0.01" min="0" required>
+                        </td>
+                        <td>
+                          <select class="form-select form-select-sm" name="site_is_active">
+                            <option value="1" {% if site.is_active != 0 %}selected{% endif %}>Aktiv</option>
+                            <option value="0" {% if site.is_active == 0 %}selected{% endif %}>Inaktiv</option>
+                          </select>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </form>
+            </div>
+            <div class="vstack gap-3">
+              {% for site in sites %}
+                <form method="post" class="little-card p-3">
+                  <input type="hidden" name="entity" value="site">
+                  <input type="hidden" name="id" value="{{ site.id }}">
+                  {% if search_q %}
+                    <input type="hidden" name="redirect_q" value="{{ search_q }}">
+                  {% endif %}
+                  <input type="hidden" name="redirect_page" value="{{ page }}">
+                  <div class="row g-2 align-items-end">
+                    <div class="col-md-4 col-12">
+                      <label class="form-label">Name</label>
+                      <input type="text" name="name" value="{{ site.name }}" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="col-md-4 col-12">
+                      <label class="form-label">Adresse</label>
+                      <input type="text" name="address" value="{{ site.address or '' }}" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="col-md-2 col-12">
+                      <label class="form-label">Stundensatz (€)</label>
+                      <input type="number" name="hourly_rate" value="{{ '%.2f'|format(site.hourly_rate or 0) }}" class="form-control form-control-sm" step="0.01" min="0" required>
+                    </div>
+                    <div class="col-md-2 col-12">
+                      <label class="form-label">Status</label>
+                      <select name="is_active" class="form-select form-select-sm">
+                        <option value="1" {% if site.is_active != 0 %}selected{% endif %}>Aktiv</option>
+                        <option value="0" {% if site.is_active == 0 %}selected{% endif %}>Inaktiv</option>
+                      </select>
+                    </div>
+                    <div class="col-md-2 col-12">
+                      <div class="d-grid gap-2 site-row-actions">
+                        <button type="submit" name="action" value="update" class="btn btn-sm btn-success" title="Speichern"><i class="bi bi-check2"></i></button>
+                        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('{{ site.name }} löschen?')" title="Löschen"><i class="bi bi-trash"></i></button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="small text-secondary mt-2">Geplante Einsätze: <span class="text-primary">{{ shift_counts.get(site.id, 0) }}</span></div>
+                </form>
+              {% endfor %}
+            </div>
+            {% if total_pages > 1 %}
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-4">
+                <span class="text-secondary small">Seite {{ page }} von {{ total_pages }}</span>
+                <div class="btn-group" role="group" aria-label="Standort-Seitennavigation">
+                  {% if has_prev %}
+                    {% if search_q %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=prev_page, q=search_q) }}">Zurück</a>
+                    {% else %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=prev_page) }}">Zurück</a>
+                    {% endif %}
+                  {% else %}
+                    <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Zurück</span>
+                  {% endif %}
+                  {% for page_num in range(1, total_pages + 1) %}
+                    {% if page_num == page %}
+                      <span class="btn btn-sm btn-primary disabled" aria-current="page">{{ page_num }}</span>
+                    {% else %}
+                      {% if search_q %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=page_num, q=search_q) }}">{{ page_num }}</a>
+                      {% else %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=page_num) }}">{{ page_num }}</a>
+                      {% endif %}
+                    {% endif %}
+                  {% endfor %}
+                  {% if has_next %}
+                    {% if search_q %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=next_page, q=search_q) }}">Weiter</a>
+                    {% else %}
+                      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=next_page) }}">Weiter</a>
+                    {% endif %}
+                  {% else %}
+                    <span class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">Weiter</span>
+                  {% endif %}
+                </div>
+              </div>
+            {% endif %}
+          {% else %}
+            <div class="card-surface">
+              <p class="placeholder mb-0">Keine Standorte entsprechen diesem Filter. Fügen Sie Standorte hinzu oder passen Sie Ihre Suche an.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    (function() {
+      const body = document.body;
+      const toggle = document.getElementById('mobile-nav-toggle');
+      const sidebar = document.getElementById('admin-sidebar');
+      const backdrop = document.getElementById('mobile-nav-backdrop');
+      if (!toggle || !sidebar || !backdrop) {
+        return;
+      }
+      const closeNav = () => {
+        body.classList.remove('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      };
+      const openNav = () => {
+        body.classList.add('mobile-nav-open');
+        toggle.setAttribute('aria-expanded', 'true');
+      };
+      toggle.addEventListener('click', () => {
+        if (body.classList.contains('mobile-nav-open')) {
+          closeNav();
+        } else {
+          openNav();
+        }
+      });
+      backdrop.addEventListener('click', closeNav);
+      sidebar.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeNav));
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/admin-sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

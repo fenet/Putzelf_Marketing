@@ -1,0 +1,2205 @@
+
+<!doctype html>
+<html lang="{{ current_lang }}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Elf's Plan - {{ 'Einsatzplanung' if current_lang == 'de' else 'Schedule planner' }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #0f766e;
+      --btn-grad-accent: linear-gradient(135deg,#0f766e 0%,#14b8a6 50%,#0ea5e9 100%);
+      --btn-grad-accent-hover: linear-gradient(135deg,#0ea5e9 0%,#14b8a6 50%,#22d3ee 100%);
+      --btn-grad-neutral: linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%);
+      --btn-grad-neutral-hover: linear-gradient(135deg,#e2e8f0 0%,#cbd5f5 100%);
+      --btn-grad-success: linear-gradient(135deg,#22c55e 0%,#16a34a 50%,#15803d 100%);
+      --btn-grad-success-hover: linear-gradient(135deg,#16a34a 0%,#15803d 50%,#166534 100%);
+      --btn-grad-danger: linear-gradient(135deg,#f87171 0%,#ef4444 50%,#dc2626 100%);
+      --btn-grad-danger-hover: linear-gradient(135deg,#ef4444 0%,#dc2626 50%,#b91c1c 100%);
+    }
+    body { background:#f1f5f9; color:#0f172a; font-size:1rem; min-height:100vh; }
+    .app-shell { min-height:100vh; display:grid; grid-template-columns:260px minmax(0,1fr); transition:grid-template-columns 0.2s ease; background:#ffffff; }
+    .sidebar { background:#eef2ff; border-right:1px solid #cbd5f5; color:#0f172a; display:flex; flex-direction:column; padding:1.5rem 1.25rem; gap:1.5rem; width:260px; transition:width 0.2s ease, padding 0.2s ease; }
+    .sidebar-brand { display:flex; align-items:center; gap:0.75rem; }
+    .sidebar-logo { height:40px; width:40px; border-radius:12px; background:radial-gradient(circle at 10% 0, #22c55e 0%, #0ea5e9 45%, #1d4ed8 100%); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .sidebar-logo img { max-width:80%; max-height:80%; object-fit:contain; }
+    .sidebar-title { font-weight:600; letter-spacing:0.03em; font-size:0.95rem; text-transform:uppercase; color:#0f172a; }
+    .sidebar-sub { font-size:0.78rem; color:#475569; }
+    .sidebar-section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; margin-bottom:0.4rem; }
+    .nav-text { display:inline; }
+    .nav-pill { border-radius:0.75rem; padding:0.45rem 0.75rem; font-size:0.9rem; color:#0f172a; display:flex; align-items:center; gap:0.5rem; text-decoration:none; border:1px solid transparent; transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+    .nav-pill:hover, .nav-pill.active { background-image:var(--btn-grad-accent); border-color:transparent; color:#ffffff; box-shadow:0 12px 24px rgba(15,118,110,0.25); }
+    .nav-pill-icon { width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background:#ecfdf5; color:#0f766e; font-size:0.9rem; }
+    .nav-pill-logout { margin-top:0.3rem; background-image:var(--btn-grad-neutral); border-color:transparent; color:#0f172a; box-shadow:0 8px 18px rgba(15,23,42,0.08); }
+    .nav-pill-logout:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .sidebar-footer { margin-top:auto; font-size:0.75rem; color:#475569; }
+    .main-shell { background:#ffffff; padding:1.6rem 1.75rem; display:flex; flex-direction:column; gap:1.5rem; }
+    .scheduler-shell .sidebar { background:#111b3d; border-right:0; color:#fff; }
+    .scheduler-shell .sidebar-title, .scheduler-shell .sidebar-sub, .scheduler-shell .sidebar-section-title, .scheduler-shell .sidebar-footer { color:#cbd5e1; }
+    .scheduler-shell .nav-pill { color:#e2e8f0; }
+    .scheduler-shell .nav-pill:hover, .scheduler-shell .nav-pill.active { color:#fff; background:#26366c; box-shadow:none; }
+    .scheduler-shell .sidebar-logo { background:#26366c; }
+    .scheduler-shell .main-shell { min-width:0; }
+    .page-header { display:flex; align-items:flex-start; justify-content:space-between; gap:1.5rem; margin-bottom:0.5rem; }
+    .page-header-actions { display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; }
+    .btn { font-size:1rem; padding:0.65rem 1.15rem; border-radius:0.75rem; min-height:2.7rem; border:0; background-image:var(--btn-grad-neutral); color:#0f172a; box-shadow:0 10px 20px rgba(15,23,42,0.08); transition:transform 0.15s ease, box-shadow 0.15s ease; }
+    .btn-sm { font-size:0.92rem; padding:0.5rem 0.9rem; border-radius:0.7rem; min-height:2.4rem; }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 16px 28px rgba(15,23,42,0.12); }
+    .btn:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(14,165,233,0.25); }
+    .btn-icon { width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; padding:0; border-radius:0.65rem; }
+    .btn-primary,
+    .btn-outline-primary { background-image:var(--btn-grad-accent); color:#ffffff; box-shadow:0 14px 26px rgba(15,118,110,0.25); }
+    .btn-primary:hover,
+    .btn-outline-primary:hover { background-image:var(--btn-grad-accent-hover); color:#ffffff; }
+    .btn-outline-secondary { background-image:var(--btn-grad-neutral); color:#0f172a; }
+    .btn-outline-secondary:hover { background-image:var(--btn-grad-neutral-hover); color:#0f172a; }
+    .btn-success { background-image:var(--btn-grad-success); color:#ffffff; box-shadow:0 12px 24px rgba(34,197,94,0.25); }
+    .btn-success:hover { background-image:var(--btn-grad-success-hover); color:#ffffff; }
+    .btn-danger { background-image:var(--btn-grad-danger); color:#ffffff; box-shadow:0 12px 24px rgba(220,38,38,0.25); }
+    .btn-danger:hover { background-image:var(--btn-grad-danger-hover); color:#ffffff; }
+    .page-header a.btn-outline-secondary { color:#0f172a; }
+    .content-shell { margin-top:0.25rem; border-radius:1.15rem; background:#ffffff; border:1px solid #e2e8f0; box-shadow:0 24px 48px rgba(15,23,42,0.08); padding:1.35rem 1.35rem 1.6rem; color:#0f172a; display:flex; flex-direction:column; gap:1.5rem; }
+    .section-card { background:#ffffff; border:1px solid #e2e8f0; border-radius:1rem; padding:1.5rem; box-shadow:0 16px 32px rgba(15,23,42,0.08); }
+    .section-header { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1.25rem; }
+    .section-kicker { font-size:0.68rem; letter-spacing:0.14em; text-transform:uppercase; color:#0f766e; margin-bottom:0.4rem; }
+    .section-title { font-size:1.35rem; font-weight:600; color:#0f172a; margin-bottom:0.35rem; }
+    .section-subtitle { font-size:0.9rem; color:#475569; max-width:560px; margin-bottom:0; }
+    .section-actions { display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; }
+    .insight-badges { display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1.1rem; }
+    .insight-badge { display:inline-flex; align-items:center; gap:0.4rem; padding:0.35rem 0.65rem; border-radius:999px; border:1px solid #cbd5f5; background:#ecfdf5; color:#0f766e; font-size:0.72rem; letter-spacing:0.04em; text-transform:uppercase; }
+    .filter-toolbar { display:grid; gap:0.75rem; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); background:#f8fafc; border:1px solid #e2e8f0; border-radius:0.85rem; padding:1rem; margin-bottom:1.25rem; }
+    .filter-toolbar .form-label { font-size:0.7rem; letter-spacing:0.1em; text-transform:uppercase; color:#64748b; margin-bottom:0.35rem; }
+    .filter-toolbar .form-select,
+    .filter-toolbar input[type="date"] { background:#ffffff; border:1px solid #cbd5f5; color:#0f172a; font-size:0.82rem; border-radius:0.6rem; }
+    .filter-toolbar .form-select:focus,
+    .filter-toolbar input[type="date"]:focus { box-shadow:0 0 0 3px rgba(15,118,110,0.15); border-color:#0f766e; }
+    .table-wrapper { background:#ffffff; border:1px solid #e2e8f0; border-radius:0.85rem; overflow-y:auto; overflow-x:hidden; resize:vertical; width:100%; min-width:0; min-height:260px; max-height:75vh; }
+    .table-scroll { max-height:none; width:100%; min-width:0; overflow:visible; }
+    .period-outside-date { color:#aab2bf !important; background:#f8fafc !important; }
+    .period-outside-cell { background:#fafbfc !important; }
+    .schedule-table { margin-bottom:0; color:#0f172a; width:100%; min-width:0; table-layout:fixed; }
+    .schedule-table th,
+    .schedule-table td { font-size:0.82rem; vertical-align:top; border-color:#e2e8f0; }
+    .schedule-table thead th { background:#f1f5f9; color:#475569; position:sticky; top:0; z-index:5; }
+    .schedule-table thead tr.week-number-row th { top:0; height:38px; text-align:center; background:#f8f9fb; color:#717b8c; font-size:.8rem; font-weight:700; }
+    .schedule-table thead tr:nth-child(2) th { top:38px; }
+    .schedule-table thead .week-number-empty { left:0; z-index:12; }
+    .schedule-table thead .week-number-heading { border-bottom:0; }
+    .schedule-table.is-full-day-view .date-heading::after { content:"00:00–24:00"; display:block; margin-top:.15rem; color:#788397; font-size:.64rem; font-weight:500; }
+    .schedule-table thead th:first-child { position:sticky; left:0; z-index:10; background:#f1f5f9; }
+    .schedule-table tbody th { position:sticky; left:0; z-index:4; background:inherit; color:#0f172a; }
+    .schedule-table .employee-heading, .schedule-table .employee-cell { width:var(--employee-column-width, 17%); min-width:0; max-width:none; }
+    .schedule-table .date-heading { width:auto; min-width:0; text-align:center; }
+    .schedule-table[data-period="month"] .date-heading span { display:none; }
+    .schedule-table[data-period="month"] .date-heading strong { font-size:.63rem; }
+    .schedule-table[data-period="month"] .schedule-cell { padding:1px !important; }
+    .schedule-table[data-period="month"] .shift-pill { padding:4px 2px 4px 5px; font-size:.59rem; }
+    .employee-heading { position:relative; padding-right:1rem !important; }
+    .employee-column-resizer { position:absolute; z-index:12; top:0; right:-3px; width:8px; height:100%; padding:0; border:0; background:transparent; cursor:col-resize; touch-action:none; }
+    .employee-column-resizer::after { content:""; position:absolute; top:20%; bottom:20%; left:3px; width:2px; border-radius:2px; background:#cbd5e1; }
+    .employee-column-resizer:hover::after, .employee-column-resizer:focus-visible::after { background:#2563eb; width:3px; }
+    .employee-column-resizing, .employee-column-resizing * { cursor:col-resize !important; user-select:none !important; }
+    .add-employee-row th, .add-employee-row td { height:48px; vertical-align:middle !important; background:#f8fafc !important; }
+    .add-employee-link { display:inline-flex; align-items:center; gap:.4rem; text-decoration:none; font-size:.78rem; font-weight:600; color:#2563eb; }
+    .add-employee-link:hover { color:#1d4ed8; text-decoration:underline; }
+    .date-heading span, .date-heading strong { display:block; }
+    .date-heading strong { font-size:.86rem; color:#334155; }
+    .employee-cell { display:flex; align-items:center; gap:.45rem; height:100%; background:#fff !important; }
+    .site-employee-cell { background:#f8fafc !important; }
+    .site-employee-cell .employee-avatar { background:#e0eaff; color:#2767c7; }
+    .site-slot-secondary { display:none !important; }
+    .employee-avatar { display:inline-flex; flex:0 0 32px; width:32px; height:32px; align-items:center; justify-content:center; border-radius:50%; background:#dbeafe; color:#1d4ed8; font-weight:700; }
+    .employee-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+    .employee-details { display:flex; flex-direction:column; min-width:0; }
+    .employee-details strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .employee-details small { color:#64748b; }
+    .open-employee-cell { background:#eff6ff !important; color:#1d4ed8; }
+    .open-employee-cell .employee-avatar { background:#bfdbfe; }
+    .open-shift-pill { background:#eff6ff; border-color:#93c5fd; color:#1e40af; }
+    .open-shift-pill .shift-pill-title, .open-shift-pill .shift-pill-time { color:#1e40af; }
+    .schedule-cell { height:88px; min-height:88px; padding:.25rem !important; overflow:hidden; }
+    .empty-cell { display:flex; align-items:center; justify-content:center; height:100%; width:100%; color:#cbd5e1; opacity:0; background:transparent; border:0; font:inherit; cursor:pointer; }
+    .schedule-cell:hover .empty-cell { opacity:1; }
+    .schedule-table tbody tr:nth-child(odd) { background:#ffffff; }
+    .schedule-table tbody tr:nth-child(even) { background:#f8fafc; }
+    .shift-pill { display:flex; align-items:flex-start; gap:0.35rem; padding:0.3rem 0.6rem; border-radius:0.9rem; background:#ecfdf5; border:1px solid #16a34a26; color:#0f766e; font-size:0.74rem; margin-bottom:0.35rem; white-space:normal; }
+    .shift-pill-text { display:flex; flex-direction:column; gap:0.1rem; line-height:1.2; min-width:0; }
+    .shift-pill-title { font-weight:600; color:#0f766e; }
+    .shift-pill-sub { color:#0f766e; opacity:0.9; }
+    .shift-pill-time { color:#0f766e; opacity:0.9; }
+    .shift-pill-actions { display:inline-flex; align-items:center; gap:0.25rem; margin-left:auto; }
+    .shift-pill { position:relative; display:block; font-size:0.68rem; padding:0.25rem; min-width:0; overflow:hidden; }
+    .shift-pill-text { padding-right:0; }
+    .shift-pill-title, .shift-pill-sub, .shift-pill-time { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .shift-pill-sub { display:none; }
+    .shift-pill-actions { position:absolute; top:2px; right:2px; gap:1px; opacity:0; transition:opacity .12s ease; }
+    .shift-pill:hover .shift-pill-actions, .shift-pill:focus-within .shift-pill-actions { opacity:1; }
+    .shift-action { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; padding:0; border:0; border-radius:5px; background:#ffffffed; color:#0f766e; cursor:pointer; font-size:0.68rem; line-height:1; }
+    .shift-action:hover { background:#ccfbf1; }
+    /* Compact, readable shift cards */
+    .shift-pill {
+      position:relative;
+      display:block;
+      min-width:0;
+      margin:0 0 .35rem;
+      padding:7px 7px 7px 10px;
+      overflow:hidden;
+      border:1px solid #e1e8ef;
+      border-left:3px solid #34b779;
+      border-radius:9px;
+      background:linear-gradient(145deg,#fff 0%,#f7fcf9 100%);
+      color:#27364c;
+      box-shadow:0 1px 3px rgba(20,39,62,.07);
+      font-size:.68rem;
+      line-height:1.25;
+      transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease;
+    }
+    .shift-pill:hover,.shift-pill:focus-within {
+      z-index:2;
+      transform:translateY(-1px);
+      border-color:#b9dcca;
+      border-left-color:#1f9c61;
+      box-shadow:0 5px 12px rgba(20,39,62,.12);
+    }
+    .shift-pill-text { display:flex; min-width:0; flex-direction:column; gap:3px; padding-right:0; line-height:1.2; }
+    .shift-pill-time {
+      display:block;
+      width:fit-content;
+      max-width:100%;
+      padding:2px 5px;
+      overflow:hidden;
+      border-radius:5px;
+      background:#f0f4f8;
+      color:#536176;
+      font-size:.61rem;
+      font-weight:700;
+      line-height:1.15;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .shift-pill-time-row { display:flex; min-width:0; align-items:center; gap:4px; }
+    .shift-people-indicator { display:inline-flex; flex:0 0 auto; align-items:center; justify-content:center; margin-left:auto; color:#64748b; font-size:.78rem; }
+    .shift-has-crew .shift-people-indicator { color:#526b99; }
+    .shift-pill-title {
+      display:-webkit-box;
+      max-height:2.35em;
+      overflow:hidden;
+      color:#25344b;
+      font-size:.68rem;
+      font-weight:650;
+      line-height:1.17;
+      text-overflow:ellipsis;
+      white-space:normal;
+      -webkit-box-orient:vertical;
+      -webkit-line-clamp:2;
+    }
+    .shift-crew { display:flex; align-items:center; min-height:18px; margin-top:2px; padding-left:2px; }
+    .shift-crew-avatar,.shift-crew-more { display:inline-flex; width:18px; height:18px; align-items:center; justify-content:center; margin-left:-3px; overflow:hidden; border:1.5px solid #fff; border-radius:50%; background:#e8f0fe; color:#3965a8; font-size:.62rem; }
+    .shift-crew-avatar:first-child { margin-left:0; }
+    .shift-crew-avatar img { width:100%; height:100%; object-fit:cover; }
+    .shift-crew-more { width:auto; min-width:18px; padding:0 4px; border-radius:9px; background:#eef2f7; color:#566477; font-size:.58rem; font-weight:700; }
+    .shift-has-crew { border-right-color:#cfe5d8; }
+    .edit-shift-employee-chips { min-height:46px; align-content:flex-start; padding:7px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
+    .edit-selected-employee { display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 4px; border:1px solid #e2e8f0; border-radius:999px; background:#f8fafc; color:#344054; font-size:.82rem; }
+    .edit-selected-avatar { display:inline-flex; width:23px; height:23px; align-items:center; justify-content:center; overflow:hidden; border-radius:50%; background:#eaf2ff; color:#2168d8; font-size:.68rem; font-weight:700; }
+    .edit-selected-avatar img { width:100%; height:100%; object-fit:cover; }
+    .edit-selected-remove { display:inline-flex; width:19px; height:19px; align-items:center; justify-content:center; padding:0; border:0; border-radius:50%; background:#8993a3; color:#fff; font-size:.72rem; line-height:1; }
+    .edit-selected-remove:hover { background:#dc3545; }
+    .edit-employee-picker { margin-top:8px; padding:10px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; box-shadow:0 8px 24px rgba(20,39,62,.1); }
+    .edit-employee-picker[hidden] { display:none !important; }
+    .edit-employee-picker-list { display:flex; max-height:150px; flex-wrap:wrap; gap:6px; overflow:auto; margin-top:8px; }
+    .edit-employee-picker-list [hidden] { display:none !important; }
+    .shift-pill-sub { display:none; }
+    .shift-checkbox { position:static; z-index:auto; flex:0 0 14px; width:14px; height:14px; margin:0 auto 0 2px; accent-color:#2878e8; opacity:1; pointer-events:auto; }
+    .shift-pill-actions { position:static; display:flex; width:100%; justify-content:flex-end; gap:3px; height:0; margin:0; overflow:hidden; opacity:0; pointer-events:none; transition:height .14s ease,opacity .14s ease,margin .14s ease; }
+    .shift-pill:hover .shift-pill-actions,.shift-pill:focus-within .shift-pill-actions { position:static; height:21px; margin-top:5px; overflow:visible; opacity:1; pointer-events:auto; }
+    .shift-action { width:21px; height:21px; border:1px solid #e5eaf0; border-radius:6px; background:#fff; color:#526176; box-shadow:0 1px 3px rgba(20,39,62,.12); font-size:.7rem; }
+    .shift-action:hover { border-color:#b9dcca; background:#ecfdf4; color:#16834f; }
+    .shift-delete,.shift-delete:hover { color:#dc3545; }
+    .open-shift-pill { border-color:#fed7aa; border-left-color:#f97316; background:linear-gradient(145deg,#fff 0%,#fff7ed 100%); color:#713f12; }
+    .open-shift-pill:hover,.open-shift-pill:focus-within { border-color:#fdba74; border-left-color:#ea580c; }
+    .open-shift-pill .shift-pill-time { background:#ffedd5; color:#c2410c; }
+    .open-shift-pill .shift-pill-title { color:#9a3412; }
+    .shift-pill.is-recurring { border-color:#e6defe; border-left-color:#8b5cf6; background:linear-gradient(145deg,#fff 0%,#faf7ff 100%); }
+    .shift-pill.is-recurring:hover,.shift-pill.is-recurring:focus-within { border-color:#d4c5fb; border-left-color:#7c3aed; }
+    .shift-pill.is-recurring .shift-pill-time { background:#f3edff; color:#6941a5; }
+    .recurring-shift-mark { display:inline-flex; flex:0 0 19px; width:19px; height:19px; align-items:center; justify-content:center; border:1px solid #dfd2ff; border-radius:6px; background:#f3edff; color:#7646c4; font-size:.95rem; font-weight:700; line-height:1; }
+    .open-shift-pill.is-recurring { border-left-color:#8b5cf6; }
+    .schedule-cell { overflow:visible; }
+    .shift-pill { overflow:hidden; }
+    .shift-pill:not([draggable="true"]) { cursor:pointer; }
+    .shift-pill:hover,.shift-pill:focus-within { z-index:20; overflow:visible; }
+    .shift-pill.is-selected { z-index:3; border-color:#8db8fb; border-left-color:#2563eb; background:linear-gradient(145deg,#f3f8ff 0%,#eaf2ff 100%); box-shadow:0 0 0 2px rgba(37,99,235,.13),0 3px 9px rgba(37,99,235,.12); }
+    .shift-pill.is-selected .shift-pill-actions { height:21px; margin-top:5px; overflow:visible; opacity:1; pointer-events:auto; }
+    .shift-pill.is-selected .shift-checkbox { opacity:1; pointer-events:auto; }
+    .shift-pill.is-selected .shift-pill-time { background:#dceaff; color:#2358a2; }
+    .shift-pill.is-selected.is-recurring .shift-pill-time { background:#f3edff; color:#6941a5; }
+    .shift-pill:hover .shift-pill-title,.shift-pill:focus-within .shift-pill-title { display:block; max-height:none; overflow:visible; text-overflow:clip; white-space:normal; overflow-wrap:anywhere; }
+    .shift-pill:hover .shift-pill-sub,.shift-pill:focus-within .shift-pill-sub { display:block; overflow:visible; color:#66758a; opacity:1; text-overflow:clip; white-space:normal; overflow-wrap:anywhere; }
+    .open-shift-pill:hover .shift-pill-sub,.open-shift-pill:focus-within .shift-pill-sub { color:#9a5b35; }
+    @media (hover:none) {
+      .shift-pill-actions { height:21px; margin-top:5px; overflow:visible; opacity:1; pointer-events:auto; }
+      .shift-pill .shift-pill-sub { display:block; overflow:visible; color:#66758a; opacity:1; text-overflow:ellipsis; white-space:nowrap; }
+    }
+    .schedule-table td, .schedule-table thead th.date-heading { min-width:0 !important; }
+    .schedule-table tbody th { min-width:0; }
+    .repeat-fields { display:none; gap:.8rem; align-items:end; flex-wrap:wrap; padding:.85rem; background:#f8fafc; border:1px solid #e3e8ef; border-radius:.8rem; }
+    .repeat-fields.is-visible { display:flex; }
+    .repeat-interval-field { display:grid; grid-template-columns:auto 72px auto; align-items:end; gap:.55rem; }
+    .repeat-interval-field .form-label { grid-column:1/-1; margin:0; }
+    .repeat-interval-field input { min-height:38px; }
+    .repeat-weekdays { min-width:100%; margin:0; padding:0; border:0; }
+    .repeat-weekdays legend { float:none; width:auto; margin:0 0 .45rem; color:#64748b; font-size:.78rem; }
+    .weekday-options { display:flex; flex-wrap:wrap; gap:.35rem; }
+    .weekday-options label { position:relative; cursor:pointer; }
+    .weekday-options input { position:absolute; opacity:0; }
+    .weekday-options span { display:grid; width:38px; height:38px; place-items:center; border:1px solid #dce3ec; border-radius:50%; background:#fff; color:#667085; font-size:.76rem; }
+    .weekday-options input:checked + span { border-color:#60a5fa; background:#eaf3ff; color:#1769e0; box-shadow:0 0 0 2px rgba(96,165,250,.16); }
+    .weekday-options input:focus-visible + span { outline:2px solid #2563eb; outline-offset:2px; }
+    .quick-add-modal { display:none; position:fixed; inset:0; z-index:10020; background:#0f172a88; align-items:center; justify-content:center; padding:1rem; }
+    .quick-add-modal.is-open { display:flex; }
+    .scheduler-toolbar { display:grid; gap:.7rem; margin-bottom:.25rem; }
+    .scheduler-toolbar-row { display:flex; align-items:center; justify-content:space-between; gap:.65rem; flex-wrap:wrap; }
+    .scheduler-toolbar-left,.scheduler-toolbar-right,.scheduler-toolbar-filters { display:flex; align-items:center; gap:.55rem; flex-wrap:wrap; min-width:0; }
+    .scheduler-toolbar .btn { min-height:40px; padding:.48rem .82rem; border:1px solid #e1e5ec; border-radius:11px; background:#fff; color:#596477; box-shadow:0 2px 5px rgba(15,23,42,.04); font-size:.85rem; font-weight:550; }
+    .scheduler-toolbar .btn:hover { background:#f8fafc; transform:none; box-shadow:0 3px 9px rgba(15,23,42,.08); }
+    .scheduler-toolbar .btn-primary { border-color:#1877f2; background:#1877f2; color:#fff; }
+    .scheduler-toolbar .btn-primary:hover { background:#1268dc; color:#fff; }
+    .week-stepper { display:flex; align-items:center; overflow:hidden; border:1px solid #e1e5ec; border-radius:11px; background:#fff; }
+    .week-stepper .btn { min-width:39px; border:0; border-radius:0; box-shadow:none; }
+    .week-stepper .btn + .btn { border-left:1px solid #e1e5ec; }
+    .week-stepper .today-button { min-width:74px; background:#f7f8fa; font-weight:650; }
+    .week-range-wrap,.schedule-view-wrap,.schedule-filter-add { position:relative; }
+    .week-range-button { min-width:310px; justify-content:flex-start; }
+    .week-range-button .bi-chevron-down { margin-left:auto; font-size:.72rem; }
+    .week-picker-popover,.view-options,.add-filter-popover,.notification-popover { display:none; position:absolute; z-index:100; top:calc(100% + 7px); right:0; min-width:240px; padding:.85rem; border:1px solid #e2e8f0; border-radius:12px; background:#fff; box-shadow:0 14px 36px rgba(15,23,42,.16); }
+    .week-range-wrap.is-open .week-picker-popover,.schedule-view-wrap.is-open .view-options,.schedule-filter-add.is-open .add-filter-popover,.notification-wrap.is-open .notification-popover { display:grid; gap:.55rem; }
+    .week-picker-popover label,.add-filter-popover label { margin:0; color:#68758b; font-size:.76rem; font-weight:600; }
+    .week-picker-popover input,.add-filter-popover select { min-height:38px; border:1px solid #dce3ec; border-radius:8px; font-size:.85rem; }
+    .week-range-wrap.is-open .week-picker-popover { display:block; left:0; right:auto; width:min(590px,calc(100vw - 24px)); min-width:0; padding:16px; }
+    .date-range-layout { display:grid; grid-template-columns:minmax(0,1fr) 150px; gap:20px; }
+    .date-calendar-head { display:grid; grid-template-columns:40px 1fr 40px; align-items:center; gap:8px; margin-bottom:15px; }
+    .date-calendar-head strong { text-align:center; color:#26334b; font-size:1.05rem; font-weight:600; }
+    .date-calendar-nav { width:40px; min-width:40px !important; height:40px; padding:0 !important; border-radius:8px !important; box-shadow:none !important; }
+    .date-calendar-weekdays,.date-calendar-days { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); text-align:center; }
+    .date-calendar-weekdays { margin-bottom:8px; color:#9aa2b0; font-size:.78rem; }
+    .date-calendar-days { gap:5px 0; }
+    .date-calendar-day { display:grid; place-items:center; min-width:0; height:40px; padding:0 !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; color:#26334b !important; font-size:.9rem !important; }
+    .date-calendar-day:hover { background:#eff6ff !important; }
+    .date-calendar-day.is-outside { color:#aab1bd !important; }
+    .date-calendar-day.is-in-range { background:#dff3ff !important; }
+    .date-calendar-day.is-start,.date-calendar-day.is-end { background:#1976f3 !important; color:#fff !important; border-radius:7px !important; }
+    .date-range-presets { display:flex; flex-direction:column; gap:7px; padding-top:56px; }
+    .date-range-preset { min-height:36px !important; padding:.4rem .55rem !important; border:0 !important; box-shadow:none !important; text-align:left; white-space:nowrap; }
+    .date-range-preset:hover { background:#f1f5f9 !important; }
+    .date-range-footer { display:flex; justify-content:flex-end; gap:10px; margin-top:18px; padding-top:12px; border-top:1px solid #edf0f4; }
+    .date-range-footer .btn { min-width:120px; }
+    .view-options { left:50%; right:auto; min-width:330px; padding:.7rem; display:none; gap:.18rem; transform:translateX(-50%); overflow:visible; }
+    .schedule-view-wrap.is-open .view-options { display:block; }
+    .view-option-check { display:flex; align-items:center; gap:.75rem; min-height:42px; padding:.45rem .7rem; border-radius:8px; color:#29354b; font-size:.9rem; cursor:pointer; }
+    .view-option-check:hover,.view-split-choice:hover,.view-submenu-trigger:hover { background:#f4f6f9; }
+    .view-option-check input,.view-split-choice input { width:18px; height:18px; margin:0; accent-color:#1976f3; flex:0 0 auto; }
+    .view-menu-divider { height:1px; margin:.45rem 0; background:#e5e7eb; }
+    .view-submenu { position:relative; }
+    .view-submenu-trigger { display:flex; width:100%; min-height:60px; align-items:center; justify-content:space-between; gap:.8rem; padding:.5rem .7rem; border:0; border-radius:8px; background:#fff; text-align:left; color:#253149; }
+    .view-submenu-trigger small { display:block; color:#717b8d; font-size:.72rem; line-height:1.2; }
+    .view-submenu-trigger strong { display:block; font-size:.96rem; font-weight:550; }
+    .view-submenu-trigger .bi-caret-right-fill { color:#687386; font-size:.8rem; }
+    .view-submenu-panel { display:none; position:absolute; z-index:2; top:0; left:calc(100% + .45rem); min-width:255px; padding:.5rem; border:1px solid #e4e8ee; border-radius:10px; background:#fff; box-shadow:0 12px 28px rgba(15,23,42,.14); }
+    .view-submenu:hover .view-submenu-panel,.view-submenu:focus-within .view-submenu-panel { display:grid; gap:.18rem; }
+    .view-split-choice { display:flex; align-items:center; gap:.7rem; min-height:42px; padding:.4rem .6rem; border-radius:7px; color:#29354b; font-size:.9rem; cursor:pointer; }
+    .view-split-choice.is-active { background:#f1f6ff; color:#1769d2; font-weight:600; }
+    .view-time-choice { border-top:1px solid #e7eaf0; margin-top:.35rem; padding-top:.55rem; }
+    .view-options button { justify-content:flex-start; }
+    .notification-wrap { position:relative; }
+    .notification-wrap .btn { width:42px; padding:0; }
+    .notification-wrap .btn i { display:inline-block; transform-origin:50% 12%; }
+    .notification-wrap.is-active #schedule-notifications-toggle { border-color:#e8c46a; background:#fff8e5; color:#b77900; }
+    .notification-wrap.is-active.is-online #schedule-notifications-toggle i { animation:notification-bell-alive 2.4s ease-in-out infinite; }
+    .notification-wrap.is-paused #schedule-notifications-toggle { border-color:#e8d7a9; background:#fbf7ed; color:#9a741f; }
+    .notification-wrap.is-paused #schedule-notifications-toggle i,.notification-wrap.is-offline #schedule-notifications-toggle i { animation:none !important; }
+    .notification-wrap.is-offline #schedule-notifications-toggle { border-color:#e8d7a9; background:#fbf7ed; color:#9a741f; }
+    .notification-popover .notification-action { display:flex; width:100%; min-height:38px; align-items:center; justify-content:center; gap:.5rem; margin-top:.15rem; border:1px solid #e6bd55; border-radius:9px; background:#fff8e5; color:#8a5d00; font-size:.84rem; font-weight:650; box-shadow:0 2px 5px rgba(138,93,0,.08); }
+    .notification-popover .notification-action:hover { border-color:#d9a82e; background:#fff0c2; color:#704b00; }
+    .notification-popover .notification-action.is-resume { border-color:#bd8a18; background:#c99112; color:#fff; }
+    .notification-popover .notification-action.is-resume:hover { border-color:#a9780b; background:#b8830c; color:#fff; }
+    @keyframes notification-bell-alive { 0%,82%,100% { transform:rotate(0); } 86% { transform:rotate(12deg); } 90% { transform:rotate(-10deg); } 94% { transform:rotate(6deg); } 98% { transform:rotate(-3deg); } }
+    @media (prefers-reduced-motion:reduce) { .notification-wrap .btn i { animation:none !important; } }
+    .notification-popover { min-width:260px; color:#596477; font-size:.82rem; line-height:1.45; }
+    .notification-popover strong { color:#25344d; }
+    .notification-popover p { margin:.45rem 0; color:#586579; }
+    .notification-popover .notification-pending { padding:.45rem .55rem; border-radius:8px; background:#f7f9fc; font-size:.76rem; }
+    .notification-popover small { display:block; margin-top:.5rem; color:#8a94a5; font-size:.7rem; }
+    .notification-confirm-icon { width:54px; height:54px; display:grid; place-items:center; border-radius:50%; background:#e0f2fe; color:#1976f3; font-size:1.35rem; }
+    .add-filter-popover { max-height:min(72vh,560px); overflow-y:auto; }
+    .availability-filter-grid { display:grid; grid-template-columns:1fr 1fr; gap:.4rem; }
+    .scheduler-toolbar-filters { justify-content:flex-start; }
+    .schedule-search-wrap { position:relative; flex:1 1 250px; max-width:340px; }
+    .schedule-search-wrap .bi-search { position:absolute; z-index:1; left:.85rem; top:50%; transform:translateY(-50%); color:#475569; }
+    .schedule-search-wrap .schedule-search { min-height:42px; padding-left:2.45rem; border:1px solid #e1e5ec; border-radius:11px; background:white; font-size:.9rem; }
+    .filter-select { min-width:170px; min-height:42px; border:1px solid #e1e5ec; border-radius:11px; background:#fff; color:#727c8d; font-size:.85rem; }
+    .filter-add-button { min-height:42px !important; padding-inline:.7rem !important; border-color:transparent !important; box-shadow:none !important; color:#596477 !important; }
+    .add-filter-popover { left:0; right:auto; min-width:270px; }
+    .add-filter-popover .form-label { margin:0; color:#6c788c; font-size:.73rem; }
+    .filter-active-indicator { display:none; align-items:center; gap:.35rem; padding:.28rem .55rem; border-radius:99px; color:#315fbd; background:#edf3ff; font-size:.72rem; }
+    .filter-active-indicator.is-visible { display:inline-flex; }
+    .schedule-card { padding:0; overflow:visible; border:0; box-shadow:none; }
+    .batch-actions { margin:.5rem 0 .55rem; }
+    .schedule-table [hidden] { display:none !important; }
+    #edit-selected-btn { display:none !important; }
+    .table-wrapper { resize:vertical; overflow-y:auto; overflow-x:hidden; }
+    @media(max-width:700px) { .scheduler-toolbar-row { align-items:stretch; } .scheduler-toolbar-left,.scheduler-toolbar-right,.scheduler-toolbar-filters { width:100%; } .scheduler-toolbar-right > * { flex:1 1 auto; } .week-range-button { min-width:0; width:100%; } .week-range-wrap { flex:1; } .week-picker-popover { left:0; right:auto; } .schedule-search-wrap { max-width:none; flex-basis:100%; } .filter-select { flex:1 1 135px; min-width:0; } }
+    /* Unified, compact planner toolbar */
+    .scheduler-toolbar {
+      gap:0;
+      margin:0 0 1rem;
+      overflow:visible;
+      border:1px solid #e7ebf2;
+      border-radius:16px;
+      background:#fff;
+      box-shadow:0 5px 18px rgba(24,39,75,.055);
+    }
+    .scheduler-toolbar form { min-width:0; }
+    .scheduler-toolbar-row { padding:14px 16px; gap:12px; }
+    .scheduler-toolbar-row + .scheduler-toolbar-row { border-top:1px solid #edf0f5; }
+    .scheduler-toolbar-left,.scheduler-toolbar-right,.scheduler-toolbar-filters { gap:8px; }
+    .scheduler-toolbar .btn {
+      min-height:42px;
+      padding:.55rem .85rem;
+      border-color:#e4e8ef;
+      border-radius:10px;
+      color:#4c566b;
+      box-shadow:0 1px 2px rgba(16,24,40,.035);
+      font-size:.84rem;
+      font-weight:600;
+      transition:background-color .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease;
+    }
+    .scheduler-toolbar .btn:hover { border-color:#cdd7e5; background:#f8fafc; color:#26364f; box-shadow:0 2px 5px rgba(16,24,40,.07); }
+    .scheduler-toolbar .btn:focus-visible,.scheduler-toolbar .form-select:focus,.scheduler-toolbar .form-control:focus {
+      border-color:#76a8fa;
+      box-shadow:0 0 0 3px rgba(37,99,235,.13);
+      outline:0;
+    }
+    .scheduler-toolbar .btn-primary,.scheduler-toolbar .btn-primary:hover {
+      border-color:#2168e8;
+      background:#2168e8;
+      color:#fff;
+      box-shadow:0 3px 8px rgba(33,104,232,.2);
+    }
+    .scheduler-toolbar .btn-primary:hover { background:#185bd1; }
+    .week-stepper { border-color:#e4e8ef; border-radius:10px; box-shadow:0 1px 2px rgba(16,24,40,.035); }
+    .week-stepper .btn { min-width:40px; box-shadow:none; }
+    .week-stepper .today-button { min-width:72px; color:#35435c; background:#f5f7fa; }
+    .week-range-button { min-width:310px; gap:.6rem; color:#39465d !important; }
+    .week-range-button > .bi-calendar3 { color:#64748b; }
+    .scheduler-toolbar-right { margin-left:auto; }
+    .notification-wrap .btn { width:42px; color:#667085; }
+    .scheduler-toolbar-filters { justify-content:flex-start; padding-top:11px; padding-bottom:11px; background:#fafbfc; border-radius:0 0 16px 16px; }
+    .schedule-search-wrap { flex:1 1 270px; max-width:360px; }
+    .schedule-search-wrap .schedule-search { min-height:42px; border-color:#e4e8ef; border-radius:10px; padding-left:2.5rem; color:#26364f; }
+    .schedule-search-wrap .bi-search { left:.9rem; color:#8490a3; }
+    .filter-select { min-width:172px; min-height:42px; border-color:#e4e8ef; border-radius:10px; color:#525e73; font-size:.84rem; }
+    .filter-add-button { min-width:132px; border-color:#dce5f4 !important; background:#fff !important; color:#315fbd !important; box-shadow:0 1px 2px rgba(16,24,40,.035) !important; }
+    .filter-add-button:hover { border-color:#b8ccef !important; background:#f3f7ff !important; color:#244f9f !important; }
+    .filter-active-indicator { padding:.38rem .65rem; border:1px solid #d9e6ff; color:#315fbd; background:#f1f6ff; font-weight:600; }
+    .selection-toolbar { justify-content:flex-start; gap:9px; border-top:1px solid #edf0f5; background:#fff; }
+    .selection-toolbar[hidden] { display:none !important; }
+    .selection-toolbar .selection-summary { margin:0 10px 0 0; color:#2470ec; font-size:.9rem; white-space:nowrap; }
+    .selection-toolbar .selection-summary strong { font-weight:700; }
+    .selection-toolbar .selection-clear { border-color:transparent; background:transparent; color:#8992a3; box-shadow:none; }
+    .selection-toolbar .selection-clear:hover { background:#f3f5f8; color:#475569; }
+    .selection-toolbar .btn:disabled { opacity:.48; cursor:not-allowed; box-shadow:none; }
+    .selection-toolbar .btn-batch-delete,.selection-toolbar .btn-batch-delete:hover { border-color:#dc3545; background:#dc3545; color:#fff; }
+    .selection-toolbar .btn-batch-delete:hover { background:#bd2635; }
+    .week-picker-popover,.view-options,.add-filter-popover,.notification-popover { top:calc(100% + 9px); padding:.95rem; border-color:#e5eaf1; border-radius:13px; box-shadow:0 16px 40px rgba(21,34,56,.16); }
+    .view-options { min-width:330px; padding:.7rem; gap:.18rem; overflow:visible; }
+    .view-options button { min-height:36px; box-shadow:none; }
+    .add-filter-popover { width:min(320px,calc(100vw - 32px)); }
+    .add-filter-popover select,.add-filter-popover input { border-color:#e1e7ef; border-radius:8px; }
+    @media(max-width:900px) {
+      .scheduler-toolbar-row { align-items:flex-start; }
+      .scheduler-toolbar-right { margin-left:0; }
+    }
+    @media(max-width:700px) {
+      .scheduler-toolbar { border-radius:13px; }
+      .scheduler-toolbar-row { padding:12px; }
+      .scheduler-toolbar-left { display:grid; grid-template-columns:auto minmax(0,1fr); }
+      .scheduler-toolbar-right { display:grid; grid-template-columns:42px 1fr 1fr; }
+      .scheduler-toolbar-right > * { min-width:0; }
+      .scheduler-toolbar-right > a { justify-content:center; }
+      .scheduler-toolbar-right #open-new-shift { grid-column:1 / -1; }
+      .scheduler-toolbar-filters { gap:8px; }
+      .schedule-search-wrap { flex-basis:100%; }
+      .filter-select { flex:1 1 calc(50% - 8px); }
+      .selection-toolbar { align-items:stretch; }
+      .selection-toolbar .selection-summary { align-self:center; flex-basis:100%; }
+      .selection-toolbar .btn { flex:1 1 auto; justify-content:center; }
+    }
+    .quick-add-card { width:min(100%, 380px); background:#fff; padding:1.25rem; border-radius:1rem; box-shadow:0 20px 50px #0f172a44; }
+    .schedule-create-modal { display:none; position:fixed; inset:0; z-index:10030; align-items:center; justify-content:center; padding:12px; background:rgba(15,23,42,.42); }
+    .schedule-create-modal.is-open { display:flex; }
+    .schedule-create-card { display:flex; flex-direction:column; width:min(560px, calc(100vw - 24px)); max-height:calc(100vh - 24px); background:#fff; border-radius:14px; box-shadow:0 20px 60px rgba(15,23,42,.24); overflow:hidden; }
+    .schedule-create-header { display:flex; align-items:center; justify-content:space-between; flex:none; padding:16px 20px; border-bottom:1px solid #e2e8f0; }
+    .schedule-create-header h2 { margin:0; color:#1e293b; font-size:1.12rem; font-weight:600; }
+    .schedule-create-header button { width:32px; height:32px; border:0; border-radius:8px; background:transparent; color:#64748b; font-size:1.4rem; }
+    .schedule-create-header button:hover { background:#f1f5f9; }
+    .schedule-create-form { display:flex; min-height:0; flex-direction:column; flex:1; }
+    .schedule-create-body { display:flex; min-height:0; flex:1; flex-direction:column; gap:16px; overflow-y:auto; padding:18px 20px; }
+    .create-field { min-width:0; }
+    .create-field .form-label { display:block; margin-bottom:6px; color:#475569; font-size:.82rem; }
+    .required-mark { color:#ef4444; }
+    .employee-chip-list { display:flex; flex-wrap:wrap; gap:7px; max-height:130px; overflow:auto; padding:2px; }
+    .employee-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid #e2e8f0; border-radius:999px; color:#475569; font-size:.8rem; cursor:pointer; }
+    .employee-chip:has(input:checked) { border-color:#2563eb; background:#eff6ff; color:#1d4ed8; }
+    .employee-chip input { accent-color:#2563eb; }
+    .form-hint { display:block; margin-top:5px; color:#94a3b8; font-size:.74rem; }
+    .open-shift-option { display:flex; align-items:center; gap:7px; margin-top:9px; color:#64748b; font-size:.78rem; }
+    .open-shift-option input { accent-color:#2563eb; }
+    .repeat-mode-tabs { display:flex; gap:7px; margin-bottom:12px; }
+    .repeat-mode-tab { padding:7px 12px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; color:#475569; font-size:.8rem; }
+    .repeat-mode-tab.active { border-color:#60a5fa; box-shadow:0 0 0 1px #60a5fa; color:#1d4ed8; }
+    .create-time-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+    .duration-display { display:flex; min-height:38px; align-items:center; gap:5px; padding:7px 10px; border:1px solid #e2e8f0; border-radius:8px; color:#334155; }
+    .duration-display small { color:#94a3b8; }
+    .schedule-create-footer { display:flex; flex:none; align-items:center; justify-content:space-between; gap:12px; padding:12px 20px; border-top:1px solid #e2e8f0; background:#fff; }
+    .schedule-create-footer > div { display:flex; gap:8px; }
+    @media (max-width:600px) { .schedule-create-footer { align-items:stretch; flex-direction:column; } .schedule-create-footer > div { justify-content:flex-end; } .schedule-create-footer .btn { font-size:.76rem; padding:.4rem .55rem; } .create-time-grid { gap:7px; } }
+    /* Keep the planner toolbar compact so more of the schedule stays visible. */
+    .scheduler-shell .main-shell { padding:1rem 1.4rem 1.2rem; gap:1rem; }
+    .scheduler-toolbar { margin-bottom:.45rem; }
+    .scheduler-toolbar-row { padding:7px 12px; gap:8px; }
+    .scheduler-toolbar-left,.scheduler-toolbar-right,.scheduler-toolbar-filters { gap:6px; }
+    .scheduler-toolbar .btn { min-height:36px; padding:.38rem .68rem; font-size:.81rem; }
+    .week-stepper .btn { min-width:36px; }
+    .week-stepper .today-button { min-width:64px; }
+    .week-range-button { min-width:270px; }
+    .notification-wrap .btn { width:38px; }
+    .scheduler-toolbar-filters { padding-top:6px; padding-bottom:6px; }
+    .schedule-search-wrap { flex-basis:230px; max-width:300px; }
+    .schedule-search-wrap .schedule-search,.filter-select { min-height:36px; }
+    .filter-select { min-width:150px; }
+    .filter-add-button { min-width:112px; }
+    @media(max-width:700px) {
+      .scheduler-shell .main-shell { padding: .75rem .65rem 1rem; gap:.65rem; }
+      .scheduler-toolbar-row { padding:7px 9px; gap:7px; }
+      .week-range-button { min-width:0; }
+      .scheduler-toolbar-right { grid-template-columns:38px 1fr 1fr; }
+      .scheduler-toolbar-filters { padding:7px 9px; }
+    }
+    .scheduler-toolbar-filters { display:grid; grid-template-columns:minmax(150px,1fr) minmax(125px,170px) minmax(125px,170px) minmax(105px,auto) auto; align-items:center; gap:7px; }
+    .scheduler-toolbar-filters > * { min-width:0; }
+    .scheduler-toolbar-filters .schedule-search-wrap { width:100%; max-width:none; flex:none; }
+    .scheduler-toolbar-filters .schedule-search { width:100%; min-width:0; }
+    .scheduler-toolbar-filters .filter-select { width:100%; min-width:0; }
+    .scheduler-toolbar-filters .schedule-filter-add,#add-filter-toggle { width:100%; min-width:0; }
+    .scheduler-toolbar-filters .filter-active-indicator { justify-self:start; white-space:nowrap; }
+    @media(max-width:700px) {
+      .scheduler-toolbar-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .scheduler-toolbar-filters .schedule-search-wrap { grid-column:1 / -1; }
+      .scheduler-toolbar-filters .schedule-filter-add { width:100%; }
+      .scheduler-toolbar-filters .filter-add-button { width:100%; }
+    }
+    @media (hover:none) { .empty-cell { opacity:.55; } .shift-pill-actions { opacity:1; } }
+    .shift-pill[draggable="true"] { cursor:grab; }
+    .shift-pill.dragging { opacity:0.55; }
+    .schedule-drop-target { outline:2px dashed #0ea5e9; outline-offset:-2px; background:#e0f2fe !important; }
+    .schedule-cell.has-shifts { cursor:cell; }
+    .schedule-cell.has-shifts:hover { background:#f8fbff; }
+    .shift-checkbox { cursor:pointer; }
+    .shift-delete { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#ef4444; color:#ffffff; font-size:0.85rem; line-height:1; text-decoration:none; opacity:0.7; transition:opacity 0.15s ease; }
+    .shift-delete:hover { opacity:1; color:#ffffff; }
+    .batch-actions { display:flex; justify-content:flex-start; align-items:center; gap:0.45rem; margin-bottom:0.55rem; flex-wrap:wrap; }
+    .batch-actions .btn { min-height:2.1rem; padding:.35rem .65rem; font-size:.8rem; box-shadow:0 2px 7px #0f172a12; }
+    .selection-summary { color:#2563eb; font-size:.8rem; margin-right:.35rem; }
+    .schedule-search { min-width:210px; }
+    .schedule-search-wrap { position:relative; }
+    .schedule-search-wrap .bi-search { position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:#64748b; }
+    .schedule-search-wrap input { padding-left:2rem; }
+    .btn-batch-delete,
+    .btn-batch-delete:hover,
+    .btn-batch-delete:focus,
+    .btn-batch-delete:active {
+      background-image:var(--btn-grad-danger) !important;
+      color:#ffffff !important;
+      border:0 !important;
+      text-shadow:none;
+    }
+    .btn-batch-delete:disabled { opacity:0.55; color:#ffffff !important; }
+    .free-pill { display:inline-flex; align-items:center; padding:0.18rem 0.6rem; border-radius:999px; border:1px dashed #cbd5f5; color:#94a3b8; font-size:0.74rem; }
+    .form-card .section-subtitle { max-width:600px; }
+    .form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.1rem; }
+    .form-grid .form-field { display:flex; flex-direction:column; gap:0.35rem; }
+    .form-field-span { grid-column:1 / -1; }
+    .form-grid .form-select,
+    .form-grid input[type="text"],
+    .form-grid input[type="time"],
+    .form-grid input[type="number"],
+    .form-grid textarea { background:#ffffff; border:1px solid #cbd5f5; color:#0f172a; border-radius:0.6rem; }
+    #day-picker { background:#ffffff; border:1px solid #cbd5f5; color:#0f172a; border-radius:0.6rem; }
+    #day-picker:focus,
+    .form-grid .form-select:focus,
+    .form-grid input:focus,
+    .form-grid textarea:focus { border-color:#0f766e; box-shadow:0 0 0 3px rgba(15,118,110,0.15); }
+    .selected-days { display:flex; flex-wrap:wrap; gap:0.35rem; }
+    .day-chip { display:inline-flex; align-items:center; padding:0.18rem 0.6rem; border-radius:999px; background:#ecfdf5; border:1px solid #cbd5f5; color:#0f766e; font-size:0.72rem; letter-spacing:0.04em; text-transform:uppercase; }
+    .form-actions { display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap; }
+    .tip-callout { margin-top:1.25rem; border-radius:0.85rem; background:#f1f5f9; border:1px dashed #cbd5f5; padding:0.9rem 1rem; color:#475569; font-size:0.85rem; }
+    .tag-muted { display:inline-flex; align-items:center; gap:0.3rem; font-size:0.75rem; color:#94a3b8; }
+    .small-note { font-size:0.82rem; color:#64748b; }
+    @media (max-width: 992px) {
+      .app-shell { grid-template-columns:minmax(0,1fr); }
+      .sidebar { display:none; }
+      .main-shell { padding:1.25rem; }
+      .content-shell { padding:1rem; }
+    }
+    @media (max-width: 600px) {
+      .week-picker-popover { left:0; right:auto; }
+      .date-range-layout { grid-template-columns:minmax(0,1fr); gap:8px; }
+      .date-range-presets { display:grid; grid-template-columns:1fr 1fr; padding-top:0; }
+      .date-calendar-day { height:36px; }
+      .week-range-button { min-width:250px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell scheduler-shell">
+{% include "partials/admin_sidebar.html" %}
+    <div class="main-shell">
+      <header class="scheduler-toolbar">
+        <form id="schedule-filter-form" method="get" action="{{ url_for('schedule_dashboard') }}">
+          <input type="hidden" name="weeks" value="{{ weeks }}">
+          <input type="hidden" name="days" value="{{ request.args.get('days', '') }}">
+          <input type="hidden" name="period" id="schedule-period-input" value="{{ selected_period }}">
+          <input type="hidden" name="end_date" id="schedule-end-date" value="{{ schedule_period_end.isoformat() }}">
+          <input type="hidden" name="split" id="schedule-split-input" value="{{ selected_schedule_split }}">
+          <input type="hidden" name="free_day" value="{{ free_day or '' }}">
+          <input type="hidden" name="free_week_start" value="{{ free_week_start or '' }}">
+          <input type="hidden" name="free_start_time" value="{{ request.args.get('free_start_time', '') }}">
+          <input type="hidden" name="free_end_time" value="{{ request.args.get('free_end_time', '') }}">
+          <div class="scheduler-toolbar-row">
+            <div class="scheduler-toolbar-left">
+              <div class="week-stepper" role="group" aria-label="Week navigation">
+                <button type="button" class="btn" id="schedule-prev-week" title="Previous week" aria-label="Previous week"><i class="bi bi-chevron-left"></i></button>
+                <button type="button" class="btn today-button" id="schedule-today">Today</button>
+                <button type="button" class="btn" id="schedule-next-week" title="Next week" aria-label="Next week"><i class="bi bi-chevron-right"></i></button>
+              </div>
+              <div class="week-range-wrap" id="week-range-wrap">
+                <button type="button" class="btn week-range-button" id="week-range-toggle" aria-expanded="false"><i class="bi bi-calendar3"></i><span>{{ week_days[0].strftime('%d.%m.%Y') }} &rarr; {{ week_days[-1].strftime('%d.%m.%Y') }}</span><i class="bi bi-chevron-down"></i></button>
+                <div class="week-picker-popover" id="schedule-date-picker" role="dialog" aria-label="Choose schedule date range">
+                  <input type="hidden" id="start_date" name="start_date" value="{{ start_date or week_days[0].isoformat() }}">
+                  <div class="date-range-layout">
+                    <div class="date-range-calendar">
+                      <div class="date-calendar-head"><button type="button" class="btn date-calendar-nav" id="schedule-calendar-prev" aria-label="Previous month"><i class="bi bi-chevron-left"></i></button><strong id="schedule-calendar-month"></strong><button type="button" class="btn date-calendar-nav" id="schedule-calendar-next" aria-label="Next month"><i class="bi bi-chevron-right"></i></button></div>
+                      <div class="date-calendar-weekdays" aria-hidden="true">{% if current_lang == 'de' %}<span>MO</span><span>DI</span><span>MI</span><span>DO</span><span>FR</span><span>SA</span><span>SO</span>{% else %}<span>MO</span><span>TU</span><span>WE</span><span>TH</span><span>FR</span><span>SA</span><span>SU</span>{% endif %}</div>
+                      <div class="date-calendar-days" id="schedule-calendar-days" role="grid" aria-label="Calendar days"></div>
+                    </div>
+                    <nav class="date-range-presets" aria-label="Quick date ranges">
+                      <button type="button" class="btn date-range-preset" data-date-preset="yesterday">{{ 'Gestern' if current_lang == 'de' else 'Yesterday' }}</button>
+                      <button type="button" class="btn date-range-preset" data-date-preset="last7">{{ 'Letzten 7 Tage' if current_lang == 'de' else 'Last 7 days' }}</button>
+                      <button type="button" class="btn date-range-preset" data-date-preset="thisMonth">{{ 'Dieser Monat' if current_lang == 'de' else 'This month' }}</button>
+                      <button type="button" class="btn date-range-preset" data-date-preset="lastMonth">{{ 'Letzter Monat' if current_lang == 'de' else 'Last month' }}</button>
+                    </nav>
+                  </div>
+                  <footer class="date-range-footer"><button type="button" class="btn" id="schedule-calendar-cancel">{{ 'Abbrechen' if current_lang == 'de' else 'Cancel' }}</button><button type="button" class="btn btn-primary" id="schedule-calendar-save" data-custom-label="{{ 'Benutzerdefiniert' if current_lang == 'de' else 'Custom range' }}">{{ 'Speichern' if current_lang == 'de' else 'Save' }}</button></footer>
+                </div>
+              </div>
+            </div>
+            <div class="scheduler-toolbar-right">
+              <div class="notification-wrap" id="notification-wrap">
+                <button type="button" class="btn" id="schedule-notifications-toggle" aria-label="Notifications: checking status" aria-expanded="false" title="Notifications"><i class="bi bi-bell-fill" aria-hidden="true"></i></button>
+                <div class="notification-popover" id="schedule-notification-popover" role="region" aria-label="Employee notifications">
+                  <strong id="schedule-notification-title">Notifications are active</strong>
+                  <p id="schedule-notification-description">Employees receive alerts when shifts are added, changed, assigned, or removed.</p>
+                  <p class="notification-pending" id="schedule-notification-pending">No queued employee alerts.</p>
+                  <button type="button" class="btn notification-action" id="schedule-notification-action" aria-label="Pause notifications"><i class="bi bi-pause-circle-fill" aria-hidden="true"></i><span id="schedule-notification-action-label">Pause</span></button>
+                  <small id="schedule-notification-connection" aria-live="polite">Checking connection...</small>
+                  <small>Pausing queues shift alerts and daily reminders. Resume sends queued alerts. The pause ends automatically at midnight.</small>
+                </div>
+              </div>
+              <div class="schedule-view-wrap" id="schedule-view-wrap">
+                <button type="button" class="btn" id="schedule-view-toggle" aria-expanded="false"><i class="bi bi-layout-three-columns me-1"></i>View <i class="bi bi-caret-up-fill ms-1" style="font-size:.55rem"></i><i class="bi bi-caret-down-fill" style="font-size:.55rem"></i></button>
+                <div class="view-options" role="menu" aria-label="Schedule view options">
+                  <label class="view-option-check"><input type="checkbox" id="view-unassigned-only"><span>Unassigned shifts</span></label>
+                  <label class="view-option-check"><input type="checkbox" id="view-all-shifts"><span>All shifts</span></label>
+                  <label class="view-option-check"><input type="checkbox" id="view-full-day"><span>0&#8211;24 {{ 'Stunden' if current_lang == 'de' else 'hours' }}</span></label>
+                  <div class="view-menu-divider"></div>
+                  <div class="view-submenu">
+                    <button type="button" class="view-submenu-trigger" aria-haspopup="true"><span><small id="schedule-split-current">{{ {'employees':'Employees','objects':'Objects','orders':'Orders'}.get(selected_schedule_split, 'Employees') }}</small><strong>Split by</strong></span><i class="bi bi-caret-right-fill" aria-hidden="true"></i></button>
+                    <div class="view-submenu-panel" role="group" aria-label="Split schedule by">
+                      <label class="view-split-choice"><input type="radio" name="schedule-split" value="employees" {% if selected_schedule_split == 'employees' %}checked{% endif %}><span>Employees</span></label>
+                      <label class="view-split-choice"><input type="radio" name="schedule-split" value="objects" {% if selected_schedule_split == 'objects' %}checked{% endif %}><span>Objects</span></label>
+                      <label class="view-split-choice"><input type="radio" name="schedule-split" value="orders" {% if selected_schedule_split == 'orders' %}checked{% endif %}><span>Orders</span></label>
+                    </div>
+                  </div>
+                  <div class="view-submenu view-time-choice">
+                    <button type="button" class="view-submenu-trigger" aria-haspopup="true"><span><small id="schedule-period-current">{{ {'day':'Day','week':'Week','fortnight':'2 weeks','month':'Month','custom':('Benutzerdefiniert' if current_lang == 'de' else 'Custom range')}.get(selected_period, 'Week') }}</small><strong>Time window</strong></span><i class="bi bi-caret-right-fill" aria-hidden="true"></i></button>
+                    <div class="view-submenu-panel" role="group" aria-label="Schedule time window">
+                      <button type="button" class="view-split-choice{% if selected_period == 'day' %} is-active{% endif %}" data-period="day" aria-pressed="{{ 'true' if selected_period == 'day' else 'false' }}"><i class="bi bi-calendar-day"></i><span>Day</span></button>
+                      <button type="button" class="view-split-choice{% if selected_period == 'week' %} is-active{% endif %}" data-period="week" aria-pressed="{{ 'true' if selected_period == 'week' else 'false' }}"><i class="bi bi-calendar-week"></i><span>Week</span></button>
+                      <button type="button" class="view-split-choice{% if selected_period == 'fortnight' %} is-active{% endif %}" data-period="fortnight" aria-pressed="{{ 'true' if selected_period == 'fortnight' else 'false' }}"><i class="bi bi-calendar3"></i><span>2 weeks</span></button>
+                      <button type="button" class="view-split-choice{% if selected_period == 'month' %} is-active{% endif %}" data-period="month" aria-pressed="{{ 'true' if selected_period == 'month' else 'false' }}"><i class="bi bi-calendar-month"></i><span>Month</span></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <a href="{{ pdf_url }}" class="btn" target="_blank" rel="noopener"><i class="bi bi-layout-text-window me-1"></i>Schedule overview</a>
+              <button type="button" class="btn btn-primary" id="open-new-shift"><i class="bi bi-plus-circle-fill me-1"></i>Create shift</button>
+            </div>
+          </div>
+          <div class="scheduler-toolbar-row scheduler-toolbar-filters">
+            <div class="schedule-search-wrap"><i class="bi bi-search"></i><input class="form-control schedule-search" id="schedule-search" type="search" placeholder="Search employees or shifts" aria-label="Search employees or shifts"></div>
+            <select class="form-select filter-select" id="filter-role" aria-label="Employee groups"><option value="">Employee groups</option>{% for group in employees|map(attribute='profile_group_type')|select|unique|list %}<option value="{{ group|lower }}">{{ group }}</option>{% endfor %}</select>
+            <select class="form-select filter-select" id="filter_site_id" name="site_id" aria-label="Sites"><option value="">Objects</option>{% for site in sites %}<option value="{{ site.id }}" {% if selected_site_id == site.id %}selected{% endif %}>{{ site.profile_company_name or site.name }}</option>{% endfor %}</select>
+            <div class="schedule-filter-add" id="schedule-filter-add">
+              <button type="button" class="btn filter-add-button" id="add-filter-toggle" aria-expanded="false"><i class="bi bi-plus-lg me-1"></i>Add filter</button>
+              <div class="add-filter-popover" id="add-filter-popover">
+                <label for="filter_employee_id">Employee</label><select class="form-select form-select-sm" id="filter_employee_id" name="employee_id"><option value="">All employees</option>{% for emp in employees %}<option value="{{ emp.id }}" {% if selected_employee_id == emp.id %}selected{% endif %}>{{ emp.name }}</option>{% endfor %}</select>
+                <label for="filter-work-type">Work type</label><select class="form-select form-select-sm" id="filter-work-type"><option value="">All work types</option>{% for work_type in employees|map(attribute='profile_work_type')|select|unique|list %}<option value="{{ work_type|lower }}">{{ work_type }}</option>{% endfor %}</select>
+                <label for="filter-employee-role">Employee role</label><select class="form-select form-select-sm" id="filter-employee-role"><option value="">All roles</option>{% for role in employees|map(attribute='role')|select|unique|list %}<option value="{{ role|lower }}">{{ role }}</option>{% endfor %}</select>
+                <label for="filter-assignment">Shift assignment</label><select class="form-select form-select-sm" id="filter-assignment"><option value="">All shifts</option><option value="assigned">Assigned shifts</option><option value="open">Open shifts</option></select>
+                <label for="filter-weekday">Day of week</label><select class="form-select form-select-sm" id="filter-weekday"><option value="">Every day</option><option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option></select>
+                <label for="free_start_date">Employee availability</label>
+                <div class="availability-filter-grid"><input type="date" class="form-control form-control-sm" id="free_start_date" aria-label="Availability start date"><input type="date" class="form-control form-control-sm" id="free_end_date" aria-label="Availability end date"><input type="time" class="form-control form-control-sm" id="free_start_time" aria-label="Available from"><input type="time" class="form-control form-control-sm" id="free_end_time" aria-label="Available until"></div>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="showFreeEmployeesModal()"><i class="bi bi-person-check me-1"></i>Find available employees</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="clear-schedule-filters"><i class="bi bi-x-circle me-1"></i>Clear filters</button>
+              </div>
+            </div>
+            <span class="filter-active-indicator" id="active-filter-indicator"><i class="bi bi-funnel-fill"></i><span id="active-filter-count">0</span> filters</span>
+          </div>
+          <div class="scheduler-toolbar-row selection-toolbar" id="selection-toolbar" hidden>
+            <span class="selection-summary"><strong id="selected-count">0</strong> <span id="selected-label">shifts selected</span></span>
+            <button type="button" class="btn selection-clear" id="clear-selection-btn">Clear selection</button>
+            <button type="button" class="btn" id="duplicate-selected-btn" disabled><i class="bi bi-copy"></i> Duplicate</button>
+            <button type="submit" class="btn" id="release-selected-btn" form="batch-delete-form" formaction="{{ url_for('batch_release_shifts') }}" title="Unassign selected employee(s); keep the shift open for reassignment" disabled><i class="bi bi-check-circle-fill"></i> Release</button>
+            <button type="button" class="btn" id="assign-selected-btn" disabled><i class="bi bi-person-fill"></i> Assign</button>
+            <button type="submit" class="btn btn-batch-delete" id="delete-selected-btn" form="batch-delete-form" disabled><i class="bi bi-trash3-fill"></i> Delete</button>
+          </div>
+        </form>
+        <div class="quick-add-modal" id="schedule-notification-confirm" role="dialog" aria-modal="true" aria-labelledby="schedule-notification-confirm-title">
+          <div class="quick-add-card">
+            <div class="d-flex justify-content-center mb-3"><span class="notification-confirm-icon"><i class="bi bi-bell-fill" aria-hidden="true"></i></span></div>
+            <h2 class="h4 text-center mb-3" id="schedule-notification-confirm-title">Pause notifications</h2>
+            <p class="text-secondary text-center" id="schedule-notification-confirm-copy">When you resume, each affected employee will receive their queued shift updates. Notifications automatically resume at midnight.</p>
+            <div class="d-flex justify-content-center gap-2 mt-4"><button type="button" class="btn btn-outline-secondary modal-cancel">Cancel</button><button type="button" class="btn btn-primary" id="schedule-notification-confirm-action">Confirm pause</button></div>
+          </div>
+        </div>
+      </header>
+      <main class="content-shell">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <section class="section-card" style="padding:1rem 1.1rem;">
+              {% for category, message in messages %}
+                <div class="alert {% if category in ['warning', 'error', 'danger'] %}alert-warning{% elif category == 'success' %}alert-success{% else %}alert-info{% endif %} mb-2" role="alert" style="border-radius:0.8rem;">
+                  {{ message }}
+                </div>
+              {% endfor %}
+            </section>
+          {% endif %}
+        {% endwith %}
+<section class="section-card schedule-card">
+
+          <form id="batch-delete-form" method="post" action="{{ url_for('batch_delete_shifts') }}">
+            {% if not has_any_shifts %}
+              <div class="alert alert-warning mb-3" role="alert" style="border-radius:0.85rem;">
+                No shifts in the selected period ({{ week_days[0].strftime('%d.%m.%Y') }} – {{ week_days[-1].strftime('%d.%m.%Y') }}){% if selected_site %} for {{ selected_site.name }}{% endif %}{% if selected_employee %} ({{ selected_employee.name }}){% endif %}. Adjust the dates or filters, or create a shift.
+              </div>
+            {% endif %}
+            <div class="table-wrapper">
+              <div class="table-scroll">
+                <table class="table table-bordered table-sm align-middle schedule-table" data-split="{{ selected_schedule_split }}" data-period="{{ selected_period }}">
+                  <thead>
+                    <tr class="week-number-row">
+                      <th scope="col" class="employee-heading week-number-empty"></th>
+                      {% for week in schedule_weeks %}<th scope="col" class="week-number-heading" colspan="{{ week|length }}">{{ 'KW' if current_lang == 'de' else 'Week' }} {{ week[0].isocalendar()[1] }}</th>{% endfor %}
+                    </tr>
+                    <tr>
+                      <th scope="col" class="employee-heading">{{ 'Sites' if selected_schedule_split == 'objects' else 'Employees' }}
+                        <button type="button" class="employee-column-resizer" aria-label="Resize employee column" title="Drag to resize employee column"></button>
+                      </th>
+                      {% for d in display_days %}
+                        <th scope="col" class="date-heading{% if d < schedule_period_start or d > schedule_period_end %} period-outside-date{% endif %}" data-date="{{ d.isoformat() }}">
+                          <span>{{ (['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'] if current_lang == 'de' else ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])[d.weekday()] }}</span>
+                          <strong>{{ d.strftime('%d.%m') }}</strong>
+                        </th>
+                      {% endfor %}
+                    </tr>
+                  </thead>
+                  <tbody id="schedule-grid-body">
+                    {% if selected_schedule_split != 'objects' %}<tr class="open-shifts-row">
+                      <th scope="row" class="employee-cell open-employee-cell"><span class="employee-avatar">+</span><span class="employee-details"><strong>Open shifts</strong><small>Unassigned</small></span></th>
+                      {% for d in display_days %}
+                        {% set open_cell = cells.get((none, d)) %}
+                        <td class="schedule-cell open-schedule-cell{% if d < schedule_period_start or d > schedule_period_end %} period-outside-cell{% endif %}" data-day="{{ d.isoformat() }}" data-employee-id="">
+                          {% for shift in open_cell or [] %}
+                            <article class="shift-pill open-shift-pill{% if shift.is_recurring %} is-recurring{% endif %}" data-assignment="open" data-shift-id="{{ shift.id }}" data-assigned-people="[]" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions | e }}" title="Click to edit shift">
+                              <div class="shift-pill-text"><div class="shift-pill-time-row"><div class="shift-pill-time">{{ shift.time_window }}</div>{% if shift.is_recurring %}<span class="recurring-shift-mark" title="Repeating schedule" aria-label="Repeating schedule">&#8635;</span>{% endif %}</div><div class="shift-pill-title">{{ shift.site_name }}</div><div class="shift-pill-sub">{{ shift.site_address }}</div></div>
+                              <div class="shift-pill-actions"><input type="checkbox" class="shift-checkbox" name="shift_ids[]" value="{{ shift.id }}" aria-label="Select open shift"><button type="button" class="shift-action shift-edit" data-shift-id="{{ shift.id }}" data-employee-id="" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions | e }}" title="Edit shift" aria-label="Edit shift"><i class="bi bi-pencil-fill" aria-hidden="true"></i></button><button type="button" class="shift-action shift-add-employee" data-shift-id="{{ shift.id }}" title="Add employees" aria-label="Add employees"><i class="bi bi-person-plus-fill" aria-hidden="true"></i></button></div>
+                            </article>
+                          {% endfor %}
+                          {% if d >= schedule_period_start and d <= schedule_period_end %}<button type="button" class="empty-cell quick-create-shift" data-day="{{ d.isoformat() }}" data-open="1" title="Create open shift" aria-label="Create open shift">+</button>{% endif %}
+                        </td>
+                      {% endfor %}
+                    </tr>{% endif %}
+                    {% for emp in visible_employees %}
+                      {% if selected_schedule_split != 'objects' %}
+                      <tr class="employee-row" data-employee-name="{{ emp.name|lower }}" data-employee-group="{{ (emp.profile_group_type or '')|lower }}" data-employee-role="{{ (emp.role or '')|lower }}" data-work-type="{{ (emp.profile_work_type or '')|lower }}">
+                        <th scope="row" class="employee-cell">
+                          <span class="employee-avatar">{% if emp.profile_image_path %}<img src="/static/{{ emp.profile_image_path }}" alt="">{% else %}{{ emp.name[:1]|upper }}{% endif %}</span>
+                          <span class="employee-details"><strong>{{ emp.name }}</strong><small>{{ emp.role or 'Employee' }}</small></span>
+                        </th>
+                        {% for d in display_days %}
+                          {% set cell = cells.get((emp.id, d)) %}
+                          <td class="schedule-cell{% if cell %} has-shifts{% endif %}{% if d < schedule_period_start or d > schedule_period_end %} period-outside-cell{% endif %}" data-day="{{ d.isoformat() }}" data-employee-id="{{ emp.id }}">
+                            {% if cell %}
+                              {% for shift in cell %}
+                                <article class="shift-pill{% if shift.is_recurring %} is-recurring{% endif %}{% if shift.assigned_people|length > 1 %} shift-has-crew{% endif %}" data-assignment="assigned" draggable="true" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}" data-assigned-people="{{ shift.assigned_people|tojson|forceescape }}" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions | e }}" title="Click to edit shift">
+                                  <div class="shift-pill-text">
+                                    <div class="shift-pill-time-row"><div class="shift-pill-time">{{ shift.time_window }}</div>{% if shift.is_recurring %}<span class="recurring-shift-mark" title="Repeating schedule" aria-label="Repeating schedule">&#8635;</span>{% endif %}<span class="shift-people-indicator" title="{{ shift.assigned_people|length }} employee(s) assigned" aria-label="{{ shift.assigned_people|length }} employee(s) assigned"><i class="bi {% if shift.assigned_people|length > 1 %}bi-people-fill{% else %}bi-person-fill{% endif %}" aria-hidden="true"></i></span></div>
+                                    <div class="shift-pill-title" title="{{ shift.site_name }}">{{ shift.site_name }}</div>
+                                    {% if shift.assigned_people|length > 1 %}<div class="shift-crew" aria-label="{{ shift.assigned_people|length }} employees assigned">
+                                      {% for person in shift.assigned_people[:3] %}<span class="shift-crew-avatar" title="{{ person.name }}">{% if person.image %}<img src="{{ url_for('static', filename=person.image) }}" alt="">{% else %}<i class="bi bi-person-fill" aria-hidden="true"></i>{% endif %}</span>{% endfor %}
+                                      {% if shift.assigned_people|length > 3 %}<span class="shift-crew-more">+{{ shift.assigned_people|length - 3 }}</span>{% endif %}
+                                    </div>{% endif %}
+                                    {% if shift.site_address %}<div class="shift-pill-sub" title="{{ shift.site_address }}">{{ shift.site_address }}</div>{% endif %}
+                                    {% if shift.instructions %}<div class="shift-pill-sub" title="{{ shift.instructions }}">{{ shift.instructions }}</div>{% endif %}
+                                  </div>
+                                  <div class="shift-pill-actions">
+                                    <input type="checkbox" class="shift-checkbox" name="shift_ids[]" value="{{ shift.id }}" aria-label="{{ 'Einsatz ausw?hlen f?r' if current_lang == 'de' else 'Select shift for' }} {{ emp.name }}">
+                                    <button type="button" class="shift-action shift-edit" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions | e }}" title="Edit shift" aria-label="Edit shift">&#9998;</button>
+                                    <button type="button" class="shift-action shift-add-employee" data-shift-id="{{ shift.id }}" title="Add employees" aria-label="Add employees"><i class="bi bi-person-plus-fill" aria-hidden="true"></i></button>
+                                    <a href="{{ url_for('delete_shift', shift_id=shift.id) }}" class="shift-action shift-delete" onclick="return confirm('Remove this employee from the shift?')" title="Remove assignment" aria-label="Remove assignment">&times;</a>
+                                  </div>
+                                </article>
+                              {% endfor %}
+                            {% elif d >= schedule_period_start and d <= schedule_period_end %}
+                              <button type="button" class="empty-cell quick-create-shift" data-day="{{ d.isoformat() }}" data-employee-id="{{ emp.id }}" title="Create shift on this date" aria-label="Create shift on this date">+</button>
+                            {% endif %}
+                          </td>
+                        {% endfor %}
+                      </tr>
+                      {% endif %}
+                    {% endfor %}
+                    {% if selected_schedule_split == 'objects' %}
+                      {% for site in visible_sites %}
+                      <tr class="site-row" data-site-name="{{ (site.profile_company_name or site.name)|lower }}">
+                        <th scope="row" class="employee-cell site-employee-cell"><span class="employee-avatar"><i class="bi bi-building-fill" aria-hidden="true"></i></span><span class="employee-details"><strong>{{ site.profile_company_name or site.name }}</strong><small>{{ site.address or 'Site' }}</small></span></th>
+                        {% for d in display_days %}
+                          {% set site_shifts = site_cells.get((site.id, d), []) %}
+                          <td class="schedule-cell site-schedule-cell{% if site_shifts %} has-shifts{% endif %}{% if d < schedule_period_start or d > schedule_period_end %} period-outside-cell{% endif %}" data-day="{{ d.isoformat() }}" data-site-id="{{ site.id }}">
+                            {% for shift in site_shifts %}
+                              <article class="shift-pill site-shift-pill{% if shift.is_recurring %} is-recurring{% endif %}{% if shift.is_open %} open-shift-pill{% endif %}{% if shift.assigned_people|length > 1 %} shift-has-crew{% endif %}" data-assignment="{{ 'open' if shift.is_open else 'assigned' }}" data-shift-id="{{ shift.shift_ids[0] }}" data-shift-ids="{{ shift.shift_ids|tojson|forceescape }}" data-employee-id="" data-assigned-people="{{ shift.assigned_people|tojson|forceescape }}" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions|e }}" title="Click to edit shift">
+                                <div class="shift-pill-text">
+                                  <div class="shift-pill-time-row"><div class="shift-pill-time">{{ shift.time_window }}</div>{% if shift.is_recurring %}<span class="recurring-shift-mark" title="Repeating schedule" aria-label="Repeating schedule">&#8635;</span>{% endif %}
+                                    {% if not shift.is_open %}<span class="shift-people-indicator" title="{{ shift.assigned_people|length }} employee(s) assigned" aria-label="{{ shift.assigned_people|length }} employee(s) assigned"><i class="bi {% if shift.assigned_people|length > 1 %}bi-people-fill{% else %}bi-person-fill{% endif %}" aria-hidden="true"></i></span>{% endif %}
+                                  </div>
+                                  <div class="shift-pill-title" title="{{ shift.site_name }}">{{ shift.site_name }}</div>
+                                  {% if shift.assigned_people %}<div class="shift-crew" aria-label="Assigned employees">{% for person in shift.assigned_people[:4] %}<span class="shift-crew-avatar" title="{{ person.name }}">{% if person.image %}<img src="{{ url_for('static', filename=person.image) }}" alt="">{% else %}<i class="bi bi-person-fill" aria-hidden="true"></i>{% endif %}</span>{% endfor %}{% if shift.assigned_people|length > 4 %}<span class="shift-crew-more">+{{ shift.assigned_people|length - 4 }}</span>{% endif %}</div>{% endif %}
+                                  {% if shift.instructions %}<div class="shift-pill-sub" title="{{ shift.instructions }}">{{ shift.instructions }}</div>{% endif %}
+                                </div>
+                                <div class="shift-pill-actions">
+                                  {% for shift_id in shift.shift_ids %}<input type="checkbox" class="shift-checkbox{% if not loop.first %} site-slot-secondary{% endif %}" name="shift_ids[]" value="{{ shift_id }}" aria-label="Select site shift" {% if not loop.first %}tabindex="-1"{% endif %}>
+                                  {% endfor %}
+                                  <button type="button" class="shift-action shift-edit" data-shift-id="{{ shift.shift_ids[0] }}" data-employee-id="" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions|e }}" title="Edit shift" aria-label="Edit shift"><i class="bi bi-pencil-fill" aria-hidden="true"></i></button>
+                                  <button type="button" class="shift-action shift-add-employee" data-shift-id="{{ shift.shift_ids[0] }}" title="Add employees" aria-label="Add employees"><i class="bi bi-person-plus-fill" aria-hidden="true"></i></button>
+                                </div>
+                              </article>
+                            {% endfor %}
+                            {% if not site_shifts and d >= schedule_period_start and d <= schedule_period_end %}<button type="button" class="empty-cell quick-create-shift" data-day="{{ d.isoformat() }}" data-site-id="{{ site.id }}" title="Create shift at this site" aria-label="Create shift at this site">+</button>{% endif %}
+                          </td>
+                        {% endfor %}
+                      </tr>
+                      {% endfor %}
+                    {% endif %}
+                    {% if selected_schedule_split != 'objects' %}<tr class="add-employee-row">
+                      <th scope="row" class="employee-cell"><a class="add-employee-link" href="{{ url_for('admin_employees', create=1, return_to=request.full_path) }}"><i class="bi bi-person-plus-fill" aria-hidden="true"></i> Add employee</a></th>
+                      <td colspan="{{ display_days|length }}"></td>
+                    </tr>{% endif %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <div id="new-shift-modal" class="schedule-create-modal" data-initial-open="{{ 1 if open_create else 0 }}" role="dialog" aria-modal="true" aria-labelledby="new-shift-title">
+  <div class="schedule-create-card">
+    <header class="schedule-create-header"><h2 id="new-shift-title">Create shift</h2><button type="button" id="close-new-shift" aria-label="Close">&times;</button></header>
+    <form method="post" id="new-shift-form" class="schedule-create-form">
+      <div class="schedule-create-body">
+        <div class="create-field"><label class="form-label" for="site_id">Site <span class="required-mark">*</span></label>
+          <select class="form-select" id="site_id" name="site_id" required><option value="">Select a site</option>{% for site in sites %}<option value="{{ site.id }}">{{ site.name }}</option>{% endfor %}</select>
+        </div>
+        <div class="create-field"><label class="form-label">Employees <span class="required-mark">*</span></label>
+          <div class="employee-chip-list">{% for emp in employees %}<label class="employee-chip"><input type="checkbox" name="employee_id" value="{{ emp.id }}"><span>{{ emp.name }}</span></label>{% endfor %}</div>
+          <small class="form-hint">Select one or more employees.</small>
+          <label class="open-shift-option"><input type="checkbox" id="create-open-shift" name="create_open_shift"> Create without assigning an employee</label>
+        </div>
+        <div class="create-field">
+          <div class="repeat-mode-tabs" role="tablist" aria-label="Schedule type"><button type="button" class="repeat-mode-tab active" data-mode="once" aria-pressed="true">One-time</button><button type="button" class="repeat-mode-tab" data-mode="weekly" aria-pressed="false">Repeating</button></div>
+          <input type="checkbox" id="repeat-weekly" name="repeat_weekly" hidden>
+          <label class="form-label" id="shift-date-label" for="day-picker">Date <span class="required-mark">*</span></label>
+          <input type="date" class="form-control" id="day-picker" name="day_display" required>
+          <div id="repeat-fields" class="repeat-fields mt-2">
+            <div class="repeat-interval-field"><label class="form-label small-note" for="repeat-interval">Repeat every</label><input type="number" class="form-control form-control-sm" id="repeat-interval" name="repeat_interval" value="1" min="1" max="52"><span>week(s)</span></div>
+            <fieldset class="repeat-weekdays"><legend>Repeat on</legend><div class="weekday-options">
+              <label><input type="checkbox" name="repeat_weekday" value="0"><span>Mon</span></label><label><input type="checkbox" name="repeat_weekday" value="1"><span>Tue</span></label><label><input type="checkbox" name="repeat_weekday" value="2"><span>Wed</span></label><label><input type="checkbox" name="repeat_weekday" value="3"><span>Thu</span></label><label><input type="checkbox" name="repeat_weekday" value="4"><span>Fri</span></label><label><input type="checkbox" name="repeat_weekday" value="5"><span>Sat</span></label><label><input type="checkbox" name="repeat_weekday" value="6"><span>Sun</span></label>
+            </div></fieldset>
+            <div><label class="form-label small-note" for="repeat-until">End date <span class="required-mark">*</span></label><input type="date" class="form-control form-control-sm" id="repeat-until" name="repeat_until"></div>
+          </div>
+        </div>
+        <div class="create-time-grid">
+          <div class="create-field"><label class="form-label" for="start_time">Start <span class="required-mark">*</span></label><input type="time" class="form-control" id="start_time" name="start_time" required></div>
+          <div class="create-field"><label class="form-label" for="end_time">End <span class="required-mark">*</span></label><input type="time" class="form-control" id="end_time" required></div>
+          <div class="create-field"><label class="form-label">Duration</label><div class="duration-display"><span id="duration-label">--:--</span><small>hrs</small></div><input type="hidden" id="duration_hours" name="duration_hours"></div>
+        </div>
+        <div class="create-field"><label class="form-label" for="instructions">Comment</label><textarea class="form-control" id="instructions" name="instructions" rows="3" placeholder="Optional notes for this shift"></textarea></div>
+      </div>
+      <footer class="schedule-create-footer"><span class="small-note">Review the time and employees before creating the shift.</span><div><button type="submit" name="create_another" value="1" class="btn btn-sm btn-outline-secondary">Create another shift</button><button type="submit" value="" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle"></i> Create</button></div></footer>
+    </form>
+  </div>
+</div>
+      </main>
+    </div>
+  </div>
+
+  <div id="quick-add-employee-modal" class="quick-add-modal" role="dialog" aria-modal="true" aria-labelledby="quick-add-title">
+    <div class="quick-add-card">
+      <div class="d-flex justify-content-between align-items-center mb-3"><h3 id="quick-add-title" class="h5 mb-0">Add employees to this shift</h3><button type="button" class="btn btn-sm btn-outline-secondary" id="quick-add-close" aria-label="Close">x</button></div>
+      <p class="small-note">Date, site, and time will match the selected shift.</p>
+      <form id="quick-add-employee-form" method="post">
+        <span class="form-label">Select one or more employees</span>
+        <div class="employee-chip-list quick-add-employee-list">{% for emp in employees if emp.is_active %}<label class="employee-chip"><input type="checkbox" name="employee_ids[]" value="{{ emp.id }}"><span>{{ emp.name }}</span></label>{% endfor %}</div>
+        <div class="d-flex justify-content-end gap-2 mt-3"><button type="button" class="btn btn-sm btn-outline-secondary" id="quick-add-cancel">Cancel</button><button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-person-plus-fill me-1"></i>Add selected</button></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Previous month import modal -->
+  <div id="previous-month-import-modal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:10010; align-items:center; justify-content:center; padding:1.5rem;">
+    <div style="background:#ffffff; border-radius:1rem; padding:1.5rem; width:100%; max-width:900px; max-height:90vh; overflow-y:auto; box-shadow:0 24px 60px rgba(15,23,42,0.25);">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1rem;">
+        <div>
+          <h3 style="margin:0; font-size:1.3rem; color:#0f172a;">Import shifts</h3>
+          <p style="margin:0.5rem 0 0; color:#475569;">Choose the source week and how many weeks ahead to copy.</p>
+        </div>
+        <button type="button" id="previous-month-import-close" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#64748b;">×</button>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+        <div style="flex:1; min-width:220px;">
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Source week (back)</label>
+          <select id="previous-month-import-source-offset" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
+            <option value="0" selected>Current week</option>
+            <option value="1">1 week back</option>
+            <option value="2">2 weeks back</option>
+            <option value="3">3 weeks back</option>
+          </select>
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Target (weeks ahead)</label>
+          <select id="previous-month-import-target-offset" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
+            <option value="1" selected>+1 week</option>
+            <option value="2">+2 weeks</option>
+            <option value="3">+3 weeks</option>
+            <option value="4">+4 weeks</option>
+          </select>
+        </div>
+      </div>
+      <div id="previous-month-import-content">
+        <div class="alert alert-info" role="alert">Loading shifts for the selected month...</div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1rem;">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="previous-month-import-cancel">Cancel</button>
+        <button type="button" class="btn btn-sm btn-primary" id="previous-month-import-submit" disabled>Import</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Shift Modal -->
+  <div id="edit-shift-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:1rem; padding:1.5rem; max-width:500px; width:90%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+        <h3 style="margin:0; font-size:1.3rem; color:#0f172a;">Edit shift</h3>
+        <button type="button" onclick="document.getElementById('edit-shift-modal').style.display='none'" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#94a3b8;">×</button>
+      </div>
+      <form id="edit-shift-form" method="post" action="" style="display:flex; flex-direction:column; gap:1rem;">
+        <input type="hidden" id="edit-shift-id" name="shift_id" value="">
+        <div>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Date</label>
+          <input type="date" id="edit-shift-day" name="day" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;" required>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Start time</label>
+          <input type="time" id="edit-shift-start" name="start_time" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;" required>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">End time</label>
+          <input type="time" id="edit-shift-end" name="end_time" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;" required>
+        </div>
+        <div class="edit-shift-employees-field">
+          <label class="form-label" style="display:block; margin-bottom:.4rem;">Employees</label>
+          <div class="edit-shift-employee-chips employee-chip-list" id="edit-shift-employee-chips" aria-live="polite"></div>
+          <div class="edit-shift-add-wrap">
+            <button type="button" class="btn btn-sm btn-primary edit-shift-add-button" id="edit-add-employee-toggle"><i class="bi bi-plus-circle-fill me-1"></i>Add employees</button>
+            <div class="edit-employee-picker" id="edit-employee-picker" hidden>
+              <input type="search" class="form-control form-control-sm" id="edit-employee-search" placeholder="Search employees" aria-label="Search employees">
+              <div class="edit-employee-picker-list" id="edit-employee-picker-list">{% for emp in employees if emp.is_active %}<label class="employee-chip" data-employee-id="{{ emp.id }}" data-employee-name="{{ emp.name }}" data-image="{{ emp.profile_image_path or '' }}"><input type="checkbox" class="edit-employee-option" value="{{ emp.id }}"><span>{{ emp.name }}</span></label>{% endfor %}</div>
+              <div class="d-flex justify-content-end mt-2"><button type="button" class="btn btn-sm btn-primary" id="edit-employee-picker-add">Add selected</button></div>
+            </div>
+          </div>
+          <div id="edit-shift-employee-hidden"></div>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Notes (optional)</label>
+          <textarea id="edit-shift-instructions" name="instructions" rows="3" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem; font-family:inherit; resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1rem;">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('edit-shift-modal').style.display='none'">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-primary">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Free employees modal -->
+  <div id="free-employees-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10005; align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:1rem; padding:1rem; max-width:680px; width:94%; max-height:80vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+        <h3 style="margin:0; font-size:1.1rem; color:#0f172a;">Available employees</h3>
+        <button type="button" onclick="document.getElementById('free-employees-modal').style.display='none'" style="background:none; border:none; font-size:1.25rem; cursor:pointer; color:#94a3b8;">×</button>
+      </div>
+      <div id="free-employees-content" style="min-height:3rem;">
+        <div class="small-note">Searching...</div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.75rem;">
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('free-employees-modal').style.display='none'">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.scheduleText = (english, german) => document.documentElement.lang.toLowerCase().startsWith('de') ? german : english;
+    async function showFreeEmployeesModal(){
+      const startDate = document.getElementById('free_start_date').value;
+      const endDate = document.getElementById('free_end_date').value || startDate;
+      const startTime = document.getElementById('free_start_time').value;
+      const endTime = document.getElementById('free_end_time').value;
+      const siteIdElem = document.getElementById('filter_site_id');
+      const siteId = siteIdElem ? siteIdElem.value : '';
+      if(!startDate){
+        alert(window.scheduleText('Choose a start date.','Wählen Sie ein Startdatum aus.'));
+        return;
+      }
+      const params = new URLSearchParams({free_start_date: startDate, free_end_date: endDate});
+      if(startTime) params.set('free_start_time', startTime);
+      if(endTime) params.set('free_end_time', endTime);
+      if(siteId) params.set('site_id', siteId);
+      const url = `/schedule/free-available?${params.toString()}`;
+      const container = document.getElementById('free-employees-content');
+      container.innerHTML = `<div class="small-note">${window.scheduleText('Searching...','Suche läuft...')}</div>`;
+      document.getElementById('free-employees-modal').style.display = 'flex';
+      try{
+        const resp = await fetch(url, {credentials: 'same-origin'});
+        if(!resp.ok){
+          const err = await resp.json().catch(()=>({error: 'Error'}));
+          container.innerHTML = `<div class="alert alert-danger">${window.scheduleText('Error:','Fehler:')} ${err.error || resp.statusText}</div>`;
+          return;
+        }
+        const data = await resp.json();
+        const items = data.items || [];
+        if(items.length === 0){
+          container.innerHTML = `<div class="small-note">${window.scheduleText('No available employees found for this period.','Für diesen Zeitraum wurden keine verfügbaren Mitarbeitenden gefunden.')}</div>`;
+          return;
+        }
+        const list = document.createElement('div');
+        list.style.display = 'grid';
+        list.style.gridTemplateColumns = 'repeat(2, 1fr)';
+        list.style.gap = '0.5rem';
+        items.forEach(it => {
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'btn btn-outline-secondary text-start';
+          card.style.padding = '0.6rem';
+          card.style.whiteSpace = 'normal';
+          card.textContent = `${it.name}${it.role ? ' — ' + it.role : ''}`;
+          card.addEventListener('click', () => {
+            const employeeSelect = document.getElementById('filter_employee_id');
+            if (!employeeSelect) return;
+            employeeSelect.value = String(it.id);
+            document.getElementById('free-employees-modal').style.display = 'none';
+            document.getElementById('schedule-filter-form')?.requestSubmit();
+          });
+          list.appendChild(card);
+        });
+        container.innerHTML = '';
+        container.appendChild(list);
+      }catch(e){
+        container.innerHTML = `<div class="alert alert-danger">${window.scheduleText('Network error while loading.','Netzwerkfehler beim Laden.')}</div>`;
+      }
+    }
+
+    function toggleFreeFilterPanel(){
+      const content = document.getElementById('free-filter-content');
+      const toggle = document.getElementById('free-filter-toggle');
+      if(!content || !toggle) return;
+      const isHidden = content.style.display === 'none' || content.style.display === '';
+      content.style.display = isHidden ? 'block' : 'none';
+      toggle.textContent = isHidden ? window.scheduleText('Available employees only ▴','Nur verfügbare Mitarbeitende ▴') : window.scheduleText('Available employees only ▾','Nur verfügbare Mitarbeitende ▾');
+    }
+  </script>
+
+  <!-- Bulk edit shifts -->
+  <div id="batch-edit-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:1rem; padding:1.5rem; max-width:520px; width:90%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h3 style="margin:0; font-size:1.2rem; color:#0f172a;">Edit multiple shifts</h3>
+        <button type="button" id="batch-edit-close" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#94a3b8;">×</button>
+      </div>
+      <p class="small-note" style="margin-bottom:1rem;">Editing <strong id="batch-edit-count">0</strong> selected shifts.</p>
+      <form id="batch-edit-form" method="post" action="{{ url_for('batch_edit_shifts') }}" style="display:flex; flex-direction:column; gap:0.9rem;">
+        <div id="batch-edit-hidden-inputs" hidden></div>
+        <div>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">New date (optional)</label>
+          <input type="date" id="batch-edit-day" name="day" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+          <div>
+            <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">New start time (optional)</label>
+            <input type="time" id="batch-edit-start" name="start_time" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
+          </div>
+          <div>
+            <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">New end time (optional)</label>
+            <input type="time" id="batch-edit-end" name="end_time" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
+          </div>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">New notes (optional)</label>
+          <textarea id="batch-edit-instructions" name="instructions" rows="3" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem; font-family:inherit; resize:vertical;" placeholder="Leave blank to keep existing notes"></textarea>
+        </div>
+        <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:0.5rem;">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="batch-edit-cancel">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-primary">Apply changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="duplicate-shifts-modal" class="quick-add-modal" role="dialog" aria-modal="true" aria-labelledby="duplicate-shifts-title">
+    <div class="quick-add-card"><div class="d-flex justify-content-between align-items-center mb-3"><h3 id="duplicate-shifts-title" class="h5 mb-0">Duplicate shifts</h3><button type="button" class="btn btn-sm btn-outline-secondary modal-close">x</button></div>
+      <form method="post" action="{{ url_for('batch_duplicate_shifts') }}" class="bulk-action-form" id="duplicate-shifts-form"><div class="bulk-action-ids"></div>
+        <label class="form-label" for="duplicate-target-day">New start date</label><input class="form-control mb-3" type="date" id="duplicate-target-day" name="target_day" required>
+        <p class="small-note">Selected shifts will be copied to the new dates, preserving their spacing, times, and employees.</p>
+        <div class="d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-outline-secondary modal-cancel">Cancel</button><button type="submit" class="btn btn-sm btn-primary">Duplicate</button></div>
+      </form>
+    </div>
+  </div>
+  <div id="assign-shifts-modal" class="quick-add-modal" role="dialog" aria-modal="true" aria-labelledby="assign-shifts-title">
+    <div class="quick-add-card"><div class="d-flex justify-content-between align-items-center mb-3"><h3 id="assign-shifts-title" class="h5 mb-0">Assign shifts</h3><button type="button" class="btn btn-sm btn-outline-secondary modal-close">x</button></div>
+      <form method="post" action="{{ url_for('batch_assign_shifts') }}" class="bulk-action-form" id="assign-shifts-form"><div class="bulk-action-ids"></div>
+        <label class="form-label" for="assign-employee-id">Employee</label><select class="form-select mb-3" id="assign-employee-id" name="employee_id" required><option value="">Select an employee</option>{% for emp in employees %}<option value="{{ emp.id }}">{{ emp.name }}{% if emp.role %} - {{ emp.role }}{% endif %}</option>{% endfor %}</select>
+        <div class="d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-outline-secondary modal-cancel">Cancel</button><button type="submit" class="btn btn-sm btn-primary">Assign</button></div>
+      </form>
+    </div>
+  </div>
+
+
+  <script>
+    const footerYear = document.getElementById('year');
+    if (footerYear) footerYear.textContent = new Date().getFullYear();
+
+    // Range (time period) filter with day picker - MUST be at global scope for inline onchange handler
+    window.handleViewChange = function(event, dashboardUrl) {
+      const selected = event.target.value;
+      if (!selected) {
+        return;
+      }
+      if (selected === 'day-picker') {
+        const dayPickerInput = document.getElementById('filter-day-picker');
+        if (typeof flatpickr === 'undefined') {
+          alert(window.scheduleText('Could not load the calendar. Please reload the page.','Der Kalender konnte nicht geladen werden. Bitte laden Sie die Seite neu.'));
+          return;
+        }
+        if (!dayPickerInput._flatpickr) {
+          flatpickr(dayPickerInput, {
+            mode: 'single',
+            dateFormat: 'Y-m-d',
+            disableMobile: true,
+            defaultDate: new Date(),
+            onChange: function(selectedDates, dateStr, instance) {
+              if (selectedDates.length > 0) {
+                const url = new URL(dashboardUrl, window.location.origin);
+                const params = new URLSearchParams(window.location.search);
+                params.delete('weeks');
+                params.set('days', '1');
+                params.set('start_date', dateStr);
+                window.location.href = url.toString() + '?' + params.toString();
+              }
+            }
+          });
+        }
+        dayPickerInput._flatpickr.open();
+      } else {
+        const url = new URL(dashboardUrl, window.location.origin);
+        const params = new URLSearchParams(window.location.search);
+        params.delete('days');
+        params.delete('start_date');
+        params.set(selected.split('=')[0], selected.split('=')[1]);
+        window.location.href = url.toString() + '?' + params.toString();
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      console.log('DOMContentLoaded fired for import modal');
+      const importPrevMonthBtn = document.getElementById('import-previous-month-btn');
+      const importModal = document.getElementById('previous-month-import-modal');
+      const importContent = document.getElementById('previous-month-import-content');
+      const importSubmitBtn = document.getElementById('previous-month-import-submit');
+      const importCancelBtn = document.getElementById('previous-month-import-cancel');
+      const importCloseBtn = document.getElementById('previous-month-import-close');
+      console.log('importPrevMonthBtn:', importPrevMonthBtn);
+      console.log('importModal:', importModal);
+
+      const openImportModal = async () => {
+        console.log('openImportModal called');
+        if (!importModal || !importContent || !importSubmitBtn) {
+          console.log('Missing elements:', { importModal, importContent, importSubmitBtn });
+          return;
+        }
+        const sourceOffset = Number(document.getElementById('previous-month-import-source-offset')?.value || 1);
+        const targetOffset = Number(document.getElementById('previous-month-import-target-offset')?.value || 1);
+        console.log('Setting modal display to flex');
+        importModal.style.display = 'flex';
+        importContent.innerHTML = `<div class="alert alert-info" role="alert">${window.scheduleText('Loading shifts for the selected week...','Einsätze für die ausgewählte Woche werden geladen...')}</div>`;
+        importSubmitBtn.disabled = true;
+        try {
+          const params = new URLSearchParams({
+            source_offset: String(sourceOffset),
+            target_offset: String(targetOffset),
+          });
+          const resp = await fetch(`/schedule/preview-import-previous-month?${params.toString()}`);
+          if (!resp.ok) {
+            throw new Error(`Server returned ${resp.status}`);
+          }
+          const data = await resp.json();
+          const items = Array.isArray(data.items) ? data.items : [];
+          if (!items.length) {
+            importContent.innerHTML = `<div class="alert alert-warning" role="alert">${window.scheduleText('No active shifts found in the previous month.','Im Vormonat wurden keine aktiven Einsätze gefunden.')}</div>`;
+            return;
+          }
+
+          const table = document.createElement('table');
+          table.className = 'table table-bordered table-sm';
+          table.innerHTML = `
+            <thead>
+              <tr>
+                <th style="width:1%;"><input type="checkbox" id="previous-month-import-select-all" aria-label="Alle auswählen"></th>
+                <th>${window.scheduleText('Employee','Mitarbeiter')}</th>
+                <th>${window.scheduleText('Status','Status')}</th>
+                <th>${window.scheduleText('Site','Standort')}</th>
+                <th>${window.scheduleText('Source','Quelle')}</th>
+                <th>${window.scheduleText('Target','Ziel')}</th>
+                <th>${window.scheduleText('Time','Uhrzeit')}</th>
+                <th>${window.scheduleText('Conflict','Konflikt')}</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          `;
+          const tbody = table.querySelector('tbody');
+          items.forEach(item => {
+            const row = document.createElement('tr');
+            row.dataset.active = item.active ? 'true' : 'false';
+            row.innerHTML = `
+              <td><input type="checkbox" class="previous-month-import-checkbox" value="${item.id}"></td>
+              <td>${item.employee}</td>
+              <td>${item.active ? `<span class="badge bg-success" title="${window.scheduleText('This employee is active and can be imported','Diese Person ist aktiv und kann importiert werden')}">${window.scheduleText('Active','Aktiv')}</span>` : `<span class="badge bg-secondary" title="${window.scheduleText('This employee is inactive and hidden by default','Diese Person ist inaktiv und wird standardmäßig ausgeblendet')}">${window.scheduleText('Inactive','Inaktiv')}</span>`}</td>
+              <td>${item.site}</td>
+              <td>${item.from_day}</td>
+              <td>${item.to_day}</td>
+              <td>${item.time}</td>
+              <td>${item.conflict ? `<span class="text-warning" title="${window.scheduleText('This shift conflicts with an existing schedule','Dieser Einsatz überschneidet sich mit einem bestehenden Einsatzplan')}">${window.scheduleText('Warning','Warnung')}</span>` : '—'}</td>
+            `;
+            tbody.appendChild(row);
+          });
+
+          importContent.innerHTML = '';
+          // add active-only filter control
+          const filterWrap = document.createElement('div');
+          filterWrap.style.marginBottom = '0.5rem';
+          filterWrap.innerHTML = `<label style="font-size:0.9rem;"><input type="checkbox" id="previous-month-only-active" style="margin-right:0.4rem;">${window.scheduleText('Show active shifts only','Nur aktive Einsätze anzeigen')}</label>`;
+          importContent.appendChild(filterWrap);
+          importContent.appendChild(table);
+
+          const onlyActiveCheckbox = document.getElementById('previous-month-only-active');
+          const applyActiveFilter = () => {
+            const onlyActive = onlyActiveCheckbox && onlyActiveCheckbox.checked;
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.forEach(r => {
+              if (onlyActive && r.dataset.active !== 'true') {
+                // hide and uncheck
+                r.style.display = 'none';
+                const cb = r.querySelector('.previous-month-import-checkbox');
+                if (cb) cb.checked = false;
+              } else {
+                r.style.display = '';
+              }
+            });
+            // refresh itemCheckboxes and submit button state
+            const visibleChecked = Array.from(importContent.querySelectorAll('.previous-month-import-checkbox:checked')).filter(cb => cb.closest('tr').style.display !== 'none');
+            importSubmitBtn.disabled = visibleChecked.length === 0;
+          };
+          if (onlyActiveCheckbox) {
+            onlyActiveCheckbox.addEventListener('change', applyActiveFilter);
+          }
+
+          const selectAllCheckbox = document.getElementById('previous-month-import-select-all');
+          const itemCheckboxes = Array.from(importContent.querySelectorAll('.previous-month-import-checkbox'));
+
+          const updateImportSelection = () => {
+            const selected = itemCheckboxes.filter(cb => cb.checked);
+            importSubmitBtn.disabled = selected.length === 0;
+          };
+
+          itemCheckboxes.forEach(cb => cb.addEventListener('change', updateImportSelection));
+          if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function () {
+              itemCheckboxes.forEach(cb => { cb.checked = this.checked; });
+              updateImportSelection();
+            });
+          }
+        } catch (err) {
+          importContent.innerHTML = `<div class="alert alert-danger" role="alert">${window.scheduleText('Could not load shifts. Please reload the page.','Einsätze konnten nicht geladen werden. Bitte laden Sie die Seite neu.')}</div>`;
+          console.error(err);
+        }
+      };
+
+      const closeImportModal = () => {
+        if (importModal) {
+          importModal.style.display = 'none';
+        }
+      };
+
+      if (importPrevMonthBtn) {
+        importPrevMonthBtn.addEventListener('click', openImportModal);
+      }
+      if (importCancelBtn) {
+        importCancelBtn.addEventListener('click', closeImportModal);
+      }
+      if (importCloseBtn) {
+        importCloseBtn.addEventListener('click', closeImportModal);
+      }
+      if (importModal) {
+        importModal.addEventListener('click', function (e) {
+          if (e.target === importModal) {
+            closeImportModal();
+          }
+        });
+      }
+      if (importSubmitBtn) {
+        importSubmitBtn.addEventListener('click', async () => {
+          const checkedBoxes = Array.from(document.querySelectorAll('.previous-month-import-checkbox:checked'));
+          const selectedIds = checkedBoxes.map(cb => cb.value).filter(Boolean);
+          if (!selectedIds.length) {
+            return;
+          }
+          const sourceOffset = Number(document.getElementById('previous-month-import-source-offset')?.value || 1);
+          const targetOffset = Number(document.getElementById('previous-month-import-target-offset')?.value || 1);
+          importSubmitBtn.disabled = true;
+          importSubmitBtn.textContent = window.scheduleText('Importing...','Import wird ausgeführt...');
+          try {
+            const resp = await fetch('/schedule/import-previous-month', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ selected_ids: selectedIds, source_offset: sourceOffset, target_offset: targetOffset }),
+            });
+            if (!resp.ok) {
+              throw new Error(`Server returned ${resp.status}`);
+            }
+            const result = await resp.json();
+            const summary = [];
+            if (result.created) summary.push(`${result.created} ${window.scheduleText('shifts imported','Einsätze importiert')}`);
+            if (result.skipped_existing) summary.push(`${result.skipped_existing} ${window.scheduleText('duplicates skipped','Duplikate übersprungen')}`);
+            if (result.conflicts) summary.push(`${result.conflicts} ${window.scheduleText('shift(s) saved despite scheduling conflicts','Einsatz/Einsätze trotz Planungskonflikten gespeichert')}`);
+            if (result.skipped_inactive) summary.push(`${result.skipped_inactive} ${window.scheduleText('inactive employees skipped','inaktive Mitarbeitende übersprungen')}`);
+            alert(summary.join(String.fromCharCode(10)) || window.scheduleText('Import complete.','Import abgeschlossen.'));
+            window.location.reload();
+          } catch (err) {
+            importSubmitBtn.disabled = false;
+            importSubmitBtn.textContent = window.scheduleText('Import','Importieren');
+            console.error(err);
+            alert(window.scheduleText('Import failed. Please try again.','Import fehlgeschlagen. Bitte versuchen Sie es erneut.'));
+          }
+        });
+      }
+    });
+
+    // Toolbar controls and client-side schedule filters.
+    const scheduleFilter = document.getElementById('schedule-filter-form');
+    const scheduleStart = document.getElementById('start_date');
+    const scheduleEnd = document.getElementById('schedule-end-date');
+    const dayModeInput = scheduleFilter?.querySelector('input[name="days"]');
+    const localIsoDate = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+    const setScheduleStart = (value) => { if (scheduleStart && scheduleFilter) { scheduleStart.value = value; scheduleFilter.requestSubmit(); } };
+    const schedulePeriod=document.getElementById('schedule-period-input');
+    const stepSchedulePeriod=(direction)=>{
+      if (!scheduleStart?.value) return;
+      const date = new Date(scheduleStart.value + 'T12:00:00');
+      if(schedulePeriod?.value==='custom'){
+        const end=new Date((scheduleEnd?.value||scheduleStart.value)+'T12:00:00');
+        date.setDate(date.getDate()+direction*7);end.setDate(end.getDate()+direction*7);
+        scheduleStart.value=localIsoDate(date);if(scheduleEnd)scheduleEnd.value=localIsoDate(end);scheduleFilter?.requestSubmit();return;
+      }
+      if(schedulePeriod?.value==='month'){date.setDate(1);date.setMonth(date.getMonth()+direction);}
+      else date.setDate(date.getDate()+direction*(schedulePeriod?.value==='day'?1:schedulePeriod?.value==='fortnight'?14:7));
+      setScheduleStart(localIsoDate(date));
+    };
+    document.getElementById('schedule-prev-week')?.addEventListener('click', () => stepSchedulePeriod(-1));
+    document.getElementById('schedule-next-week')?.addEventListener('click', () => stepSchedulePeriod(1));
+    document.getElementById('schedule-today')?.addEventListener('click', () => {
+      const date = new Date();
+      if(schedulePeriod?.value==='month')date.setDate(1);
+      else if(schedulePeriod?.value!=='day')date.setDate(date.getDate()-((date.getDay()+6)%7));
+      if(schedulePeriod?.value==='custom'&&scheduleEnd)scheduleEnd.value=localIsoDate(date);
+      setScheduleStart(localIsoDate(date));
+    });
+
+    const calendarMonthLabel=document.getElementById('schedule-calendar-month');
+    const calendarDays=document.getElementById('schedule-calendar-days');
+    const calendarLocale=document.documentElement.lang==='de'?'de-DE':'en-GB';
+    let calendarMonth=new Date((scheduleStart?.value||localIsoDate(new Date()))+'T12:00:00');
+    calendarMonth.setDate(1);
+    let draftStart=null,draftEnd=null;
+    const parseLocalDate=(value)=>value?new Date(value+'T12:00:00'):null;
+    const renderScheduleCalendar=()=>{
+      if(!calendarDays||!calendarMonthLabel)return;
+      calendarMonthLabel.textContent=new Intl.DateTimeFormat(calendarLocale,{month:'long',year:'numeric'}).format(calendarMonth);
+      calendarDays.replaceChildren();
+      const first=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth(),1,12);
+      const gridStart=new Date(first);gridStart.setDate(first.getDate()-((first.getDay()+6)%7));
+      for(let index=0;index<42;index++){
+        const day=new Date(gridStart);day.setDate(gridStart.getDate()+index);
+        const key=localIsoDate(day);
+        const button=document.createElement('button');button.type='button';button.className='btn date-calendar-day';button.textContent=String(day.getDate());
+        button.setAttribute('role','gridcell');button.setAttribute('aria-label',new Intl.DateTimeFormat(calendarLocale,{dateStyle:'full'}).format(day));
+        if(day.getMonth()!==calendarMonth.getMonth())button.classList.add('is-outside');
+        const isStart=draftStart&&key===localIsoDate(draftStart),isEnd=draftEnd&&key===localIsoDate(draftEnd);
+        if(isStart)button.classList.add('is-start');if(isEnd)button.classList.add('is-end');
+        if(draftStart&&draftEnd&&day>draftStart&&day<draftEnd)button.classList.add('is-in-range');
+        button.addEventListener('click',()=>{
+          if(!draftStart||draftEnd){draftStart=day;draftEnd=null;}
+          else if(day<draftStart){draftEnd=draftStart;draftStart=day;}
+          else draftEnd=day;
+          renderScheduleCalendar();
+        });
+        calendarDays.appendChild(button);
+      }
+    };
+    document.getElementById('schedule-calendar-prev')?.addEventListener('click',()=>{calendarMonth.setMonth(calendarMonth.getMonth()-1);renderScheduleCalendar();});
+    document.getElementById('schedule-calendar-next')?.addEventListener('click',()=>{calendarMonth.setMonth(calendarMonth.getMonth()+1);renderScheduleCalendar();});
+    document.getElementById('week-range-toggle')?.addEventListener('click',()=>window.setTimeout(()=>{
+      if(!document.getElementById('week-range-wrap')?.classList.contains('is-open'))return;
+      draftStart=parseLocalDate(scheduleStart?.value);draftEnd=parseLocalDate(scheduleEnd?.value);
+      calendarMonth=draftStart?new Date(draftStart.getFullYear(),draftStart.getMonth(),1,12):new Date();
+      renderScheduleCalendar();
+    },0));
+    const setDraftRange=(start,end)=>{draftStart=start;draftEnd=end;calendarMonth=new Date(start.getFullYear(),start.getMonth(),1,12);renderScheduleCalendar();};
+    document.querySelectorAll('[data-date-preset]').forEach(button=>button.addEventListener('click',()=>{
+      const today=new Date();today.setHours(12,0,0,0);let start=new Date(today),end=new Date(today);
+      if(button.dataset.datePreset==='yesterday')start.setDate(start.getDate()-1),end=new Date(start);
+      if(button.dataset.datePreset==='last7')start.setDate(start.getDate()-6);
+      if(button.dataset.datePreset==='thisMonth'){start.setDate(1);end.setMonth(end.getMonth()+1,0);}
+      if(button.dataset.datePreset==='lastMonth'){start.setDate(1);start.setMonth(start.getMonth()-1);end=new Date(start.getFullYear(),start.getMonth()+1,0,12);}
+      setDraftRange(start,end);
+    }));
+    const closeDatePicker=()=>{document.getElementById('week-range-wrap')?.classList.remove('is-open');document.getElementById('week-range-toggle')?.setAttribute('aria-expanded','false');};
+    document.getElementById('schedule-calendar-cancel')?.addEventListener('click',closeDatePicker);
+    document.getElementById('schedule-calendar-save')?.addEventListener('click',()=>{
+      if(!draftStart)return;
+      if(!draftEnd)draftEnd=new Date(draftStart);
+      if(scheduleStart)scheduleStart.value=localIsoDate(draftStart);
+      if(scheduleEnd)scheduleEnd.value=localIsoDate(draftEnd);
+      if(schedulePeriod)schedulePeriod.value='custom';
+      if(dayModeInput)dayModeInput.value='';
+      const weeksInput=scheduleFilter?.querySelector('input[name="weeks"]');
+      if(weeksInput)weeksInput.value=String(Math.max(1,Math.ceil((draftEnd-draftStart)/86400000/7)));
+      const periodLabel=document.getElementById('schedule-period-current');
+      const saveButton=document.getElementById('schedule-calendar-save');
+      if(periodLabel)periodLabel.textContent=saveButton?.dataset.customLabel||window.scheduleText('Custom range','Benutzerdefinierter Zeitraum');
+      closeDatePicker();scheduleFilter?.requestSubmit();
+    });
+
+    const togglePopover = (wrap, button) => {
+      const open = !wrap.classList.contains('is-open');
+      document.querySelectorAll('.week-range-wrap,.schedule-view-wrap,.schedule-filter-add,.notification-wrap').forEach(item => item.classList.remove('is-open'));
+      document.querySelectorAll('#week-range-toggle,#schedule-view-toggle,#add-filter-toggle,#schedule-notifications-toggle').forEach(item => item.setAttribute('aria-expanded','false'));
+      wrap.classList.toggle('is-open', open);
+      button.setAttribute('aria-expanded', String(open));
+    };
+    [['week-range-wrap','week-range-toggle'],['schedule-view-wrap','schedule-view-toggle'],['schedule-filter-add','add-filter-toggle'],['notification-wrap','schedule-notifications-toggle']].forEach(([wrapId,buttonId]) => {
+      const wrap=document.getElementById(wrapId), button=document.getElementById(buttonId);
+      button?.addEventListener('click',()=>togglePopover(wrap,button));
+    });
+    const notificationPopover=document.getElementById('schedule-notification-popover');
+    const notificationTitle=document.getElementById('schedule-notification-title');
+    const notificationDescription=document.getElementById('schedule-notification-description');
+    const notificationPending=document.getElementById('schedule-notification-pending');
+    const notificationWrap=document.getElementById('notification-wrap');
+    const notificationBell=document.getElementById('schedule-notifications-toggle');
+    const notificationBellIcon=notificationBell?.querySelector('i');
+    const notificationConnection=document.getElementById('schedule-notification-connection');
+    const notificationAction=document.getElementById('schedule-notification-action');
+    const notificationActionLabel=document.getElementById('schedule-notification-action-label');
+    const notificationActionIcon=notificationAction?.querySelector('i');
+    const notificationConfirm=document.getElementById('schedule-notification-confirm');
+    const notificationConfirmTitle=document.getElementById('schedule-notification-confirm-title');
+    const notificationConfirmCopy=document.getElementById('schedule-notification-confirm-copy');
+    const notificationConfirmAction=document.getElementById('schedule-notification-confirm-action');
+    let notificationPauseState={paused:false,pending_count:0};
+    let requestedNotificationAction='pause';
+    const renderNotificationState=(state)=>{
+      notificationPauseState=state||notificationPauseState;
+      const isPaused=Boolean(notificationPauseState.paused);
+      notificationWrap?.classList.toggle('is-active',!isPaused);
+      notificationWrap?.classList.toggle('is-paused',isPaused);
+      if(notificationBellIcon)notificationBellIcon.className=isPaused?'bi bi-bell-slash-fill':'bi bi-bell-fill';
+      if(notificationBell){
+        const stateLabel=isPaused?window.scheduleText('paused','pausiert'):window.scheduleText('active','aktiv');
+        notificationBell.setAttribute('aria-label',`${window.scheduleText('Notifications','Benachrichtigungen')} ${stateLabel}; ${window.scheduleText('click to manage','zum Verwalten klicken')}`);
+        notificationBell.title=`${window.scheduleText('Notifications','Benachrichtigungen')} ${stateLabel}`;
+      }
+      if(notificationTitle)notificationTitle.textContent=notificationPauseState.paused?window.scheduleText('Notifications are paused','Benachrichtigungen sind pausiert'):window.scheduleText('Notifications are active','Benachrichtigungen sind aktiv');
+      if(notificationDescription)notificationDescription.textContent=notificationPauseState.paused
+        ?`${window.scheduleText('Shift updates and daily reminders are paused','Einsatzänderungen und tägliche Erinnerungen sind pausiert')}${notificationPauseState.paused_until?` ${window.scheduleText('until','bis')} ${new Intl.DateTimeFormat(document.documentElement.lang==='de'?'de-DE':'en-GB',{hour:'2-digit',minute:'2-digit'}).format(new Date(notificationPauseState.paused_until))}`:''}. ${window.scheduleText('Resume to send queued employee alerts.','Setzen Sie die Benachrichtigungen fort, um vorgemerkte Hinweise zu senden.')}`
+        :window.scheduleText('Employees receive alerts when shifts are added, changed, assigned, or removed. Daily reminders are sent at 6:00 AM while notifications are active.','Mitarbeitende erhalten eine Benachrichtigung, wenn Einsätze erstellt, geändert, zugewiesen oder entfernt werden. Bei aktiven Benachrichtigungen werden tägliche Erinnerungen um 6:00 Uhr gesendet.');
+      if(notificationPending)notificationPending.textContent=notificationPauseState.pending_count
+        ?`${notificationPauseState.pending_count} ${window.scheduleText('employee alert(s) queued.','Mitarbeiterbenachrichtigung(en) vorgemerkt.')}`:window.scheduleText('No queued employee alerts.','Keine vorgemerkten Mitarbeiterbenachrichtigungen.');
+      if(notificationActionLabel)notificationActionLabel.textContent=notificationPauseState.paused?window.scheduleText('Resume','Fortsetzen'):window.scheduleText('Pause','Pausieren');
+      if(notificationActionIcon)notificationActionIcon.className=notificationPauseState.paused?'bi bi-bell-fill':'bi bi-pause-circle-fill';
+      if(notificationAction){
+        notificationAction.classList.toggle('is-resume',Boolean(notificationPauseState.paused));
+        notificationAction.setAttribute('aria-label',notificationPauseState.paused?window.scheduleText('Resume notifications and release queued alerts','Benachrichtigungen fortsetzen und vorgemerkte Hinweise senden'):window.scheduleText('Pause notifications for all employees','Benachrichtigungen für alle Mitarbeitenden pausieren'));
+        notificationAction.title=notificationPauseState.paused?window.scheduleText('Resume notifications and release queued alerts','Benachrichtigungen fortsetzen und vorgemerkte Hinweise senden'):window.scheduleText('Pause notifications for all employees','Benachrichtigungen für alle Mitarbeitenden pausieren');
+      }
+    };
+    const refreshNotificationState=async()=>{
+      try{
+        const response=await fetch('/admin/notifications/state',{credentials:'same-origin',cache:'no-store'});
+        const state=await response.json();
+        if(!response.ok)throw new Error(state.error||'Could not load notification status.');
+        renderNotificationState(state);
+      }catch(_error){if(notificationDescription)notificationDescription.textContent=window.scheduleText('Notification status could not be loaded. Check your connection and retry.','Der Benachrichtigungsstatus konnte nicht geladen werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.');}
+    };
+    const updateNotificationConnection=()=>{
+      const isOnline=navigator.onLine!==false;
+      notificationWrap?.classList.toggle('is-online',isOnline);
+      notificationWrap?.classList.toggle('is-offline',!isOnline);
+      if(notificationConnection)notificationConnection.textContent=isOnline
+        ?window.scheduleText('Connected. Notification status is synced.','Verbunden. Benachrichtigungsstatus synchronisiert.')
+        :window.scheduleText('Offline. Notification settings will sync after reconnecting.','Offline. Die Benachrichtigungseinstellungen werden nach der Verbindung synchronisiert.');
+      if(!isOnline&&notificationBell)notificationBell.title=window.scheduleText('Offline notification status may be out of date','Offline: Der Benachrichtigungsstatus ist m\u00f6glicherweise veraltet');
+      else if(notificationBell)notificationBell.title=`${window.scheduleText('Notifications','Benachrichtigungen')} ${notificationPauseState.paused?window.scheduleText('paused','pausiert'):window.scheduleText('active','aktiv')}`;
+    };
+    updateNotificationConnection();
+    window.addEventListener('online',()=>{updateNotificationConnection();refreshNotificationState();});
+    window.addEventListener('offline',updateNotificationConnection);
+    refreshNotificationState();
+    notificationAction?.addEventListener('click',()=>{
+      requestedNotificationAction=notificationPauseState.paused?'resume':'pause';
+      if(notificationConfirmTitle)notificationConfirmTitle.textContent=requestedNotificationAction==='pause'?window.scheduleText('Pause notifications','Benachrichtigungen pausieren'):window.scheduleText('Resume notifications?','Benachrichtigungen fortsetzen?');
+      if(notificationConfirmCopy)notificationConfirmCopy.textContent=requestedNotificationAction==='pause'
+        ?window.scheduleText('When you resume, each affected employee will receive their queued shift updates. Notifications automatically resume at midnight.','Beim Fortsetzen erhalten die jeweils betroffenen Mitarbeitenden ihre vorgemerkten Einsatzänderungen. Um Mitternacht werden die Benachrichtigungen automatisch fortgesetzt.')
+        :`${notificationPauseState.pending_count||0} ${window.scheduleText('queued employee alert(s) will become available as soon as notifications resume.','vorgemerkte Mitarbeiterbenachrichtigung(en) werden beim Fortsetzen verfügbar.')}`;
+      if(notificationConfirmAction)notificationConfirmAction.textContent=requestedNotificationAction==='pause'?window.scheduleText('Confirm pause','Pause bestätigen'):window.scheduleText('Resume and notify','Fortsetzen und benachrichtigen');
+      notificationConfirm?.classList.add('is-open');
+    });
+    const closeNotificationConfirm=()=>notificationConfirm?.classList.remove('is-open');
+    notificationConfirm?.querySelector('.modal-cancel')?.addEventListener('click',closeNotificationConfirm);
+    notificationConfirm?.addEventListener('click',(event)=>{if(event.target===notificationConfirm)closeNotificationConfirm();});
+    notificationConfirmAction?.addEventListener('click',async()=>{
+      const idleLabel=requestedNotificationAction==='pause'?window.scheduleText('Confirm pause','Pause best?tigen'):window.scheduleText('Resume and notify','Fortsetzen und benachrichtigen');
+      notificationConfirmAction.disabled=true;
+      notificationConfirmAction.textContent=window.scheduleText('Saving...','Wird gespeichert...');
+      try{
+        const response=await fetch('/admin/notifications/state',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({action:requestedNotificationAction})});
+        const state=await response.json();
+        if(!response.ok)throw new Error(state.error||'Could not update notifications.');
+        renderNotificationState(state);closeNotificationConfirm();
+      }catch(error){alert(error.message||window.scheduleText('Could not update notifications.','Benachrichtigungen konnten nicht aktualisiert werden.'));}
+      finally{notificationConfirmAction.disabled=false;notificationConfirmAction.textContent=idleLabel;}
+    });
+    document.getElementById('schedule-notifications-toggle')?.addEventListener('click',()=>window.setTimeout(refreshNotificationState,0));
+    document.addEventListener('click',(event)=>{
+      if (!event.target.closest('.week-range-wrap,.schedule-view-wrap,.schedule-filter-add,.notification-wrap')) {
+        document.querySelectorAll('.week-range-wrap,.schedule-view-wrap,.schedule-filter-add,.notification-wrap').forEach(item=>item.classList.remove('is-open'));
+        document.querySelectorAll('#week-range-toggle,#schedule-view-toggle,#add-filter-toggle,#schedule-notifications-toggle').forEach(item=>item.setAttribute('aria-expanded','false'));
+      }
+    });
+    document.querySelectorAll('.view-options [data-period]').forEach(button=>button.addEventListener('click',()=>{
+      const selected=button.dataset.period||'week';
+      if(schedulePeriod)schedulePeriod.value=selected;
+      const periodLabel=document.getElementById('schedule-period-current');
+      if(periodLabel)periodLabel.textContent=({day:window.scheduleText('Day','Tag'),week:window.scheduleText('Week','Woche'),fortnight:window.scheduleText('2 weeks','2 Wochen'),month:window.scheduleText('Month','Monat')})[selected]||window.scheduleText('Week','Woche');
+      if(dayModeInput)dayModeInput.value='';
+      const weeksInput=scheduleFilter?.querySelector('input[name="weeks"]');
+      if(weeksInput)weeksInput.value=selected==='fortnight'?'2':'1';
+      scheduleFilter?.requestSubmit();
+    }));
+    const viewUnassignedOnly=document.getElementById('view-unassigned-only');
+    const viewAllShifts=document.getElementById('view-all-shifts');
+    const viewFullDay=document.getElementById('view-full-day');
+    [viewUnassignedOnly,viewAllShifts,viewFullDay].forEach(control=>control?.addEventListener('change',()=>{
+      if(control===viewUnassignedOnly&&control.checked&&viewAllShifts)viewAllShifts.checked=false;
+      if(control===viewAllShifts&&control.checked&&viewUnassignedOnly)viewUnassignedOnly.checked=false;
+      document.querySelector('.schedule-table')?.classList.toggle('is-full-day-view',Boolean(viewFullDay?.checked));
+      filterEmployees();
+    }));
+    document.querySelectorAll('input[name="schedule-split"]').forEach(radio=>radio.addEventListener('change',()=>{
+      const splitLabel=document.getElementById('schedule-split-current');
+      if(splitLabel)splitLabel.textContent=radio.value==='objects'?window.scheduleText('Objects','Standorte'):radio.value==='orders'?window.scheduleText('Orders','Aufträge'):window.scheduleText('Employees','Mitarbeitende');
+      const splitInput=document.getElementById('schedule-split-input');
+      if(splitInput)splitInput.value=radio.value;
+      scheduleFilter?.requestSubmit();
+    }));
+    document.getElementById('filter_site_id')?.addEventListener('change',()=>scheduleFilter?.requestSubmit());
+    document.getElementById('filter_employee_id')?.addEventListener('change',()=>scheduleFilter?.requestSubmit());
+
+    const scheduleSearch=document.getElementById('schedule-search');
+    const groupFilter=document.getElementById('filter-role');
+    const workTypeFilter=document.getElementById('filter-work-type');
+    const employeeRoleFilter=document.getElementById('filter-employee-role');
+    const assignmentFilter=document.getElementById('filter-assignment');
+    const weekdayFilter=document.getElementById('filter-weekday');
+    const openShiftRows=document.querySelectorAll('.open-shifts-row');
+    const filterIndicator=document.getElementById('active-filter-indicator');
+    const filterCount=document.getElementById('active-filter-count');
+    const filterEmployees=()=>{
+      const query=(scheduleSearch?.value||'').trim().toLowerCase();
+      const group=(groupFilter?.value||'').toLowerCase();
+      const workType=(workTypeFilter?.value||'').toLowerCase();
+      const role=(employeeRoleFilter?.value||'').toLowerCase();
+      const assignment=assignmentFilter?.value||'';
+      const weekday=weekdayFilter?.value||'';
+      const objectView=document.querySelector('.schedule-table')?.dataset.split==='objects';
+      document.querySelectorAll('.employee-row').forEach(row=>{
+        const searchText=(row.textContent||'').toLowerCase();
+        const matches=searchText.includes(query)
+          && (!group||row.dataset.employeeGroup===group)
+          && (!workType||row.dataset.workType===workType)
+          && (!role||row.dataset.employeeRole===role)
+          && (viewAllShifts?.checked || assignment!=='open');
+        row.hidden=!matches;
+      });
+      document.querySelectorAll('.site-row').forEach(row=>{row.hidden=!objectView||!(row.textContent||'').toLowerCase().includes(query);});
+      openShiftRows.forEach(row=>{row.hidden=assignment==='assigned'&&!viewAllShifts?.checked;});
+      if(viewUnassignedOnly?.checked&&!objectView){document.querySelectorAll('.employee-row').forEach(row=>row.hidden=true);openShiftRows.forEach(row=>{row.hidden=false;});}
+      document.querySelectorAll('.schedule-table .shift-pill').forEach(pill=>{
+        const isOpen=pill.dataset.assignment==='open';
+        pill.hidden=(viewUnassignedOnly?.checked&&!isOpen)
+          || (assignment==='open'&&!isOpen&&!viewAllShifts?.checked)
+          || (assignment==='assigned'&&isOpen&&!viewAllShifts?.checked);
+      });
+      document.querySelectorAll('.schedule-table [data-date],.schedule-table [data-day]').forEach(cell=>{
+        if(weekday===''){cell.hidden=false;return;}
+        const value=cell.dataset.date||cell.dataset.day;
+        const day=(new Date(`${value}T12:00:00`).getDay()+6)%7;
+        cell.hidden=day!==Number(weekday);
+      });
+      const active=[query,group,workType,role,assignment,weekday,document.getElementById('filter_employee_id')?.value,document.getElementById('filter_site_id')?.value].filter(Boolean).length;
+      if(filterCount) filterCount.textContent=String(active);
+      filterIndicator?.classList.toggle('is-visible',active>0);
+    };
+    [scheduleSearch,groupFilter,workTypeFilter,employeeRoleFilter,assignmentFilter,weekdayFilter].forEach(control=>control?.addEventListener('input',filterEmployees));
+    [groupFilter,workTypeFilter,employeeRoleFilter,assignmentFilter,weekdayFilter].forEach(control=>control?.addEventListener('change',filterEmployees));
+    document.getElementById('clear-schedule-filters')?.addEventListener('click',()=>{
+      [scheduleSearch,groupFilter,workTypeFilter,employeeRoleFilter,assignmentFilter,weekdayFilter].forEach(control=>{if(control)control.value='';});
+      const employeeSelect=document.getElementById('filter_employee_id'),siteSelect=document.getElementById('filter_site_id');
+      const hadServerFilters=Boolean(employeeSelect?.value||siteSelect?.value);
+      if(employeeSelect)employeeSelect.value=''; if(siteSelect)siteSelect.value='';
+      if(hadServerFilters)scheduleFilter?.requestSubmit(); else filterEmployees();
+    });
+    filterEmployees();
+
+    const createShiftModal = document.getElementById('new-shift-modal');
+    const createShiftForm = document.getElementById('new-shift-form');
+    const closeCreateShift = () => createShiftModal?.classList.remove('is-open');
+    const resetCreateShift = () => {
+      createShiftForm?.reset();
+      const dateInput = document.getElementById('day-picker'); if (dateInput) dateInput.value = '';
+      const openToggle = document.getElementById('create-open-shift');
+      if (openToggle) { openToggle.checked = false; openToggle.dispatchEvent(new Event('change')); }
+      document.querySelectorAll('.repeat-mode-tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.mode === 'once'));
+      document.getElementById('repeat-fields')?.classList.remove('is-visible');
+      const repeatUntilInput = document.getElementById('repeat-until'); if (repeatUntilInput) { repeatUntilInput.required = false; repeatUntilInput.value = ''; repeatUntilInput.min = ''; }
+      const repeatInterval = document.getElementById('repeat-interval'); if (repeatInterval) repeatInterval.value = '1';
+      const dateLabel = document.getElementById('shift-date-label'); if (dateLabel) dateLabel.innerHTML = `${window.scheduleText('Date','Datum')} <span class="required-mark">*</span>`;
+      document.querySelectorAll('.repeat-mode-tab').forEach((tab) => tab.setAttribute('aria-pressed', String(tab.dataset.mode === 'once')));
+      const duration = document.getElementById('duration_hours'); if (duration) duration.value = '';
+      const durationLabel = document.getElementById('duration-label'); if (durationLabel) durationLabel.textContent = '--:--';
+    };
+    const openCreateShift = ({ day = '', employeeId = '', siteId = '', open = false } = {}) => {
+      resetCreateShift();
+      const siteChoice=document.getElementById('site_id');
+      if(siteId&&siteChoice)siteChoice.value=siteId;
+      if (employeeId) {
+        const employeeChoice = document.querySelector(`#new-shift-form input[name="employee_id"][value="${employeeId}"]`);
+        if (employeeChoice) employeeChoice.checked = true;
+      }
+      const openShiftToggle = document.getElementById('create-open-shift');
+      if (openShiftToggle) { openShiftToggle.checked = open; openShiftToggle.dispatchEvent(new Event('change')); }
+      const pickerInput = document.getElementById('day-picker');
+      if (day && pickerInput) pickerInput.value = day;
+      createShiftModal?.classList.add('is-open');
+      window.setTimeout(() => document.getElementById('site_id')?.focus({ preventScroll: true }), 50);
+    };
+    document.getElementById('open-new-shift')?.addEventListener('click', () => openCreateShift());
+    document.getElementById('close-new-shift')?.addEventListener('click', closeCreateShift);
+    createShiftModal?.addEventListener('click', (event) => { if (event.target === createShiftModal) closeCreateShift(); });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeCreateShift(); });
+
+    document.querySelectorAll('.quick-create-shift').forEach((button) => {
+      button.addEventListener('click', () => openCreateShift({ day: button.dataset.day, employeeId: button.dataset.employeeId, siteId:button.dataset.siteId, open: button.dataset.open === '1' }));
+    });
+    document.querySelectorAll('.schedule-table tbody td.schedule-cell[data-day]').forEach((cell) => {
+      cell.addEventListener('click', (event) => {
+        if (event.target !== cell || event.target.closest('.shift-pill,.quick-create-shift')) return;
+        openCreateShift({
+          day: cell.dataset.day,
+          employeeId: cell.dataset.employeeId || '',
+          siteId: cell.dataset.siteId || '',
+          open: cell.classList.contains('open-schedule-cell'),
+        });
+      });
+    });
+    document.querySelectorAll('.repeat-mode-tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.repeat-mode-tab').forEach((item) => item.classList.toggle('active', item === tab));
+        document.querySelectorAll('.repeat-mode-tab').forEach((item) => item.setAttribute('aria-pressed', String(item === tab)));
+        const repeatBox = document.getElementById('repeat-weekly');
+        if (repeatBox) { repeatBox.checked = tab.dataset.mode === 'weekly'; repeatBox.dispatchEvent(new Event('change')); }
+        const recurring = tab.dataset.mode === 'weekly';
+        const untilInput = document.getElementById('repeat-until');
+        const dateInput = document.getElementById('day-picker');
+        const dateLabel = document.getElementById('shift-date-label');
+        if (untilInput) { untilInput.required = recurring; untilInput.min = recurring && dateInput ? dateInput.value : ''; }
+        if (dateLabel) dateLabel.innerHTML = recurring ? `${window.scheduleText('Start date','Startdatum')} <span class="required-mark">*</span>` : `${window.scheduleText('Date','Datum')} <span class="required-mark">*</span>`;
+        if (recurring && dateInput?.value && !document.querySelector('.weekday-options input:checked')) {
+          const weekday = (new Date(`${dateInput.value}T12:00:00`).getDay() + 6) % 7;
+          const weekdayInput = document.querySelector(`.weekday-options input[value="${weekday}"]`);
+          if (weekdayInput) weekdayInput.checked = true;
+        }
+      });
+    });
+    document.getElementById('day-picker')?.addEventListener('change', (event) => {
+      const dateValue = event.target.value;
+      const repeatUntilInput = document.getElementById('repeat-until');
+      if (repeatUntilInput) {
+        repeatUntilInput.min = dateValue;
+        if (repeatUntilInput.value && repeatUntilInput.value < dateValue) repeatUntilInput.value = '';
+      }
+      if (document.getElementById('repeat-weekly')?.checked && !document.querySelector('.weekday-options input:checked') && dateValue) {
+        const weekday = (new Date(`${dateValue}T12:00:00`).getDay() + 6) % 7;
+        const weekdayInput = document.querySelector(`.weekday-options input[value="${weekday}"]`);
+        if (weekdayInput) weekdayInput.checked = true;
+      }
+    });
+
+    const openShiftToggle = document.getElementById('create-open-shift');
+    const employeeChipList = document.querySelector('.employee-chip-list');
+    openShiftToggle?.addEventListener('change', () => {
+      const isOpen = openShiftToggle.checked;
+      document.querySelectorAll('#new-shift-form input[name="employee_id"]').forEach((input) => {
+        if (isOpen) input.checked = false;
+        input.disabled = isOpen;
+      });
+      employeeChipList?.classList.toggle('is-disabled', isOpen);
+    });
+
+    const updateDuration = () => {
+      const start = document.getElementById('start_time')?.value || '';
+      const end = document.getElementById('end_time')?.value || '';
+      const duration = document.getElementById('duration_hours');
+      const label = document.getElementById('duration-label');
+      if (!start || !end || !duration || !label) return false;
+      const [startHour, startMinute] = start.split(':').map(Number);
+      const [endHour, endMinute] = end.split(':').map(Number);
+      const minutes = endHour * 60 + endMinute - (startHour * 60 + startMinute);
+      if (minutes <= 0) { duration.value = ''; label.textContent = window.scheduleText('Invalid time','Ungültige Uhrzeit'); return false; }
+      duration.value = String(minutes / 60);
+      label.textContent = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+      return true;
+    };
+    document.getElementById('start_time')?.addEventListener('input', updateDuration);
+    document.getElementById('end_time')?.addEventListener('input', updateDuration);
+    createShiftForm?.addEventListener('submit', (event) => {
+      if (!openShiftToggle?.checked && !createShiftForm.querySelector('input[name="employee_id"]:checked')) {
+        event.preventDefault(); alert(window.scheduleText('Select an employee or create the shift as unassigned.','Wählen Sie eine mitarbeitende Person aus oder erstellen Sie den Einsatz unbesetzt.')); return;
+      }
+      if (!updateDuration()) { event.preventDefault(); alert(window.scheduleText('The end time must be after the start time.','Die Endzeit muss nach der Startzeit liegen.')); }
+    });
+
+    const repeatCheckbox = document.getElementById('repeat-weekly');
+    const repeatFields = document.getElementById('repeat-fields');
+    const repeatUntil = document.getElementById('repeat-until');
+    repeatCheckbox?.addEventListener('change', () => {
+      repeatFields?.classList.toggle('is-visible', repeatCheckbox.checked);
+      if (repeatUntil) repeatUntil.required = repeatCheckbox.checked;
+    });
+
+    if (createShiftModal?.dataset.initialOpen === '1') openCreateShift();
+
+    // Batch selection/actions functionality
+    const batchDeleteForm = document.getElementById('batch-delete-form');
+    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+    const editSelectedBtn = document.getElementById('edit-selected-btn');
+    const selectedCountSpan = document.getElementById('selected-count');
+    const editSelectedCountSpan = document.getElementById('edit-selected-count');
+
+    const getSelectedShiftCheckboxes = () => Array.from(document.querySelectorAll('.shift-checkbox:checked'));
+    const getSelectedShiftIds = () => getSelectedShiftCheckboxes().map(cb => cb.value);
+
+    const deleteCountSpan = document.getElementById('delete-selected-count');
+    const selectionToolbar = document.getElementById('selection-toolbar');
+    const bulkButtons = [
+      deleteSelectedBtn,
+      editSelectedBtn,
+      document.getElementById('duplicate-selected-btn'),
+      document.getElementById('release-selected-btn'),
+      document.getElementById('assign-selected-btn'),
+    ];
+    function updateBatchActionButtons() {
+      const checkedCount = getSelectedShiftCheckboxes().length;
+      document.querySelectorAll('.shift-pill').forEach((pill) => {
+        pill.classList.toggle('is-selected', Boolean(pill.querySelector('.shift-checkbox:checked')));
+      });
+      if (selectedCountSpan) selectedCountSpan.textContent = String(checkedCount);
+      const selectedLabel = document.getElementById('selected-label');
+      if (selectedLabel) selectedLabel.textContent = checkedCount === 1 ? window.scheduleText('shift selected','Einsatz ausgewählt') : window.scheduleText('shifts selected','Einsätze ausgewählt');
+      if (deleteCountSpan) deleteCountSpan.textContent = String(checkedCount);
+      if (editSelectedCountSpan) editSelectedCountSpan.textContent = String(checkedCount);
+      bulkButtons.forEach((button) => { if (button) button.disabled = checkedCount === 0; });
+      if (selectionToolbar) selectionToolbar.hidden = checkedCount === 0;
+    }
+
+    document.getElementById('clear-selection-btn')?.addEventListener('click', () => {
+      getSelectedShiftCheckboxes().forEach((checkbox) => { checkbox.checked = false; });
+      updateBatchActionButtons();
+    });
+
+    const copySelectedIds = (form) => {
+      const holder = form?.querySelector('.bulk-action-ids');
+      if (!holder) return;
+      holder.replaceChildren();
+      getSelectedShiftIds().forEach((id) => {
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = 'shift_ids[]'; input.value = id;
+        holder.appendChild(input);
+      });
+    };
+    const showBulkModal = (modalId, formId) => {
+      const modal = document.getElementById(modalId);
+      const form = document.getElementById(formId);
+      if (!modal || !form || !getSelectedShiftIds().length) return;
+      copySelectedIds(form); modal.style.display = 'flex';
+      form.querySelector('input:not([type="hidden"]),select')?.focus();
+    };
+    document.getElementById('duplicate-selected-btn')?.addEventListener('click', () => showBulkModal('duplicate-shifts-modal', 'duplicate-shifts-form'));
+    document.getElementById('assign-selected-btn')?.addEventListener('click', () => showBulkModal('assign-shifts-modal', 'assign-shifts-form'));
+    document.querySelectorAll('.quick-add-modal .modal-close, .quick-add-modal .modal-cancel').forEach((button) => {
+      button.addEventListener('click', () => { const modal = button.closest('.quick-add-modal'); if (modal) modal.style.display = 'none'; });
+    });
+    document.querySelectorAll('.quick-add-modal').forEach((modal) => modal.addEventListener('click', (event) => {
+      if (event.target === modal) modal.style.display = 'none';
+    }));
+
+    if (batchDeleteForm) {
+      batchDeleteForm.addEventListener('change', function(e) {
+        if (e.target.classList.contains('shift-checkbox')) {
+          const pill=e.target.closest('.site-shift-pill');
+          if(pill&&!e.target.classList.contains('site-slot-secondary'))pill.querySelectorAll('.site-slot-secondary').forEach(checkbox=>{checkbox.checked=e.target.checked;});
+          updateBatchActionButtons();
+        }
+      });
+
+      batchDeleteForm.addEventListener('submit', function(e) {
+        const checkedCount = getSelectedShiftIds().length;
+        if (checkedCount === 0) {
+          e.preventDefault();
+          return false;
+        }
+        const releasingEmployees = e.submitter?.id === 'release-selected-btn' || document.activeElement?.id === 'release-selected-btn';
+        const confirmation = releasingEmployees
+          ? window.scheduleText(`Release the assigned employee(s) from ${checkedCount} selected shift(s)? The shift(s) will stay open for reassignment.`,`Zugewiesene Mitarbeitende aus ${checkedCount} ausgewählten Einsatz(en) lösen? Die Einsätze bleiben zur Neuzuweisung offen.`)
+          : window.scheduleText(`Delete ${checkedCount} selected shifts?`,`${checkedCount} ausgewählte Einsätze löschen?`);
+        if (!confirm(confirmation)) {
+          e.preventDefault();
+          return false;
+        }
+      });
+
+      updateBatchActionButtons();
+    }
+
+    // Batch edit functionality
+    const batchEditModal = document.getElementById('batch-edit-modal');
+    const batchEditForm = document.getElementById('batch-edit-form');
+    const batchEditHiddenInputs = document.getElementById('batch-edit-hidden-inputs');
+    const batchEditCount = document.getElementById('batch-edit-count');
+
+    function closeBatchEditModal() {
+      if (batchEditModal) {
+        batchEditModal.style.display = 'none';
+      }
+    }
+
+    if (editSelectedBtn && batchEditModal && batchEditForm) {
+      editSelectedBtn.addEventListener('click', function() {
+        const selectedIds = getSelectedShiftIds();
+        if (!selectedIds.length) {
+          return;
+        }
+
+        if (batchEditHiddenInputs) {
+          batchEditHiddenInputs.innerHTML = '';
+          selectedIds.forEach((id) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'shift_ids[]';
+            input.value = id;
+            batchEditHiddenInputs.appendChild(input);
+          });
+        }
+
+        if (batchEditCount) {
+          batchEditCount.textContent = String(selectedIds.length);
+        }
+
+        batchEditForm.reset();
+
+        const firstSelectedId = selectedIds[0];
+        const firstShiftPill = document.querySelector(`.shift-pill[data-shift-id="${firstSelectedId}"]`);
+        if (firstShiftPill) {
+          const dayInput = document.getElementById('batch-edit-day');
+          const startInput = document.getElementById('batch-edit-start');
+          const endInput = document.getElementById('batch-edit-end');
+          const instructionsInput = document.getElementById('batch-edit-instructions');
+          if (dayInput) dayInput.value = firstShiftPill.dataset.day || '';
+          if (startInput) startInput.value = firstShiftPill.dataset.start || '';
+          if (endInput) endInput.value = firstShiftPill.dataset.end || '';
+          if (instructionsInput) instructionsInput.value = firstShiftPill.dataset.instructions || '';
+        }
+
+        batchEditModal.style.display = 'flex';
+      });
+
+      batchEditForm.addEventListener('submit', function(e) {
+        const day = (document.getElementById('batch-edit-day')?.value || '').trim();
+        const start = (document.getElementById('batch-edit-start')?.value || '').trim();
+        const end = (document.getElementById('batch-edit-end')?.value || '').trim();
+        const instructions = (document.getElementById('batch-edit-instructions')?.value || '').trim();
+
+        if (!day && !start && !end && !instructions) {
+          e.preventDefault();
+          alert(window.scheduleText('Choose at least one field to update.','Wählen Sie mindestens ein Feld zum Aktualisieren aus.'));
+          return false;
+        }
+        if ((start && !end) || (!start && end)) {
+          e.preventDefault();
+          alert(window.scheduleText('Enter both a start and end time.','Geben Sie sowohl eine Start- als auch eine Endzeit ein.'));
+          return false;
+        }
+        if (start && end && end <= start) {
+          e.preventDefault();
+          alert(window.scheduleText('The end time must be after the start time.','Die Endzeit muss nach der Startzeit liegen.'));
+          return false;
+        }
+      });
+
+      document.getElementById('batch-edit-close')?.addEventListener('click', closeBatchEditModal);
+      document.getElementById('batch-edit-cancel')?.addEventListener('click', closeBatchEditModal);
+      batchEditModal.addEventListener('click', function(e) {
+        if (e.target === batchEditModal) {
+          closeBatchEditModal();
+        }
+      });
+    }
+
+    // Edit shift functionality
+    const editModal = document.getElementById('edit-shift-modal');
+    const editForm = document.getElementById('edit-shift-form');
+    const editButtons = document.querySelectorAll('.shift-edit');
+
+    const editEmployeeChips = document.getElementById('edit-shift-employee-chips');
+    const editEmployeeHidden = document.getElementById('edit-shift-employee-hidden');
+    const editEmployeePicker = document.getElementById('edit-employee-picker');
+    const editEmployeePickerList = document.getElementById('edit-employee-picker-list');
+    const editEmployeeSearch = document.getElementById('edit-employee-search');
+    const selectedEditEmployees = new Map();
+    const renderEditEmployees = () => {
+      if (!editEmployeeChips || !editEmployeeHidden) return;
+      editEmployeeChips.replaceChildren();
+      editEmployeeHidden.replaceChildren();
+      selectedEditEmployees.forEach((person, id) => {
+        const chip = document.createElement('span');
+        chip.className = 'edit-selected-employee';
+        const avatar = document.createElement('span');
+        avatar.className = 'edit-selected-avatar';
+        if (person.image) {
+          const image = document.createElement('img');
+          image.src = `/static/${person.image}`;
+          image.alt = '';
+          avatar.appendChild(image);
+        } else {
+          avatar.textContent = (person.name || '?').trim().charAt(0).toUpperCase();
+        }
+        const name = document.createElement('span');
+        name.textContent = person.name;
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'edit-selected-remove';
+        remove.textContent = '?';
+        remove.setAttribute('aria-label', `${window.scheduleText('Remove','Entfernen')} ${person.name}`);
+        remove.addEventListener('click', () => {
+          selectedEditEmployees.delete(Number(id));
+          renderEditEmployees();
+        });
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'employee_ids[]';
+        hidden.value = String(id);
+        chip.append(avatar, name, remove);
+        editEmployeeChips.appendChild(chip);
+        editEmployeeHidden.appendChild(hidden);
+      });
+    };
+    document.getElementById('edit-add-employee-toggle')?.addEventListener('click', () => {
+      if (!editEmployeePicker) return;
+      editEmployeePicker.hidden = !editEmployeePicker.hidden;
+      if (!editEmployeePicker.hidden) editEmployeeSearch?.focus();
+    });
+    editEmployeeSearch?.addEventListener('input', () => {
+      const query = editEmployeeSearch.value.trim().toLowerCase();
+      editEmployeePickerList?.querySelectorAll('[data-employee-id]').forEach((option) => {
+        option.hidden = !option.dataset.employeeName.toLowerCase().includes(query);
+      });
+    });
+    document.getElementById('edit-employee-picker-add')?.addEventListener('click', () => {
+      editEmployeePickerList?.querySelectorAll('.edit-employee-option:checked').forEach((checkbox) => {
+        const option = checkbox.closest('[data-employee-id]');
+        const id = Number(checkbox.value);
+        if (option && !selectedEditEmployees.has(id)) {
+          selectedEditEmployees.set(id, { name: option.dataset.employeeName, image: option.dataset.image || '' });
+        }
+        checkbox.checked = false;
+      });
+      renderEditEmployees();
+      if (editEmployeePicker) editEmployeePicker.hidden = true;
+    });
+
+    editButtons.forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const shiftPill = this.closest('.shift-pill') || this;
+        const shiftId = shiftPill.dataset.shiftId || this.getAttribute('data-shift-id');
+        const day = shiftPill.dataset.day || this.getAttribute('data-day');
+        const start = shiftPill.dataset.start || this.getAttribute('data-start');
+        const end = shiftPill.dataset.end || this.getAttribute('data-end');
+        const instructions = shiftPill.dataset.instructions || this.getAttribute('data-instructions');
+        selectedEditEmployees.clear();
+        let assignedPeople = [];
+        try { assignedPeople = JSON.parse(shiftPill.dataset.assignedPeople || '[]'); } catch (_err) {}
+        assignedPeople.forEach((person) => selectedEditEmployees.set(Number(person.id), { name: person.name, image: person.image || '' }));
+        if (!selectedEditEmployees.size) {
+          const fallbackId = Number(shiftPill.dataset.employeeId || this.getAttribute('data-employee-id'));
+          const fallbackOption = editEmployeePickerList?.querySelector(`[data-employee-id="${fallbackId}"]`);
+          if (fallbackOption) selectedEditEmployees.set(fallbackId, { name: fallbackOption.dataset.employeeName, image: fallbackOption.dataset.image || '' });
+        }
+        renderEditEmployees();
+        editEmployeePickerList?.querySelectorAll('.edit-employee-option').forEach((checkbox) => { checkbox.checked = false; });
+        if (editEmployeePicker) editEmployeePicker.hidden = true;
+        if (editEmployeeSearch) editEmployeeSearch.value = '';
+        if (editEmployeePickerList) editEmployeePickerList.querySelectorAll('[data-employee-id]').forEach((option) => { option.hidden = false; });
+        document.getElementById('edit-shift-id').value = shiftId;
+        document.getElementById('edit-shift-day').value = day;
+        document.getElementById('edit-shift-start').value = start;
+        document.getElementById('edit-shift-end').value = end;
+        document.getElementById('edit-shift-instructions').value = instructions || '';
+        editForm.action = '/shift/' + shiftId + '/edit';
+        editModal.style.display = 'flex';
+      });
+    });
+    document.querySelectorAll('.shift-pill').forEach((pill) => {
+      pill.addEventListener('click', (event) => {
+        if (event.target.closest('button,a,input,.shift-pill-actions')) return;
+        pill.querySelector('.shift-edit')?.click();
+      });
+    });
+    editForm?.addEventListener('submit', (event) => {
+      if (!selectedEditEmployees.size) {
+        event.preventDefault();
+        alert(window.scheduleText('Keep at least one employee assigned to this shift.','Lassen Sie mindestens eine Person diesem Einsatz zugewiesen.'));
+      }
+    });
+
+    // Close modal when clicking outside
+    if (editModal) {
+      editModal.addEventListener('click', function(e) {
+        if (e.target === editModal) {
+          editModal.style.display = 'none';
+        }
+      });
+    }
+
+    const quickAddModal = document.getElementById('quick-add-employee-modal');
+    const quickAddForm = document.getElementById('quick-add-employee-form');
+    const closeQuickAdd = () => { if (quickAddModal) quickAddModal.style.display = 'none'; };
+    quickAddForm?.addEventListener('submit', (event) => {
+      if (!quickAddForm.querySelector('input[name="employee_ids[]"]:checked')) {
+        event.preventDefault();
+        alert(window.scheduleText('Select at least one employee.','Wählen Sie mindestens eine mitarbeitende Person aus.'));
+      }
+    });
+    document.querySelectorAll('.shift-add-employee').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (!quickAddModal || !quickAddForm) return;
+        quickAddForm.action = `/shift/${button.dataset.shiftId}/assign-employee`;
+        quickAddForm.reset();
+        quickAddModal.style.display = 'flex';
+        document.querySelector('#quick-add-employee-form input[type="checkbox"]')?.focus();
+      });
+    });
+    document.getElementById('quick-add-close')?.addEventListener('click', closeQuickAdd);
+    document.getElementById('quick-add-cancel')?.addEventListener('click', closeQuickAdd);
+    quickAddModal?.addEventListener('click', (event) => { if (event.target === quickAddModal) closeQuickAdd(); });
+
+    // Resize the sticky employee column while keeping the week within the viewport.
+    const employeeResizers = document.querySelectorAll('.employee-column-resizer');
+    const scheduleTables = document.querySelectorAll('.schedule-table');
+    if (employeeResizers.length && scheduleTables.length) {
+      const widthKey = 'schedule-employee-column-width';
+      const applyEmployeeWidth = (width) => {
+        let savedWidth=width;
+        scheduleTables.forEach((table)=>{
+          const containerWidth = table.parentElement?.getBoundingClientRect().width || table.getBoundingClientRect().width;
+          const minWidth = Math.min(120, containerWidth * 0.25);
+          const maxWidth = Math.max(minWidth, Math.min(420, containerWidth * 0.45));
+          const bounded = Math.max(minWidth, Math.min(maxWidth, width));
+          savedWidth=bounded;
+          table.style.setProperty('--employee-column-width', `${bounded}px`);
+        });
+        try { localStorage.setItem(widthKey, String(Math.round(savedWidth))); } catch (_err) {}
+      };
+      try {
+        const savedWidth = Number(localStorage.getItem(widthKey));
+        if (savedWidth > 0) applyEmployeeWidth(savedWidth);
+      } catch (_err) {}
+      employeeResizers.forEach((employeeResizer)=>{
+        let resizeStartX = 0;
+        let resizeStartWidth = 0;
+        employeeResizer.addEventListener('pointerdown', (event) => {
+          event.preventDefault();
+          resizeStartX = event.clientX;
+          resizeStartWidth = employeeResizer.parentElement.getBoundingClientRect().width;
+          document.body.classList.add('employee-column-resizing');
+          employeeResizer.setPointerCapture(event.pointerId);
+        });
+        employeeResizer.addEventListener('pointermove', (event) => {
+          if (!employeeResizer.hasPointerCapture(event.pointerId)) return;
+          applyEmployeeWidth(resizeStartWidth + event.clientX - resizeStartX);
+        });
+        const stopResize = (event) => {
+          if (employeeResizer.hasPointerCapture(event.pointerId)) employeeResizer.releasePointerCapture(event.pointerId);
+          document.body.classList.remove('employee-column-resizing');
+        };
+        employeeResizer.addEventListener('pointerup', stopResize);
+        employeeResizer.addEventListener('pointercancel', stopResize);
+        employeeResizer.addEventListener('keydown', (event) => {
+          if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+          event.preventDefault();
+          const currentWidth = employeeResizer.parentElement.getBoundingClientRect().width;
+          applyEmployeeWidth(currentWidth + (event.key === 'ArrowRight' ? 16 : -16));
+        });
+      });
+    }
+
+    // Drag and drop shifts between days
+    let draggedShiftId = null;
+    let draggedFromEmployeeId = null;
+
+    document.querySelectorAll('.shift-pill[draggable="true"]').forEach((pill) => {
+      pill.addEventListener('dragstart', (e) => {
+        draggedShiftId = pill.getAttribute('data-shift-id');
+        draggedFromEmployeeId = pill.getAttribute('data-employee-id') || null;
+        pill.classList.add('dragging');
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', draggedShiftId || '');
+        }
+      });
+
+      pill.addEventListener('dragend', () => {
+        pill.classList.remove('dragging');
+        document.querySelectorAll('.schedule-drop-target').forEach((cell) => {
+          cell.classList.remove('schedule-drop-target');
+        });
+        draggedShiftId = null;
+        draggedFromEmployeeId = null;
+      });
+    });
+
+    document.querySelectorAll('.schedule-table tbody td[data-day]').forEach((cell) => {
+      cell.addEventListener('dragover', (e) => {
+        if (!draggedShiftId) {
+          return;
+        }
+        const targetEmployeeId = cell.getAttribute('data-employee-id') || null;
+        if (!targetEmployeeId) {
+          return;
+        }
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = 'move';
+        }
+        cell.classList.add('schedule-drop-target');
+      });
+
+      cell.addEventListener('dragleave', () => {
+        cell.classList.remove('schedule-drop-target');
+      });
+
+      cell.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        cell.classList.remove('schedule-drop-target');
+        if (!draggedShiftId) {
+          return;
+        }
+
+        const targetDay = cell.getAttribute('data-day');
+        const targetEmployeeId = cell.getAttribute('data-employee-id') || null;
+        if (!targetDay || !targetEmployeeId) {
+          return;
+        }
+
+        try {
+          const resp = await fetch(`/shift/${draggedShiftId}/move`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ day: targetDay, employee_id: targetEmployeeId }).toString(),
+          });
+          const payload = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            const backendMessage = payload && payload.error ? String(payload.error) : '';
+            throw new Error(backendMessage || `Server returned ${resp.status}`);
+          }
+          if (payload.notification) alert(payload.notification);
+          window.location.reload();
+        } catch (err) {
+          console.error(err);
+          alert((err && err.message) ? err.message : window.scheduleText('Could not move the shift. Please try again.','Der Einsatz konnte nicht verschoben werden. Bitte versuchen Sie es erneut.'));
+        }
+      });
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
