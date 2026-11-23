@@ -317,7 +317,7 @@ def create_service_portal_blueprint(
         target_url = f"{configured}{url_for('ops.public_resources')}" if configured else ""
         body = """
 <div class="top"><div><h1>Public document QR code</h1><p class="muted">Download this QR code and place it on your PDF documents. It links to the public document library.</p></div><a href="{{ url_for('ops.admin_public_documents') }}">Manage documents</a></div>
-{% if target_url %}<div class="card p-4 text-center"><p><strong>QR destination:</strong> <a href="{{ target_url }}">{{ target_url }}</a></p><img class="mx-auto" style="width:280px;height:280px;object-fit:contain" src="{{ url_for('ops.admin_qr_png') }}" alt="QR code for the public document library"><p class="mt-3 mb-0"><a class="btn btn-primary" href="{{ url_for('ops.admin_qr_png', download=1) }}">Download QR code</a></p></div>{% else %}<div class="alert alert-warning">Set <code>PUBLIC_APP_URL</code> in the app's <code>.env</code> to the live HTTPS base URL, restart the app, then download the QR code. For example: <code>PUBLIC_APP_URL=https://your-domain.example</code></div>{% endif %}
+{% if target_url %}<div class="card p-4 text-center"><p><strong>QR destination:</strong> <a href="{{ target_url }}">{{ target_url }}</a></p><img class="mx-auto" style="width:280px;height:280px;object-fit:contain" src="{{ url_for('ops.admin_qr_png') }}" alt="QR code for the public document library"><div class="d-flex justify-content-center flex-wrap gap-2 mt-3"><a class="btn btn-primary" href="{{ url_for('ops.admin_qr_png', download=1) }}"><i class="bi bi-image me-1"></i>Download PNG</a><a class="btn btn-outline-primary" href="{{ url_for('ops.admin_qr_pdf') }}"><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</a></div></div>{% else %}<div class="alert alert-warning">Set <code>PUBLIC_APP_URL</code> in the app's <code>.env</code> to the live HTTPS base URL, restart the app, then download the QR code. For example: <code>PUBLIC_APP_URL=https://your-domain.example</code></div>{% endif %}
 """
         return _render("QR code", body, target_url=target_url, show_admin_sidebar=True, active_page="qr")
 
@@ -351,6 +351,130 @@ def create_service_portal_blueprint(
             output = io.BytesIO(renderSVG.drawToString(drawing).encode("utf-8"))
             return send_file(output, mimetype="image/svg+xml", as_attachment=download, download_name="putzelf-public-resources-qr.svg")
 
+    @bp.route("/admin/resources/qr.pdf")
+    @login_required
+    def admin_qr_pdf():
+        configured = (public_app_url or "").strip().rstrip("/")
+        parsed = urlparse(configured)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            abort(503, "Configure PUBLIC_APP_URL to the live application URL first.")
+        if not reportlab_available or pdf_canvas is None:
+            abort(503, "Install ReportLab to generate a PDF QR code.")
+        target_url = f"{configured}{url_for('ops.public_resources')}"
+        try:
+            from reportlab.graphics import renderPDF
+            from reportlab.graphics.barcode.qr import QrCodeWidget
+            from reportlab.graphics.shapes import Drawing
+        except ImportError:
+            abort(503, "ReportLab QR rendering support is unavailable on this server.")
+
+        from reportlab.lib.colors import HexColor
+
+        qr = QrCodeWidget(target_url)
+        x1, y1, x2, y2 = qr.getBounds()
+        qr_width, qr_height = x2 - x1, y2 - y1
+        output = io.BytesIO()
+        pdf = pdf_canvas.Canvas(output, pagesize=page_size)
+        page_width, page_height = page_size
+        primary = HexColor("#014D4E")
+        primary_dark = HexColor("#003C3D")
+        pale = HexColor("#EAF4F3")
+        ink = HexColor("#193238")
+        muted = HexColor("#66797C")
+        margin = 30
+
+        pdf.setTitle("Putzelf - QR-Code Dokumentenbibliothek")
+        pdf.setAuthor("Putzelf")
+        pdf.setFillColor(HexColor("#F4F8F8"))
+        pdf.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+
+        # Branded header panel in the app's dark teal primary color.
+        header_y = page_height - 207
+        pdf.setFillColor(primary)
+        pdf.roundRect(margin, header_y, page_width - 2 * margin, 181, 18, fill=1, stroke=0)
+        pdf.setFillColor(primary_dark)
+        pdf.circle(page_width - 74, page_height - 58, 42, fill=1, stroke=0)
+
+        # Reuse the existing Putzelf logo when it is present in the deployment.
+        logo_path = os.path.join(os.path.dirname(__file__), "static", "logo.png")
+        logo_x, logo_y = 53, page_height - 101
+        pdf.setFillColor(HexColor("#FFFFFF"))
+        pdf.roundRect(logo_x, logo_y, 88, 60, 10, fill=1, stroke=0)
+        if os.path.isfile(logo_path):
+            pdf.drawImage(
+                logo_path,
+                logo_x + 3,
+                logo_y + 3,
+                width=82,
+                height=54,
+                preserveAspectRatio=True,
+                anchor="c",
+                mask="auto",
+            )
+        pdf.setFillColor(HexColor("#FFFFFF"))
+        pdf.setFont("Helvetica-Bold", 22)
+        pdf.drawString(153, page_height - 68, "Putzelf")
+        pdf.setFillColor(HexColor("#CDE5E2"))
+        pdf.setFont("Helvetica-Bold", 8)
+        pdf.drawString(53, page_height - 126, "\u00d6FFENTLICHE DOKUMENTENBIBLIOTHEK")
+        pdf.setFillColor(HexColor("#FFFFFF"))
+        pdf.setFont("Helvetica-Bold", 17)
+        pdf.drawString(53, page_height - 151, "Sicherheits- und Arbeitsunterlagen")
+        pdf.setFillColor(HexColor("#D9EAE8"))
+        pdf.setFont("Helvetica", 9.5)
+        pdf.drawString(53, page_height - 172, "Wichtige Informationen f\u00fcr unsere Standorte - direkt am Smartphone.")
+
+        # Compact white content card with a large, vector-sharp QR code.
+        card_x = margin
+        card_y = 83
+        card_w = page_width - 2 * margin
+        card_h = page_height - 235 - card_y
+        pdf.setFillColor(HexColor("#FFFFFF"))
+        pdf.roundRect(card_x, card_y, card_w, card_h, 18, fill=1, stroke=0)
+        pdf.setFillColor(primary)
+        pdf.setFont("Helvetica-Bold", 14)
+        pdf.drawCentredString(page_width / 2, card_y + card_h - 43, "Dokumente f\u00fcr Ihren Arbeitsalltag")
+        pdf.setFillColor(muted)
+        pdf.setFont("Helvetica", 9.5)
+        pdf.drawCentredString(page_width / 2, card_y + card_h - 64, "Scannen Sie den QR-Code mit der Handykamera, um die aktuelle")
+        pdf.drawCentredString(page_width / 2, card_y + card_h - 78, "Dokumentenbibliothek zu \u00f6ffnen.")
+
+        qr_size = min(page_width, page_height) * 0.34
+        scale = qr_size / max(qr_width, qr_height)
+        qr_x = (page_width - qr_size) / 2
+        qr_y = card_y + 135
+        drawing = Drawing(
+            qr_size,
+            qr_size,
+            transform=[scale, 0, 0, scale, -x1 * scale, -y1 * scale],
+        )
+        drawing.add(qr)
+        renderPDF.draw(drawing, pdf, qr_x, qr_y)
+
+        callout_x = 64
+        callout_y = card_y + 29
+        callout_w = page_width - 2 * callout_x
+        pdf.setFillColor(pale)
+        pdf.roundRect(callout_x, callout_y, callout_w, 58, 11, fill=1, stroke=0)
+        pdf.setFillColor(primary)
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawCentredString(page_width / 2, callout_y + 36, "KEIN LOGIN ERFORDERLICH")
+        pdf.setFillColor(ink)
+        pdf.setFont("Helvetica", 9)
+        pdf.drawCentredString(page_width / 2, callout_y + 19, "Freigegebene Dokumente jederzeit abrufen.")
+
+        pdf.setFillColor(muted)
+        pdf.setFont("Helvetica", 8)
+        pdf.drawCentredString(page_width / 2, 49, "putzelf.com | +43 676 6300167 | office@putzelf.com")
+        pdf.save()
+        output.seek(0)
+        return send_file(
+            output,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name="elfs-plan-public-documents-qr.pdf",
+        )
+
     @bp.route("/admin/inspection-areas", methods=["GET", "POST"])
     @manager_required
     def admin_inspection_areas():
@@ -370,7 +494,41 @@ def create_service_portal_blueprint(
                 if area_id:
                     area = db.query(SiteInspectionArea).filter_by(id=area_id, site_id=selected_site.id).first()
                 name = (request.form.get("name") or "").strip()[:160]
-                if action in {"add", "add_suggestion"}:
+                if action == "add_all_suggestions":
+                    existing_names = {
+                        row[0].casefold()
+                        for row in db.query(SiteInspectionArea.name).filter_by(site_id=selected_site.id).all()
+                    }
+                    missing_suggestions = [
+                        suggestion for suggestion in suggested_areas
+                        if suggestion.casefold() not in existing_names
+                    ]
+                    if missing_suggestions:
+                        highest = db.query(func.max(SiteInspectionArea.sort_order)).filter_by(site_id=selected_site.id).scalar() or 0
+                        for offset, suggestion in enumerate(missing_suggestions, start=1):
+                            db.add(SiteInspectionArea(
+                                site_id=selected_site.id,
+                                name=suggestion,
+                                sort_order=highest + offset,
+                                is_active=True,
+                            ))
+                        db.commit()
+                        flash("All missing suggested areas have been added.", "success")
+                    else:
+                        flash("All suggestions are already on this checklist.", "info")
+                elif action == "archive_all":
+                    active_areas = db.query(SiteInspectionArea).filter_by(
+                        site_id=selected_site.id,
+                        is_active=True,
+                    ).all()
+                    for active_area in active_areas:
+                        active_area.is_active = False
+                    if active_areas:
+                        db.commit()
+                        flash("All active areas for this site were archived.", "success")
+                    else:
+                        flash("There are no active areas to archive.", "info")
+                elif action in {"add", "add_suggestion"}:
                     if action == "add_suggestion" and name not in suggested_areas:
                         abort(400)
                     duplicate = db.query(SiteInspectionArea.id).filter(
@@ -426,8 +584,9 @@ def create_service_portal_blueprint(
   <header class="inspection-editor-header"><div><a class="inspection-editor-back" href="{{ url_for('ops.admin_inspection_areas') }}"><i class="bi bi-arrow-left"></i> All sites</a><span class="inspection-index-eyebrow"><i class="bi bi-clipboard2-check"></i> Site checklist</span><h1>{{ selected_site.profile_company_name or selected_site.name }}</h1><p>Choose the areas that apply to this site. Active areas appear in each new monthly inspection.</p></div><a class="btn btn-outline-secondary" href="{{ url_for('admin_sites') }}"><i class="bi bi-building"></i> Site details</a></header>
   <section class="inspection-editor-stats" aria-label="Checklist summary"><article><span class="is-ready"><i class="bi bi-check2-circle"></i></span><div><small>Active areas</small><strong>{{ active_area_count }}</strong></div></article><article><span><i class="bi bi-archive"></i></span><div><small>Archived</small><strong>{{ archived_area_count }}</strong></div></article><article><span class="is-suggestion"><i class="bi bi-lightbulb"></i></span><div><small>Suggestions available</small><strong>{{ available_suggestion_count }}</strong></div></article></section>
   <section class="inspection-editor-add"><div class="inspection-editor-section-title"><span class="inspection-editor-section-icon"><i class="bi bi-plus-lg"></i></span><div><h2>Add an inspection area</h2><p>Create a custom area for this site.</p></div></div><form method="post" class="inspection-area-add-form"><input type="hidden" name="site_id" value="{{ selected_site.id }}"><input type="hidden" name="action" value="add"><label class="visually-hidden" for="new-inspection-area">Area name</label><input id="new-inspection-area" class="form-control" name="name" maxlength="160" placeholder="e.g. Loading bay, stairwell, or patient rooms" required><button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg"></i> Add area</button></form></section>
-  <section class="inspection-editor-suggestions"><div class="inspection-editor-section-title"><span class="inspection-editor-section-icon is-soft"><i class="bi bi-stars"></i></span><div><h2>Common suggestions</h2><p>Add only what applies. You can rename areas below at any time.</p></div></div><div class="inspection-suggestion-list">{% for suggestion in suggested_areas %}{% if (suggestion|lower) not in existing_area_names %}<form method="post"><input type="hidden" name="site_id" value="{{ selected_site.id }}"><input type="hidden" name="action" value="add_suggestion"><input type="hidden" name="name" value="{{ suggestion }}"><button type="submit" class="inspection-suggestion-chip"><i class="bi bi-plus-circle"></i>{{ suggestion }}</button></form>{% endif %}{% endfor %}{% if not available_suggestion_count %}<span class="inspection-suggestions-done"><i class="bi bi-check2"></i> All suggestions are already on this checklist.</span>{% endif %}</div></section>
+  <section class="inspection-editor-suggestions"><div class="inspection-editor-suggestions-head"><div class="inspection-editor-section-title"><span class="inspection-editor-section-icon is-soft"><i class="bi bi-stars"></i></span><div><h2>Common suggestions</h2><p>Add only what applies. You can rename areas below at any time.</p></div></div>{% if available_suggestion_count %}<form method="post" class="inspection-editor-bulk-form"><input type="hidden" name="site_id" value="{{ selected_site.id }}"><input type="hidden" name="action" value="add_all_suggestions"><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-plus-circle"></i> Add all missing suggestions</button></form>{% endif %}</div><div class="inspection-suggestion-list">{% for suggestion in suggested_areas %}{% if (suggestion|lower) not in existing_area_names %}<form method="post"><input type="hidden" name="site_id" value="{{ selected_site.id }}"><input type="hidden" name="action" value="add_suggestion"><input type="hidden" name="name" value="{{ suggestion }}"><button type="submit" class="inspection-suggestion-chip"><i class="bi bi-plus-circle"></i>{{ suggestion }}</button></form>{% endif %}{% endfor %}{% if not available_suggestion_count %}<span class="inspection-suggestions-done"><i class="bi bi-check2"></i> All suggestions are already on this checklist.</span>{% endif %}</div></section>
   <section class="inspection-editor-list"><div class="inspection-editor-list-head"><div class="inspection-editor-section-title"><span class="inspection-editor-section-icon"><i class="bi bi-list-check"></i></span><div><h2>Checklist areas</h2><p>Rename, archive, or restore areas for this site.</p></div></div><div class="inspection-editor-list-tools"><label class="inspection-area-search"><i class="bi bi-search"></i><input id="inspection-area-search" type="search" placeholder="Search areas" aria-label="Search areas"></label><div class="inspection-area-filters" role="group" aria-label="Filter checklist areas"><button type="button" data-area-filter="all" class="is-active" aria-pressed="true">All <span>{{ areas|length }}</span></button><button type="button" data-area-filter="active" aria-pressed="false">Active <span>{{ active_area_count }}</span></button><button type="button" data-area-filter="archived" aria-pressed="false">Archived <span>{{ archived_area_count }}</span></button></div></div></div>
+    {% if active_area_count %}<div class="inspection-editor-bulk-actions"><form method="post" class="inspection-editor-bulk-form" onsubmit="return confirm('Archive all active inspection areas for this site? You can restore them later.')"><input type="hidden" name="site_id" value="{{ selected_site.id }}"><input type="hidden" name="action" value="archive_all"><button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-archive"></i> Archive all active</button></form></div>{% endif %}
     <div class="inspection-area-rows" id="inspection-area-rows">{% for area in areas %}<article class="inspection-area-row" data-area-status="{{ 'active' if area.is_active else 'archived' }}" data-area-name="{{ area.name|lower|e }}"><span class="inspection-area-row-icon {{ 'is-active' if area.is_active else '' }}"><i class="bi {{ 'bi-check2' if area.is_active else 'bi-archive' }}"></i></span><form method="post" class="inspection-area-rename-form"><input type="hidden" name="site_id" value="{{ selected_site.id }}"><input type="hidden" name="area_id" value="{{ area.id }}"><input type="hidden" name="action" value="rename"><label class="visually-hidden" for="inspection-area-{{ area.id }}">Area name</label><input id="inspection-area-{{ area.id }}" class="form-control" name="name" value="{{ area.name }}" maxlength="160" required><span class="inspection-area-status {{ 'is-active' if area.is_active else '' }}">{{ 'Active' if area.is_active else 'Archived' }}</span><button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-check2"></i> Save</button></form><form method="post" class="inspection-area-state-form"><input type="hidden" name="site_id" value="{{ selected_site.id }}"><input type="hidden" name="area_id" value="{{ area.id }}"><input type="hidden" name="action" value="{{ 'archive' if area.is_active else 'restore' }}"><button class="btn btn-sm {{ 'btn-light' if area.is_active else 'btn-outline-primary' }}" type="submit"><i class="bi {{ 'bi-archive' if area.is_active else 'bi-arrow-counterclockwise' }}"></i> {{ 'Archive' if area.is_active else 'Restore' }}</button></form></article>{% else %}<div class="inspection-area-list-empty"><i class="bi bi-clipboard2-plus"></i><strong>No inspection areas yet</strong><span>Add a custom area or choose from the suggestions above.</span></div>{% endfor %}</div><div class="inspection-area-filter-empty" id="inspection-area-filter-empty" hidden>No checklist areas match this search.</div>
   </section>
 </div>
