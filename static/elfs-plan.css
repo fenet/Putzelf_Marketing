@@ -434,3 +434,70 @@ body:has(.scheduler-shell) { --accent:#014D4E; --btn-grad-accent:linear-gradient
   .app-content { padding-left: 1rem !important; padding-right: 1rem !important; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+
+/* Site-manager PWA controls and shared narrow-screen layout. */
+.ep-global-topbar-actions { display:flex; align-items:center; justify-content:flex-end; gap:.45rem; min-width:0; }
+.ep-pwa-install-button { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; min-height:30px; padding:.2rem .6rem; color:#fff; border:1px solid rgba(220,246,242,.28); border-radius:8px; background:rgba(255,255,255,.11); font-family:inherit; font-size:.7rem; font-weight:650; line-height:1; cursor:pointer; }
+.ep-pwa-install-button:hover { background:rgba(255,255,255,.2); }
+.ep-pwa-install-button:focus-visible { outline:2px solid #bce8e2; outline-offset:2px; }
+.ep-pwa-help { width:min(420px,calc(100vw - 2rem)); max-width:none; padding:0; overflow:hidden; border:1px solid #dbe4e8; border-radius:18px; color:var(--ep-ink); background:#fff; box-shadow:0 24px 75px rgba(19,42,53,.22); }
+.ep-pwa-help::backdrop { background:rgba(17,33,44,.46); backdrop-filter:blur(2px); }
+.ep-pwa-help-card { display:grid; justify-items:center; gap:.6rem; padding:1.5rem; text-align:center; }
+.ep-pwa-help-icon { display:grid; place-items:center; width:48px; height:48px; border-radius:15px; color:#014D4E; background:#e7f2f1; font-size:1.25rem; }
+.ep-pwa-help-card h2 { margin:0; font-size:1.15rem; }
+.ep-pwa-help-card p { color:var(--ep-muted); }
+@media(max-width:760px) {
+  html,body { max-width:100%; overflow-x:clip; }
+  .app-shell,.app-shell > main,.app-shell > .main,.main,.main-shell,.content-shell,.ep-portal-shell,.ep-portal-shell > main,.wrap { min-width:0; max-width:100%; }
+  .ep-global-topbar { min-height:44px; height:44px; gap:.35rem; padding-inline:10px; }
+  .ep-global-brand { gap:.38rem; }
+  .ep-global-brand-mark { width:27px; height:27px; padding:2px; border-radius:8px; }
+  .ep-global-brand-name { font-size:.84rem; }
+  .ep-global-topbar-actions { gap:.28rem; }
+  .lang-switcher { flex:none; }
+  .lang-switcher a { min-width:36px; min-height:27px; gap:.2rem; padding-inline:.3rem; font-size:.64rem; }
+  .ep-pwa-install-button { width:34px; min-height:30px; padding:.2rem; }
+  .ep-pwa-install-button span { display:none; }
+  .ep-sidebar-mobile-toggle { top:calc(44px + .55rem); left:.55rem; width:38px; height:38px; }
+  .ep-admin-sidebar { top:44px; height:calc(100dvh - 44px); }
+  .ep-sidebar-scrim { inset:44px 0 0; }
+  body:has(.ep-global-topbar) .app-header,body:has(.ep-global-topbar) .profile-header { top:44px; }
+  .app-shell:has(.ep-admin-sidebar) > main,.app-shell:has(.ep-admin-sidebar) > .main,.ep-portal-shell > main { padding-top:3.6rem; }
+  .main,.main-shell { padding-inline:.7rem!important; }
+  .content-shell { padding:.7rem!important; }
+  .page-header,.employee-directory-header,.lead-page-header,.inspection-index-header { gap:.7rem; }
+  .page-header-actions,.toolbar-actions,.inspection-index-header-actions { flex-wrap:wrap; }
+  .page-header-actions > *, .toolbar-actions > * { min-width:0; }
+  .table-responsive,.table-wrap,.schedule-table-wrap,.data-table-wrap { max-width:100%; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; }
+  .table-responsive > table,.table-wrap > table { margin-bottom:0; }
+  .form-control,.form-select,select,textarea { max-width:100%; }
+  .btn { min-height:38px; }
+  .modal-dialog,.modal-content,.employee-modal,.client-modal,.schedule-create-modal { max-width:calc(100vw - 1rem); }
+  .ep-portal-shell { grid-template-columns:minmax(0,1fr)!important; }
+  .ep-portal-shell .wrap { padding:1rem .75rem 1.5rem; }
+  .ep-portal-shell .top { align-items:flex-start; flex-wrap:wrap; gap:.7rem; }
+  .ep-portal-shell main > nav { display:flex; flex-wrap:wrap; gap:.35rem; }
+  .ep-portal-shell main > nav a { margin:0; padding:.4rem .55rem; border-radius:8px; background:#fff; }
+  .ep-portal-shell .card { min-width:0; padding:1rem!important; }
+  .ep-portal-shell .list-group-item { align-items:flex-start!important; flex-direction:column; gap:.7rem!important; }
+  .ep-portal-shell .list-group-item > .d-flex { width:100%; flex-wrap:wrap; }
+  .ep-portal-shell .list-group-item > .d-flex .btn { flex:1 1 135px; justify-content:center; }
+  .profile-header,.profile-header-actions,.profile-actions { min-width:0; }
+  .profile-header-actions { flex-wrap:wrap; }
+  .profile-header-actions .btn { flex:0 0 auto; }
+  .profile-tabs { max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; }
+  .field-grid,.credential-fields,.form-grid,.invoice-form-grid { grid-template-columns:minmax(0,1fr)!important; }
+  .employee-modal-backdrop,.client-modal-backdrop { align-items:flex-end; padding:.35rem; }
+  .employee-modal,.client-modal { width:100%; max-height:calc(100dvh - .7rem); border-radius:16px 16px 10px 10px; }
+  .employee-modal-footer,.client-modal-footer { gap:.45rem; }
+  .employee-modal-footer .btn,.client-modal-footer .btn { flex:1 1 auto; }
+}
+@media(max-width:390px) {
+  .ep-global-brand-name { font-size:.76rem; }
+  .ep-global-brand-mark { width:24px; height:24px; }
+  .lang-switcher a { min-width:32px; }
+  .inspection-checklist-quick-actions { grid-template-columns:1fr; }
+  .inspection-checklist-savebar { align-items:stretch; flex-direction:column; }
+  .inspection-checklist-savebar > span { max-width:none; }
+  .inspection-checklist-savebar .btn { width:100%; justify-content:center; }
+}

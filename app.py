@@ -62,7 +62,7 @@ ADMIN_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Elf's Plan â€” {{ i18n.financial_dashboard }}</title>
+  <title>Elf's Plan — {{ i18n.financial_dashboard }}</title>
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -590,7 +590,7 @@ ADMIN_EMPLOYEES_TEMPLATE = """
       <div class="employee-modal-body">
         <section class="employee-form-section"><h3>Employee</h3><div class="row g-3">
           <div class="col-md-6"><label class="form-label" for="employee-name">Full name *</label><input class="form-control" id="employee-name" name="name" required></div>
-          <div class="col-md-6"><label class="form-label" for="employee-role">Role / job title</label><input class="form-control" id="employee-role" name="role" placeholder="e.g. Team lead"><div class="form-text">The employeeâ€™s specific job title.</div></div>
+          <div class="col-md-6"><label class="form-label" for="employee-role">Role / job title</label><input class="form-control" id="employee-role" name="role" placeholder="e.g. Team lead"><div class="form-text">The employee’s specific job title.</div></div>
           <div class="col-md-6"><label class="form-label" for="employee-branch">Branch office</label><select class="form-select" id="employee-branch" name="branch"><option value="Wien">Wien</option><option value="Graz">Graz</option></select></div>
           <div class="col-md-6"><label class="form-label" for="employee-status">Employee status</label><select class="form-select" id="employee-status" name="worker_status"><option value="active">Active</option><option value="passive">Passive</option></select></div>
           <div class="col-md-6"><label class="form-label" for="employee-photo">Profile photo</label><input class="form-control" type="file" id="employee-photo" name="profile_image" accept="image/png,image/jpeg,image/gif,image/webp,image/heic"></div>
@@ -707,7 +707,7 @@ ADMIN_SITES_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing â€” StandortÃ¼bersicht</title>
+  <title>Putzelf Marketing — Standortübersicht</title>
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -868,6 +868,40 @@ ADMIN_SITES_TEMPLATE = """
     .site-status-button.is-active { color:#fff; background:#16865f; }
     .site-status-button.is-inactive { color:#fff; background:#dc4545; }
     .site-status-button:hover { filter:brightness(.94); }
+    .site-directory-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:0 0 .85rem; }
+    .site-heading { display:flex; align-items:center; gap:.8rem; min-width:0; }
+    .site-heading-mark { width:42px; height:42px; display:grid; place-items:center; flex:none; border:1px solid #c8dfdd; border-radius:13px; color:#014D4E; background:linear-gradient(145deg,#eaf4f3,#dceceb); font-size:1.15rem; }
+    .site-heading-copy { min-width:0; }
+    .site-heading-copy .eyebrow { margin-bottom:.08rem; }
+    .site-heading-copy h1 { margin:0; color:#1d2d44; font-size:1.3rem; font-weight:720; letter-spacing:-.035em; }
+    .site-heading-copy p { margin:.12rem 0 0; color:#718096; font-size:.8rem; }
+    .site-count-pill { display:inline-flex; align-items:center; gap:.35rem; margin-left:.45rem; padding:.25rem .55rem; border:1px solid #e1e8f2; border-radius:999px; color:#52617a; background:#fff; font-size:.73rem; font-weight:650; white-space:nowrap; }
+    .site-directory-header > .btn { min-height:38px; padding:.48rem .8rem; white-space:nowrap; }
+    .site-status-tabs { display:flex; gap:1.35rem; align-items:center; min-height:43px; padding:0 .45rem; margin:0 0 .65rem; border-bottom:1px solid #e2e8f0; overflow-x:auto; }
+    .site-status-tab { position:relative; display:inline-flex; align-items:center; gap:.42rem; flex:none; height:43px; padding:.3rem .1rem; border:0; color:#68758a; font-size:.89rem; font-weight:600; text-decoration:none; white-space:nowrap; }
+    .site-status-tab:hover { color:#014D4E; text-decoration:none; }
+    .site-status-tab.active { color:#014D4E; }
+    .site-status-tab.active::after { position:absolute; right:0; bottom:-1px; left:0; height:3px; content:""; border-radius:3px 3px 0 0; background:#014D4E; }
+    .site-status-tab-count { color:#9aa5b5; font-size:.72rem; font-weight:600; }
+    .site-filter-toolbar { display:flex; align-items:center; gap:.45rem; margin:0 0 .8rem; padding:.48rem; border:1px solid #e2e8f0; border-radius:13px; background:#fff; box-shadow:0 5px 16px rgba(20,38,67,.045); }
+    .site-search-box { position:relative; display:flex; align-items:center; flex:1 1 260px; min-width:180px; }
+    .site-search-box > i { position:absolute; left:.72rem; color:#8190a6; pointer-events:none; }
+    .site-search-box .form-control { height:36px; padding-left:2.15rem; border:1px solid #e7ecf3; border-radius:9px; background:#f9fbfd; box-shadow:none; font-size:.83rem; }
+    .site-filter-toolbar .form-select { flex:0 1 185px; min-width:145px; height:36px; border:1px solid #e7ecf3; border-radius:9px; background-color:#fff; box-shadow:none; font-size:.81rem; }
+    .site-coverage-chip { display:inline-flex; align-items:center; gap:.35rem; min-height:36px; padding:.35rem .55rem; border:1px solid #c8dfdd; border-radius:9px; color:#014D4E; background:#f1f8f7; font-size:.76rem; font-weight:650; white-space:nowrap; }
+    .site-coverage-chip a { color:inherit; text-decoration:none; }
+    .site-add-filter { position:relative; flex:none; }
+    .site-add-filter > summary { display:inline-flex; align-items:center; gap:.4rem; min-height:36px; padding:.42rem .65rem; border:1px solid transparent; border-radius:9px; color:#68758a; background:transparent; cursor:pointer; font-size:.81rem; font-weight:600; list-style:none; white-space:nowrap; }
+    .site-add-filter > summary::-webkit-details-marker { display:none; }
+    .site-add-filter[open] > summary { border-color:#dce8e7; color:#014D4E; background:#f1f8f7; }
+    .site-add-filter-menu { position:absolute; top:calc(100% + 7px); right:0; z-index:30; display:grid; gap:.2rem; width:220px; padding:.4rem; border:1px solid #e1e7ef; border-radius:11px; background:#fff; box-shadow:0 14px 32px rgba(19,35,60,.14); }
+    .site-add-filter-menu a { padding:.55rem .6rem; border-radius:7px; color:#48566d; font-size:.81rem; text-decoration:none; }
+    .site-add-filter-menu a:hover { color:#014D4E; background:#f1f8f7; }
+    .site-filter-toolbar .btn { min-height:36px; padding:.42rem .68rem; font-size:.8rem; }
+    .site-filter-clear { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border:1px solid #e7ecf3; border-radius:9px; color:#77849a; background:#fff; text-decoration:none; }
+    .site-filter-clear:hover { color:#b42318; border-color:#f2c9c5; background:#fff8f7; }
+    @media(max-width:700px) { .site-directory-header { align-items:flex-start; } .site-filter-toolbar { align-items:stretch; flex-wrap:wrap; } .site-search-box { flex:1 1 100%; } .site-filter-toolbar .form-select { flex:1 1 calc(50% - .4rem); min-width:0; } .site-filter-toolbar > .btn-primary { flex:1 1 auto; } .site-add-filter { flex:1 1 auto; } .site-add-filter > summary { justify-content:center; width:100%; border-color:#e7ecf3; } }
+    @media(max-width:600px) { .site-directory-header { gap:.5rem; } .site-heading-mark { width:36px; height:36px; border-radius:11px; } .site-heading-copy h1 { font-size:1.15rem; } .site-directory-header > .btn { padding:.42rem .6rem; font-size:.78rem; } }
     .btn { min-height:40px; padding:.48rem .8rem; border-radius:10px; font-size:.85rem; box-shadow:0 2px 7px rgba(25,39,61,.06); }
     .btn-sm { min-height:34px; padding:.35rem .6rem; border-radius:9px; font-size:.78rem; }
     .btn-primary,.btn-outline-primary { color:#fff; border-color:#014D4E; background-image:linear-gradient(135deg,#014D4E,#087f7d); box-shadow:0 4px 10px rgba(1,77,78,.17); }
@@ -950,28 +984,24 @@ ADMIN_SITES_TEMPLATE = """
           </div>
         {% endif %}
       {% endwith %}
-      <header class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
-        <div>
-          <div class="badge-soft mb-2">Client database</div>
-          <h1 class="h3 mb-1 text-dark">Manage clients</h1>
-          <p class="text-secondary mb-0">{{ filtered_sites }} clients shown &middot; {{ total_sites }} total &middot; {{ inactive_sites }} inactive</p>
-        </div>
-        <button type="button" class="btn btn-primary" id="open-client-create"><i class="bi bi-plus-circle me-1"></i> Add client</button>
+      <header class="site-directory-header">
+        <div class="site-heading"><span class="site-heading-mark"><i class="bi bi-buildings-fill" aria-hidden="true"></i></span><div class="site-heading-copy"><div class="eyebrow">Site directory</div><h1>Site database</h1><p>Manage client sites and service locations <span class="site-count-pill"><i class="bi bi-buildings" aria-hidden="true"></i>{{ filtered_sites }} / {{ total_sites }}</span></p></div></div>
+        <button type="button" class="btn btn-primary" id="open-client-create"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Add site</button>
       </header>
-      <section class="stats-grid" aria-label="Client summary">
-        <div class="stat-card"><div class="stat-label">All clients</div><div class="stat-value">{{ total_sites }}</div></div>
-        <div class="stat-card"><div class="stat-label">Active clients</div><div class="stat-value">{{ active_sites_total }}</div></div>
-        <div class="stat-card"><div class="stat-label">With shifts this week</div><div class="stat-value">{{ covered_sites }}</div></div>
-        <div class="stat-card"><div class="stat-label">Without shifts this week</div><div class="stat-value">{{ unassigned_active_sites }}</div></div>
-      </section>
-      <nav class="site-status-tabs" aria-label="Filter sites by status">{% for status_key, status_label in [('all','All sites'),('active','Active'),('inactive','Inactive')] %}<a class="site-status-tab {{ 'active' if status_filter == status_key else '' }}" href="{{ url_for('admin_sites', status_filter=status_key, q=search_q or None) }}">{{ status_label }}{% if status_key == 'all' %}<span>{{ total_sites }}</span>{% elif status_key == 'active' %}<span>{{ active_sites_total }}</span>{% else %}<span>{{ inactive_sites }}</span>{% endif %}</a>{% endfor %}</nav>
-      <form method="get" class="client-search-bar mb-3">
+      <nav class="site-status-tabs" aria-label="Filter sites by status">{% for status_key, status_label in [('all','All'),('active','Active'),('inactive','Inactive')] %}<a class="site-status-tab {{ 'active' if status_filter == status_key else '' }}" href="{{ url_for('admin_sites', status_filter=status_key, q=search_q or None, manager_id=manager_filter or None, client=client_filter or None, coverage=coverage_filter or None) }}">{{ status_label }}<span class="site-status-tab-count">{% if status_key == 'all' %}{{ total_sites }}{% elif status_key == 'active' %}{{ active_sites_total }}{% else %}{{ inactive_sites }}{% endif %}</span></a>{% endfor %}</nav>
+      <form method="get" class="site-filter-toolbar" role="search">
         <input type="hidden" name="status_filter" value="{{ status_filter }}">
-        <label class="visually-hidden" for="site_search">Search clients</label>
-        <i class="bi bi-search" aria-hidden="true"></i>
-        <input type="search" class="form-control" id="site_search" name="q" value="{{ search_q or '' }}" placeholder="Search company, contact, email, phone, address or tax ID">
-        {% if search_q %}<a href="{{ url_for('admin_sites', status_filter=status_filter if status_filter != 'all' else None) }}" class="btn btn-outline-secondary" aria-label="Clear search"><i class="bi bi-x-lg"></i></a>{% endif %}
-        <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>Search</button>
+        <input type="hidden" name="coverage" value="{{ coverage_filter }}">
+        <label class="visually-hidden" for="site_search">Search sites</label>
+        <div class="site-search-box"><i class="bi bi-search" aria-hidden="true"></i><input type="search" class="form-control" id="site_search" name="q" value="{{ search_q or '' }}" placeholder="Search site, company, contact, email, phone or address"></div>
+        <label class="visually-hidden" for="site-manager-filter">Site manager</label>
+        <select class="form-select" id="site-manager-filter" name="manager_id" aria-label="Site manager" onchange="this.form.requestSubmit()"><option value="">All site managers</option><option value="unassigned" {% if manager_filter == 'unassigned' %}selected{% endif %}>Unassigned manager</option>{% for manager in site_manager_filter_options %}<option value="{{ manager.id }}" {% if manager_filter == manager.id|string %}selected{% endif %}>{{ manager.name }}</option>{% endfor %}</select>
+        <label class="visually-hidden" for="site-client-filter">Client</label>
+        <select class="form-select" id="site-client-filter" name="client" aria-label="Client" onchange="this.form.requestSubmit()"><option value="">All clients</option>{% for client_name in client_filter_options %}<option value="{{ client_name }}" {% if client_filter == client_name %}selected{% endif %}>{{ client_name }}</option>{% endfor %}</select>
+        {% if coverage_filter %}<span class="site-coverage-chip">{{ 'Scheduled this week' if coverage_filter == 'scheduled' else 'Without shifts this week' }}<a href="{{ url_for('admin_sites', status_filter=status_filter if status_filter != 'all' else None, q=search_q or None, manager_id=manager_filter or None, client=client_filter or None) }}" aria-label="Remove coverage filter" title="Remove filter"><i class="bi bi-x-lg" aria-hidden="true"></i></a></span>{% endif %}
+        <details class="site-add-filter"><summary><i class="bi bi-sliders" aria-hidden="true"></i><span>+ Add filter</span><i class="bi bi-chevron-down" aria-hidden="true"></i></summary><div class="site-add-filter-menu"><a href="{{ url_for('admin_sites', status_filter=status_filter if status_filter != 'all' else None, q=search_q or None, manager_id=manager_filter or None, client=client_filter or None, coverage='scheduled') }}">Scheduled this week</a><a href="{{ url_for('admin_sites', status_filter=status_filter if status_filter != 'all' else None, q=search_q or None, manager_id=manager_filter or None, client=client_filter or None, coverage='unscheduled') }}">Without shifts this week</a></div></details>
+        {% if search_q %}<a href="{{ url_for('admin_sites', status_filter=status_filter if status_filter != 'all' else None, manager_id=manager_filter or None, client=client_filter or None, coverage=coverage_filter or None) }}" class="site-filter-clear" aria-label="Clear search" title="Clear search"><i class="bi bi-x-lg"></i></a>{% endif %}
+        <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1" aria-hidden="true"></i>Search</button>
       </form>
       <section class="card-surface p-0 overflow-hidden">
         <div class="table-responsive">
@@ -979,31 +1009,31 @@ ADMIN_SITES_TEMPLATE = """
             <thead><tr><th>Client</th><th>Contact</th><th>Service address</th>{% if not is_site_manager %}<th>Rate</th>{% endif %}<th>Shifts</th><th>Status</th>{% if not is_sales_manager %}<th class="text-end">Actions</th>{% endif %}</tr></thead>
             <tbody>
               {% for site in sites %}
-              <tr class="site-row-clickable" data-row-url="{{ url_for('admin_site_detail', site_id=site.id) }}" tabindex="0" role="link" aria-label="Open site {{ (site.profile_company_name or site.name)|e }}">
+              <tr class="site-row-clickable" data-row-url="{{ url_for('admin_site_detail', site_id=site.id, q=search_q or None, status_filter=status_filter if status_filter != 'all' else None, manager_id=manager_filter or None, client=client_filter or None, coverage=coverage_filter or None, page=page if page > 1 else None) }}" tabindex="0" role="link" aria-label="Open site {{ (site.profile_company_name or site.name)|e }}">
                 <td><div class="d-flex align-items-center gap-2">
                   {% if site.profile_image_path %}<img class="client-logo" src="{{ url_for('static', filename=site.profile_image_path) }}" alt="">
                   {% else %}<span class="client-logo client-logo-placeholder">{{ (site.profile_company_name or site.name)[:1]|upper }}</span>{% endif %}
-                  <div class="client-main"><a class="client-detail-link" href="{{ url_for('admin_site_detail', site_id=site.id) }}"><strong>{{ site.profile_company_name or site.name }}</strong></a><small>{{ site.name }}</small></div>
+                  <div class="client-main"><a class="client-detail-link" href="{{ url_for('admin_site_detail', site_id=site.id, q=search_q or None, status_filter=status_filter if status_filter != 'all' else None, manager_id=manager_filter or None, client=client_filter or None, coverage=coverage_filter or None, page=page if page > 1 else None) }}"><strong>{{ site.profile_company_name or site.name }}</strong></a><small>{{ site.name }}</small></div>
                 </div></td>
                 <td><div class="client-main"><span>{{ site.profile_contact_name or site.contact_name or '?' }}</span><small>{{ site.profile_contact_email or site.contact_email or 'No email' }}</small></div></td>
                 <td>{{ site.address or '?' }}</td>
                 {% if not is_site_manager %}<td>{{ '%.2f'|format(site.profile_default_hourly_rate or site.hourly_rate or 0) }} ?</td>{% endif %}
                 <td><span class="shift-count">{{ shift_counts.get(site.id, 0) }}</span></td>
-                <td><form method="post" class="site-status-form"><input type="hidden" name="entity" value="site"><input type="hidden" name="action" value="set_status"><input type="hidden" name="id" value="{{ site.id }}"><input type="hidden" name="is_active" value="{{ '0' if site.is_active != 0 else '1' }}"><input type="hidden" name="redirect_q" value="{{ search_q }}"><input type="hidden" name="redirect_page" value="{{ page }}"><input type="hidden" name="redirect_status" value="{{ status_filter }}"><button class="site-status-button {{ 'is-active' if site.is_active != 0 else 'is-inactive' }}" type="submit"><i class="bi {{ 'bi-check-circle-fill' if site.is_active != 0 else 'bi-pause-circle-fill' }} me-1"></i>{{ 'Active' if site.is_active != 0 else 'Inactive' }}</button></form></td>
+                <td><form method="post" class="site-status-form"><input type="hidden" name="entity" value="site"><input type="hidden" name="action" value="set_status"><input type="hidden" name="id" value="{{ site.id }}"><input type="hidden" name="is_active" value="{{ '0' if site.is_active != 0 else '1' }}"><input type="hidden" name="redirect_q" value="{{ search_q }}"><input type="hidden" name="redirect_page" value="{{ page }}"><input type="hidden" name="redirect_status" value="{{ status_filter }}"><input type="hidden" name="redirect_manager" value="{{ manager_filter }}"><input type="hidden" name="redirect_client" value="{{ client_filter }}"><input type="hidden" name="redirect_coverage" value="{{ coverage_filter }}"><button class="site-status-button {{ 'is-active' if site.is_active != 0 else 'is-inactive' }}" type="submit"><i class="bi {{ 'bi-check-circle-fill' if site.is_active != 0 else 'bi-pause-circle-fill' }} me-1"></i>{{ 'Active' if site.is_active != 0 else 'Inactive' }}</button></form></td>
                 {% if not is_sales_manager %}<td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('ops.admin_inspection_areas', site_id=site.id) }}"><i class="bi bi-clipboard-check me-1"></i>Inspection areas</a></td>{% endif %}
               </tr>
               {% else %}<tr><td colspan="{{ 6 if is_site_manager or is_sales_manager else 7 }}" class="text-center py-5"><div class="empty-clients"><i class="bi bi-buildings"></i><strong>No clients found</strong><span>Adjust your search or add a client to the database.</span><button type="button" class="btn btn-primary mt-2" id="open-client-create-empty">Add client</button></div></td></tr>{% endfor %}
             </tbody>
           </table>
         </div>
-        {% if total_pages > 1 %}<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border-top"><span class="text-secondary small">Page {{ page }} of {{ total_pages }}</span><div class="d-flex gap-2">{% if has_prev %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=prev_page, q=search_q or None, status_filter=status_filter if status_filter != 'all' else None) }}">Previous</a>{% endif %}{% if has_next %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=next_page, q=search_q or None, status_filter=status_filter if status_filter != 'all' else None) }}">Next</a>{% endif %}</div></div>{% endif %}
+        {% if total_pages > 1 %}<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border-top"><span class="text-secondary small">Page {{ page }} of {{ total_pages }}</span><div class="d-flex gap-2">{% if has_prev %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=prev_page, q=search_q or None, status_filter=status_filter if status_filter != 'all' else None, manager_id=manager_filter or None, client=client_filter or None, coverage=coverage_filter or None) }}">Previous</a>{% endif %}{% if has_next %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', page=next_page, q=search_q or None, status_filter=status_filter if status_filter != 'all' else None, manager_id=manager_filter or None, client=client_filter or None, coverage=coverage_filter or None) }}">Next</a>{% endif %}</div></div>{% endif %}
       </section>
       <div class="client-modal-backdrop" id="client-modal" aria-hidden="true">
         <section class="client-modal" role="dialog" aria-modal="true" aria-labelledby="client-modal-title">
           <header class="client-modal-header"><h2 id="client-modal-title">Add client</h2><button type="button" class="client-modal-close" id="close-client-modal" aria-label="Close">&times;</button></header>
           <form method="post" enctype="multipart/form-data" id="client-form">
             <input type="hidden" name="entity" value="site"><input type="hidden" name="action" id="client-action" value="create"><input type="hidden" name="id" id="client-id">
-            <input type="hidden" name="redirect_q" value="{{ search_q }}"><input type="hidden" name="redirect_page" value="{{ page }}">
+            <input type="hidden" name="redirect_q" value="{{ search_q }}"><input type="hidden" name="redirect_page" value="{{ page }}"><input type="hidden" name="redirect_status" value="{{ status_filter }}"><input type="hidden" name="redirect_manager" value="{{ manager_filter }}"><input type="hidden" name="redirect_client" value="{{ client_filter }}"><input type="hidden" name="redirect_coverage" value="{{ coverage_filter }}">
             <div class="client-modal-body">
               <section class="client-form-section"><h3>Client</h3><div class="row g-3">
                 <div class="col-md-6"><label class="form-label" for="client-company">Company / client name <span class="text-danger">*</span></label><input class="form-control" id="client-company" name="profile_company_name" required></div>
@@ -1348,7 +1378,7 @@ EMPLOYEE_DETAIL_TEMPLATE = """
           <form method="post" enctype="multipart/form-data" action="{{ url_for('admin_employee_detail', employee_id=employee.id) }}" class="employee-inline-edit-form" data-profile-panel="information"><input type="hidden" name="action" value="update_profile">
           <section class="profile-section" id="information"><div id="general"><h2>General</h2><p class="section-description">Edit fields here, then save your changes below.</p></div><div class="field-grid"><label class="field"><span class="field-label">Full name</span><input class="form-control profile-edit-input" name="name" value="{{ employee.name|e }}" required></label><label class="field"><span class="field-label">Role</span><input class="form-control profile-edit-input" name="role" value="{{ (employee.role or '')|e }}"></label><label class="field"><span class="field-label">Status</span><select class="form-select profile-edit-input" name="worker_status"><option value="active" {% if employee.worker_status == 'active' or not employee.worker_status and employee.is_active %}selected{% endif %}>Active</option><option value="passive" {% if employee.worker_status == 'passive' or not employee.worker_status and not employee.is_active %}selected{% endif %}>Passive</option></select></label><div class="field"><span class="field-label">Employee record ID</span><div class="field-value">#{{ employee.id }}</div></div><label class="field"><span class="field-label">Profile photo</span><input class="form-control profile-edit-input" type="file" name="profile_image" accept="image/png,image/jpeg,image/gif,image/webp"></label></div></section>
           <section class="profile-section" id="contacts"><h2>Contacts</h2><p class="section-description">Update personal contact details.</p><div class="field-grid"><div class="field"><span class="field-label">Login email</span><div class="field-value">{% if not is_sales_manager and employee.login_email %}<a href="mailto:{{ employee.login_email }}">{{ employee.login_email }}</a>{% else %}-{% endif %}</div><small class="text-secondary">Manage sign-in email in Account access.</small></div><label class="field"><span class="field-label">Phone</span><input class="form-control profile-edit-input" type="tel" name="profile_phone" value="{{ (employee.profile_phone or '')|e }}"></label><label class="field"><span class="field-label">Address</span><input class="form-control profile-edit-input" name="profile_address" value="{{ (employee.profile_address or '')|e }}"></label><label class="field"><span class="field-label">Postal code</span><input class="form-control profile-edit-input" name="profile_zip_code" value="{{ (employee.profile_zip_code or '')|e }}"></label><label class="field"><span class="field-label">City</span><input class="form-control profile-edit-input" name="profile_city" value="{{ (employee.profile_city or '')|e }}"></label></div></section>
-          <section class="profile-section" id="employment"><h2>Employment</h2><p class="section-description">Update department, branch, and work information.</p><div class="field-grid"><label class="field"><span class="field-label">Branch office</span><select class="form-select profile-edit-input" name="branch"><option value="Wien" {% if (employee.branch or 'Wien') == 'Wien' %}selected{% endif %}>Wien</option><option value="Graz" {% if employee.branch == 'Graz' %}selected{% endif %}>Graz</option></select></label><label class="field"><span class="field-label">Work type</span><select class="form-select profile-edit-input" name="profile_work_type"><option value="Teilzeit" {% if employee.profile_work_type == 'Teilzeit' %}selected{% endif %}>Part-time</option><option value="Vollzeit" {% if employee.profile_work_type == 'Vollzeit' %}selected{% endif %}>Full-time</option><option value="Intern" {% if employee.profile_work_type in ['GeringfÃ¼gige','Intern'] %}selected{% endif %}>Intern</option></select></label><label class="field"><span class="field-label">Weekly hours</span><input class="form-control profile-edit-input" name="profile_working_hours" value="{{ (employee.profile_working_hours or '')|e }}"></label>{% if is_main_admin %}<label class="field"><span class="field-label">Hourly pay</span><input class="form-control profile-edit-input" name="profile_euros_per_hour" inputmode="decimal" value="{{ (employee.profile_euros_per_hour or '')|e }}"></label><label class="field"><span class="field-label">Pay group type</span><select class="form-select profile-edit-input" name="profile_group_type"><option value="Lohngruppe" {% if employee.profile_group_type == 'Lohngruppe' %}selected{% endif %}>Pay group</option><option value="Verwendungsgruppe" {% if employee.profile_group_type == 'Verwendungsgruppe' %}selected{% endif %}>Usage group</option></select></label><label class="field"><span class="field-label">Group number</span><input class="form-control profile-edit-input" name="profile_group_number" value="{{ (employee.profile_group_number or '')|e }}"></label>{% endif %}</div><div class="employee-inline-save"><button class="btn btn-primary" type="submit"><i class="bi bi-check2 me-1"></i>Save profile</button></div></section>
+          <section class="profile-section" id="employment"><h2>Employment</h2><p class="section-description">Update department, branch, and work information.</p><div class="field-grid"><label class="field"><span class="field-label">Branch office</span><select class="form-select profile-edit-input" name="branch"><option value="Wien" {% if (employee.branch or 'Wien') == 'Wien' %}selected{% endif %}>Wien</option><option value="Graz" {% if employee.branch == 'Graz' %}selected{% endif %}>Graz</option></select></label><label class="field"><span class="field-label">Work type</span><select class="form-select profile-edit-input" name="profile_work_type"><option value="Teilzeit" {% if employee.profile_work_type == 'Teilzeit' %}selected{% endif %}>Part-time</option><option value="Vollzeit" {% if employee.profile_work_type == 'Vollzeit' %}selected{% endif %}>Full-time</option><option value="Intern" {% if employee.profile_work_type in ['Geringfügige','Intern'] %}selected{% endif %}>Intern</option></select></label><label class="field"><span class="field-label">Weekly hours</span><input class="form-control profile-edit-input" name="profile_working_hours" value="{{ (employee.profile_working_hours or '')|e }}"></label>{% if is_main_admin %}<label class="field"><span class="field-label">Hourly pay</span><input class="form-control profile-edit-input" name="profile_euros_per_hour" inputmode="decimal" value="{{ (employee.profile_euros_per_hour or '')|e }}"></label><label class="field"><span class="field-label">Pay group type</span><select class="form-select profile-edit-input" name="profile_group_type"><option value="Lohngruppe" {% if employee.profile_group_type == 'Lohngruppe' %}selected{% endif %}>Pay group</option><option value="Verwendungsgruppe" {% if employee.profile_group_type == 'Verwendungsgruppe' %}selected{% endif %}>Usage group</option></select></label><label class="field"><span class="field-label">Group number</span><input class="form-control profile-edit-input" name="profile_group_number" value="{{ (employee.profile_group_number or '')|e }}"></label>{% endif %}</div><div class="employee-inline-save"><button class="btn btn-primary" type="submit"><i class="bi bi-check2 me-1"></i>Save profile</button></div></section>
           </form>
           {% if not is_site_manager and not is_sales_manager %}<section class="profile-section" id="contract" data-profile-panel="contract"><h2>Contract</h2><p class="section-description">Update the contract period and download the employee contract.</p>{% if is_main_admin %}<form method="post" action="{{ url_for('admin_employee_detail', employee_id=employee.id) }}" class="employee-inline-edit-form"><input type="hidden" name="action" value="update_contract"><div class="field-grid"><label class="field"><span class="field-label">Contract start</span><input class="form-control profile-edit-input" type="date" name="profile_contract_start_date" value="{{ (employee.profile_contract_start_date or '')|e }}"></label><label class="field"><span class="field-label">Contract end</span><input class="form-control profile-edit-input" type="date" name="profile_contract_end_date" value="{{ (employee.profile_contract_end_date or '')|e }}"></label></div><div class="employee-inline-save"><button class="btn btn-primary" type="submit"><i class="bi bi-check2 me-1"></i>Save contract dates</button></div></form>{% else %}<div class="field-grid"><div class="field"><span class="field-label">Contract start</span><div class="field-value">{{ employee.profile_contract_start_date or '-' }}</div></div><div class="field"><span class="field-label">Contract end</span><div class="field-value">{{ employee.profile_contract_end_date or '-' }}</div></div></div>{% endif %}<a class="btn btn-outline-primary mt-3" href="{{ url_for('admin_employee_docx', employee_id=employee.id) }}"><i class="bi bi-file-earmark-word me-1"></i>Download employee contract</a><p class="small text-secondary mt-2 mb-0">This uses the existing employee contract template.</p></section>{% endif %}
           {% if not is_sales_manager %}<section class="profile-section" id="account" data-profile-panel="information"><h2>Platform access</h2><p class="section-description">Functions and sign-in permissions for this employee.</p>
@@ -1359,7 +1389,7 @@ EMPLOYEE_DETAIL_TEMPLATE = """
           {% endif %}</section>{% endif %}
           {% if is_cleaner %}<section class="profile-section" id="other" data-profile-panel="information"><h2>Activity</h2><p class="section-description">Employee shift activity.</p><div class="field"><span class="field-label">Total shifts</span><div class="field-value">{{ shift_count }}</div></div></section>{% endif %}
           {% if not is_sales_manager %}<section class="profile-section" id="documents" data-profile-panel="documents"><h2>Documents</h2><p class="section-description">Upload and keep employee-related documents in one place.</p><form method="post" enctype="multipart/form-data" class="data-card employee-document-upload"><label class="form-label" for="employee-document-file">Choose a document</label><input class="form-control" type="file" id="employee-document-file" name="employee_document" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" required><button class="btn btn-primary mt-3" type="submit"><i class="bi bi-upload me-1"></i>Upload document</button></form><div class="employee-document-list">{% for document in documents %}<div class="data-card employee-document-row"><div class="employee-document-info"><i class="bi bi-file-earmark-text"></i><div><strong>{{ document.original_filename }}</strong><small>Uploaded {{ document.uploaded_at.strftime('%d.%m.%Y') }}</small></div></div><a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin_employee_document_download', employee_id=employee.id, document_id=document.id) }}"><i class="bi bi-download"></i><span>Download</span></a><form method="post" onsubmit="return confirm('Delete this employee document?')"><input type="hidden" name="action" value="delete_employee_document"><input type="hidden" name="document_id" value="{{ document.id }}"><button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Delete employee document" title="Delete document"><i class="bi bi-trash3"></i><span>Delete</span></button></form></div>{% else %}<div class="empty-state">No employee documents have been uploaded yet.</div>{% endfor %}</div></section>{% endif %}
-          {% if is_cleaner %}<details class="profile-section employee-schedule-disclosure" id="schedule" data-profile-panel="schedule"><summary class="employee-schedule-summary"><span><strong>Schedule</strong><small>Weekly shifts in a calendar view.</small></span><i class="bi bi-chevron-down"></i></summary><div class="employee-schedule-content"><div class="employee-week-toolbar"><a class="btn btn-outline-secondary" href="{{ previous_week_url }}" aria-label="Previous week" title="Previous week"><i class="bi bi-chevron-left"></i></a><a class="btn btn-outline-secondary" href="{{ current_week_url }}">Today</a><a class="btn btn-outline-secondary" href="{{ next_week_url }}" aria-label="Next week" title="Next week"><i class="bi bi-chevron-right"></i></a><span class="employee-week-range"><i class="bi bi-calendar3"></i>{{ schedule_week_range }}</span></div><div class="employee-calendar-scroll"><div class="employee-calendar"><div class="employee-calendar-head"><div></div>{% for day in schedule_days %}<div class="{{ 'is-today' if day.is_today else '' }}"><span>{{ day.weekday }}</span><small>{{ day.day_label }}</small></div>{% endfor %}</div><div class="employee-calendar-body"><div class="employee-calendar-time-axis"><div>All day</div>{% for hour in schedule_hour_rows %}<div>{{ '%02d'|format(hour) }}:00</div>{% endfor %}</div>{% for day in schedule_days %}<div class="employee-calendar-day-column {{ 'is-today' if day.is_today else '' }}"><div class="employee-calendar-all-day"></div>{% for hour in schedule_hour_rows %}<div></div>{% endfor %}{% for event in day.events %}<article class="employee-calendar-event {{ 'is-all-day' if event.all_day else '' }}" style="top:{{ event.top_px }}px;height:{{ event.height_px }}px" title="{{ event.site_name }} Â· {{ event.time_window }}"><time>{{ event.time_window }}</time><strong>{{ event.site_name }}</strong>{% if event.instructions %}<small>{{ event.instructions }}</small>{% endif %}</article>{% endfor %}</div>{% endfor %}</div></div></div>{% if not shifts %}<div class="small text-secondary mt-2">No shifts scheduled this week.</div>{% endif %}</div></details>{% endif %}
+          {% if is_cleaner %}<details class="profile-section employee-schedule-disclosure" id="schedule" data-profile-panel="schedule"><summary class="employee-schedule-summary"><span><strong>Schedule</strong><small>Weekly shifts in a calendar view.</small></span><i class="bi bi-chevron-down"></i></summary><div class="employee-schedule-content"><div class="employee-week-toolbar"><a class="btn btn-outline-secondary" href="{{ previous_week_url }}" aria-label="Previous week" title="Previous week"><i class="bi bi-chevron-left"></i></a><a class="btn btn-outline-secondary" href="{{ current_week_url }}">Today</a><a class="btn btn-outline-secondary" href="{{ next_week_url }}" aria-label="Next week" title="Next week"><i class="bi bi-chevron-right"></i></a><span class="employee-week-range"><i class="bi bi-calendar3"></i>{{ schedule_week_range }}</span></div><div class="employee-calendar-scroll"><div class="employee-calendar"><div class="employee-calendar-head"><div></div>{% for day in schedule_days %}<div class="{{ 'is-today' if day.is_today else '' }}"><span>{{ day.weekday }}</span><small>{{ day.day_label }}</small></div>{% endfor %}</div><div class="employee-calendar-body"><div class="employee-calendar-time-axis"><div>All day</div>{% for hour in schedule_hour_rows %}<div>{{ '%02d'|format(hour) }}:00</div>{% endfor %}</div>{% for day in schedule_days %}<div class="employee-calendar-day-column {{ 'is-today' if day.is_today else '' }}"><div class="employee-calendar-all-day"></div>{% for hour in schedule_hour_rows %}<div></div>{% endfor %}{% for event in day.events %}<article class="employee-calendar-event {{ 'is-all-day' if event.all_day else '' }}" style="top:{{ event.top_px }}px;height:{{ event.height_px }}px" title="{{ event.site_name }} · {{ event.time_window }}"><time>{{ event.time_window }}</time><strong>{{ event.site_name }}</strong>{% if event.instructions %}<small>{{ event.instructions }}</small>{% endif %}</article>{% endfor %}</div>{% endfor %}</div></div></div>{% if not shifts %}<div class="small text-secondary mt-2">No shifts scheduled this week.</div>{% endif %}</div></details>{% endif %}
         </div>
       </div>
     </main>
@@ -1542,7 +1572,7 @@ CLIENT_DETAIL_TEMPLATE = """
         {% if site.profile_image_path %}<img class="client-mark" src="{{ url_for('static', filename=site.profile_image_path) }}" alt="Client logo">{% else %}<span class="client-mark placeholder"><i class="bi bi-building" aria-hidden="true"></i></span>{% endif %}
         <div class="client-identity"><small>{{ site.profile_company_name or site.name }}</small><strong>{{ site.name }}</strong></div>
         <span class="status-pill {{ 'inactive' if site.is_active == 0 else '' }}">{{ 'Inactive' if site.is_active == 0 else 'Active' }}</span>
-        <div class="profile-actions">{% if not is_sales_manager %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('ops.admin_inspection_areas', site_id=site.id) }}"><i class="bi bi-clipboard-check me-1"></i>Inspection areas</a>{% endif %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites') }}"><i class="bi bi-buildings me-1"></i>Sites</a></div>
+        <div class="profile-actions">{% if not is_sales_manager %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('ops.admin_inspection_areas', site_id=site.id) }}"><i class="bi bi-clipboard-check me-1"></i>Inspection areas</a>{% endif %}<form method="post" action="{{ url_for('admin_sites') }}" class="m-0" onsubmit="return confirm(document.documentElement.lang==='de'?'Standort wirklich löschen? Zugehörige Einsätze und Kontrollberichte werden ebenfalls gelöscht. Standorte mit Rechnungen können nicht gelöscht werden.':'Delete this site? Related shifts and inspection reports will also be deleted. Sites with invoices cannot be deleted.');"><input type="hidden" name="entity" value="site"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="{{ site.id }}"><input type="hidden" name="redirect_q" value="{{ request.args.get('q', '') }}"><input type="hidden" name="redirect_status" value="{{ request.args.get('status_filter', 'all') }}"><input type="hidden" name="redirect_manager" value="{{ request.args.get('manager_id', '') }}"><input type="hidden" name="redirect_client" value="{{ request.args.get('client', '') }}"><input type="hidden" name="redirect_coverage" value="{{ request.args.get('coverage', '') }}"><input type="hidden" name="redirect_page" value="{{ request.args.get('page', '') }}"><button class="btn btn-sm btn-outline-danger" type="submit" title="Delete site" aria-label="Delete site"><i class="bi bi-trash3" aria-hidden="true"></i></button></form><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_sites', q=request.args.get('q') or None, status_filter=request.args.get('status_filter') if request.args.get('status_filter') != 'all' else None, manager_id=request.args.get('manager_id') or None, client=request.args.get('client') or None, coverage=request.args.get('coverage') or None, page=request.args.get('page') or None) }}" title="Close site" aria-label="Close site"><i class="bi bi-x-lg" aria-hidden="true"></i></a></div>
       </header>
       {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="px-3 pt-3">{% for category, message in messages %}<div class="alert alert-{{ 'success' if category == 'success' else 'warning' if category == 'warning' else 'info' }} py-2 mb-2">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
       <nav class="profile-tabs" aria-label="Client pages"><a class="active" href="#information">Information</a><a href="#schedule">Schedule</a>{% if not is_sales_manager %}<a href="{{ url_for('ops.admin_inspection_areas', site_id=site.id) }}">Inspection areas</a>{% endif %}{% if not is_site_manager %}<a href="#invoices">Invoices</a>{% endif %}<a href="#documents">Documents</a></nav>
@@ -1632,7 +1662,7 @@ INVOICE_LIST_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing â€” Invoices</title>
+  <title>Putzelf Marketing — Invoices</title>
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1762,7 +1792,7 @@ INVOICE_LIST_TEMPLATE = """
       <div class="mb-3">
         <a href="/admin/invoices/new" class="btn btn-primary">+ Create Invoice</a>
         <a href="{{ url_for('admin_income_report') }}" class="btn btn-outline-primary">ðŸ’° Monthly Income</a>
-        <button form="bulk-invoice-email-form" type="submit" class="btn btn-outline-primary" onclick="return confirm('Send selected invoices by email now?');">âœ‰ Send selected emails</button>
+        <button form="bulk-invoice-email-form" type="submit" class="btn btn-outline-primary" onclick="return confirm('Send selected invoices by email now?');">✉ Send selected emails</button>
         <button
           form="bulk-invoice-email-form"
           type="submit"
@@ -1849,7 +1879,7 @@ INVOICE_LIST_TEMPLATE = """
                 <td>{{ inv.site.name }}</td>
                 <td>{{ inv.site_contact_name or 'N/A' }}</td>
                 <td class="text-end">{{ inv.total_hours }}</td>
-                <td class="text-end"><strong>{{ "%.2f"|format(inv.total_amount) }} â‚¬</strong></td>
+                <td class="text-end"><strong>{{ "%.2f"|format(inv.total_amount) }} €</strong></td>
                 <td>
                   {% if inv.status == 'draft' %}
                     <span class="badge bg-warning text-dark">DRAFT</span>
@@ -1954,7 +1984,7 @@ INCOME_REPORT_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing â€” Monthly Income Report</title>
+  <title>Putzelf Marketing — Monthly Income Report</title>
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2086,7 +2116,7 @@ INCOME_REPORT_TEMPLATE = """
             <div class="income-summary">
               <div class="summary-stat">
                 <div class="summary-label">Total Income</div>
-                <div class="summary-value">{{ "%.2f"|format(summary.total_income) }} â‚¬</div>
+                <div class="summary-value">{{ "%.2f"|format(summary.total_income) }} €</div>
                 <div class="summary-sub">Gross earnings</div>
               </div>
               <div class="summary-stat">
@@ -2117,8 +2147,8 @@ INCOME_REPORT_TEMPLATE = """
                       <tr>
                         <td><strong>{{ site_data.site_name }}</strong></td>
                         <td class="text-end">{{ site_data.hours }}</td>
-                        <td class="text-end">{{ "%.2f"|format(site_data.hourly_rate) }} â‚¬/hr</td>
-                        <td class="text-end"><strong>{{ "%.2f"|format(site_data.income) }} â‚¬</strong></td>
+                        <td class="text-end">{{ "%.2f"|format(site_data.hourly_rate) }} €/hr</td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(site_data.income) }} €</strong></td>
                       </tr>
                     {% endfor %}
                   </tbody>
@@ -2175,7 +2205,7 @@ INCOME_REPORT_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing â€” Monthly Income Report</title>
+  <title>Putzelf Marketing — Monthly Income Report</title>
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2307,7 +2337,7 @@ INCOME_REPORT_TEMPLATE = """
             <div class="income-summary">
               <div class="summary-stat">
                 <div class="summary-label">Total Income</div>
-                <div class="summary-value">{{ "%.2f"|format(summary.total_income) }} â‚¬</div>
+                <div class="summary-value">{{ "%.2f"|format(summary.total_income) }} €</div>
                 <div class="summary-sub">Gross earnings</div>
               </div>
               <div class="summary-stat">
@@ -2338,8 +2368,8 @@ INCOME_REPORT_TEMPLATE = """
                       <tr>
                         <td><strong>{{ site_data.site_name }}</strong></td>
                         <td class="text-end">{{ site_data.hours }}</td>
-                        <td class="text-end">{{ "%.2f"|format(site_data.hourly_rate) }} â‚¬/hr</td>
-                        <td class="text-end"><strong>{{ "%.2f"|format(site_data.income) }} â‚¬</strong></td>
+                        <td class="text-end">{{ "%.2f"|format(site_data.hourly_rate) }} €/hr</td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(site_data.income) }} €</strong></td>
                       </tr>
                     {% endfor %}
                   </tbody>
@@ -2396,7 +2426,7 @@ INVOICE_FORM_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing â€” Create Invoice</title>
+  <title>Putzelf Marketing — Create Invoice</title>
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2698,7 +2728,7 @@ INVOICE_EDIT_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing â€” Edit Invoice</title>
+  <title>Putzelf Marketing — Edit Invoice</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 </head>
@@ -2813,7 +2843,7 @@ CONTRACT_BUILDER_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing â€” Contract PDF</title>
+  <title>Putzelf Marketing — Contract PDF</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
@@ -2872,7 +2902,7 @@ INVOICE_VIEW_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing â€” View Invoice</title>
+  <title>Putzelf Marketing — View Invoice</title>
   <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -3057,7 +3087,7 @@ INVOICE_VIEW_TEMPLATE = """
               <div class="col-md-6">
                 <h6 class="text-muted text-uppercase mb-2" style="font-size: 0.75rem; letter-spacing: 0.08em;">Invoice Details:</h6>
                 <p class="mb-1"><strong>Site:</strong> {{ invoice.site.name }}</p>
-                <p class="mb-1"><strong>Hourly Rate:</strong> {{ "%.2f"|format(invoice.hourly_rate) }} â‚¬</p>
+                <p class="mb-1"><strong>Hourly Rate:</strong> {{ "%.2f"|format(invoice.hourly_rate) }} €</p>
                 <p class="mb-1"><strong>Total Hours:</strong> {{ invoice.total_hours }}</p>
               </div>
             </div>
@@ -3076,8 +3106,8 @@ INVOICE_VIEW_TEMPLATE = """
                   <tr>
                     <td>Work at {{ invoice.site.name }}</td>
                     <td class="text-end">{{ invoice.total_hours }} hours</td>
-                    <td class="text-end">{{ "%.2f"|format(invoice.hourly_rate) }} â‚¬/hr</td>
-                    <td class="text-end"><strong>{{ "%.2f"|format(invoice.subtotal) }} â‚¬</strong></td>
+                    <td class="text-end">{{ "%.2f"|format(invoice.hourly_rate) }} €/hr</td>
+                    <td class="text-end"><strong>{{ "%.2f"|format(invoice.subtotal) }} €</strong></td>
                   </tr>
                 </tbody>
               </table>
@@ -3088,15 +3118,15 @@ INVOICE_VIEW_TEMPLATE = """
                 <table class="table table-sm mb-0">
                   <tr>
                     <td class="text-end">Subtotal:</td>
-                    <td class="text-end"><strong>{{ "%.2f"|format(invoice.subtotal) }} â‚¬</strong></td>
+                    <td class="text-end"><strong>{{ "%.2f"|format(invoice.subtotal) }} €</strong></td>
                   </tr>
                   <tr>
                     <td class="text-end">Tax ({{ (invoice.tax_rate * 100)|round(1) }}%):</td>
-                    <td class="text-end"><strong>{{ "%.2f"|format(invoice.tax_amount) }} â‚¬</strong></td>
+                    <td class="text-end"><strong>{{ "%.2f"|format(invoice.tax_amount) }} €</strong></td>
                   </tr>
                   <tr class="table-dark">
                     <td class="text-end"><strong>TOTAL:</strong></td>
-                    <td class="text-end"><strong>{{ "%.2f"|format(invoice.total_amount) }} â‚¬</strong></td>
+                    <td class="text-end"><strong>{{ "%.2f"|format(invoice.total_amount) }} €</strong></td>
                   </tr>
                 </table>
               </div>
@@ -3265,7 +3295,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Elf's Plan â€” {{ ui.your_missions }}</title>
+  <title>Elf's Plan — {{ ui.your_missions }}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="manifest" href="/static/manifest.json">
@@ -3381,7 +3411,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
       <section class="employee-notification-panel" id="employee-notification-panel" hidden aria-label="Notifications">
         <div class="employee-notification-panel-head"><strong>{{ 'Benachrichtigungen' if lang == 'de' else 'Notifications' }}</strong><button type="button" class="employee-notification-enable" id="employee-notification-enable">{{ 'Aktivieren' if lang == 'de' else 'Enable alerts' }}</button></div>
         <p class="employee-notification-empty" id="employee-notification-status" aria-live="polite"></p>
-        <div class="employee-notification-list" id="employee-notification-list"><p class="employee-notification-empty">{{ 'Lade Benachrichtigungenâ€¦' if lang == 'de' else 'Loading notificationsâ€¦' }}</p></div>
+        <div class="employee-notification-list" id="employee-notification-list"><p class="employee-notification-empty">{{ 'Lade Benachrichtigungen…' if lang == 'de' else 'Loading notifications…' }}</p></div>
       </section>
       <div class="d-flex justify-content-end mt-2">
         <form method="get" class="d-flex align-items-center gap-2">
@@ -3440,9 +3470,9 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
                   <div>
                     <div class="meta-label">{{ ui.duration }}</div>
                     <div class="meta-chip-row">
-                      <span class="meta-chip">{{ ui.scheduled }} Â· {{ shift.scheduled_duration }}</span>
+                      <span class="meta-chip">{{ ui.scheduled }} · {{ shift.scheduled_duration }}</span>
                       {% if shift.has_actual_duration %}
-                        <span class="meta-chip meta-chip--accent">{{ ui.actual }} Â· {{ shift.actual_duration }}</span>
+                        <span class="meta-chip meta-chip--accent">{{ ui.actual }} · {{ shift.actual_duration }}</span>
                       {% endif %}
                     </div>
                   </div>
@@ -3473,7 +3503,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
                   <form method="post" action="{{ shift.upload_url }}" enctype="multipart/form-data">
                     <input type="hidden" name="photo_type" value="after">
                     <label class="upload-tile" data-type="after">
-                      <span class="icon" aria-hidden="true">âœ¨</span>
+                      <span class="icon" aria-hidden="true">✨</span>
                       <span>{% if shift.after_photo_url %}{{ ui.replace_after }}{% else %}{{ ui.upload_after }}{% endif %}</span>
                       <input type="file" name="photo" accept="image/*" onchange="this.form.submit()">
                     </label>
@@ -3523,7 +3553,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
             {% for job in upcoming_jobs %}
               <article class="timeline-card">
                 <h3>{{ job.site_name }}</h3>
-                <div class="timeline-meta">{{ job.day_label }} Â· {{ job.time_window }}</div>
+                <div class="timeline-meta">{{ job.day_label }} · {{ job.time_window }}</div>
                 {% if job.address %}
                   <div class="timeline-meta">{{ job.address }}</div>
                 {% endif %}
@@ -3549,11 +3579,11 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
             {% for item in history %}
               <article class="timeline-card">
                 <h3>{{ item.site_name }}</h3>
-                <div class="timeline-meta">{{ item.day_label }} Â· {{ item.time_window }}</div>
+                <div class="timeline-meta">{{ item.day_label }} · {{ item.time_window }}</div>
                 <div class="meta-chip-row">
-                  <span class="meta-chip">{{ ui.scheduled }} Â· {{ item.scheduled_duration }}</span>
+                  <span class="meta-chip">{{ ui.scheduled }} · {{ item.scheduled_duration }}</span>
                   {% if item.has_actual_duration %}
-                    <span class="meta-chip meta-chip--accent">{{ ui.actual }} Â· {{ item.actual_duration }}</span>
+                    <span class="meta-chip meta-chip--accent">{{ ui.actual }} · {{ item.actual_duration }}</span>
                   {% endif %}
                 </div>
                 <span class="status-pill" data-state="{{ item.status_key }}">{{ item.status_label }}</span>
@@ -3595,13 +3625,13 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
       const enable=document.getElementById('employee-notification-enable');
       const lang=document.documentElement.lang==='de'?'de':'en';
       const text={
-        loading:lang==='de'?'Benachrichtigungen werden geladenâ€¦':'Loading notificationsâ€¦',
+        loading:lang==='de'?'Benachrichtigungen werden geladen…':'Loading notifications…',
         empty:lang==='de'?'Keine neuen Benachrichtigungen.':'No new notifications.',
         paused:lang==='de'?'Benachrichtigungen sind pausiert. Updates erscheinen nach der Reaktivierung.':'Notifications are paused. Shift updates will appear when they resume.',
         enable:lang==='de'?'Browser-Benachrichtigungen aktivieren':'Enable browser notifications',
         allowed:lang==='de'?'Browser-Benachrichtigungen sind aktiviert.':'Browser notifications are enabled.',
         denied:lang==='de'?'Bitte Benachrichtigungen in den Browsereinstellungen erlauben.':'Allow notifications in your browser settings.',
-        reminder:lang==='de'?'Deine heutigen EinsÃ¤tze':'Your shifts today'
+        reminder:lang==='de'?'Deine heutigen Einsätze':'Your shifts today'
       };
       const seenKey='elfs-plan-seen-notifications';
       let pollTimer=null;
@@ -3614,7 +3644,7 @@ EMPLOYEE_DASHBOARD_TEMPLATE = """
         const key='elfs-plan-morning-reminder-'+localDate;
         try{if(localStorage.getItem(key))return;}catch(_error){}
         const shifts=data.today_shifts||[];if(!shifts.length)return;
-        const body=shifts.slice(0,3).map(item=>`${item.site_name} Â· ${item.time_window}`).join('\n');
+        const body=shifts.slice(0,3).map(item=>`${item.site_name} · ${item.time_window}`).join('\n');
         try{const notice=new Notification(text.reminder,{body,icon:'/static/employee-icon-192.png',tag:key});notice.onclick=()=>{window.focus();notice.close();};localStorage.setItem(key,'1');}catch(_error){}
       };
       if(enable&&'Notification' in window){
@@ -4056,17 +4086,17 @@ LEADS_TEMPLATE = """
                             {% if lead.email %}
                               <button type="button" class="lead-email-copy" data-email="{{ lead.email|e }}" title="Copy email">{{ lead.email }}</button>
                             {% else %}
-                              <span class="lead-meta">â€”</span>
+                              <span class="lead-meta">—</span>
                             {% endif %}
                           </div>
                           <div class="text-end">
                             <span class="small-note d-block">{{ lead.created_at.strftime('%d.%m.%Y') }}</span>
                             <div class="btn-group btn-group-sm mt-1" role="group" aria-label="Lead actions">
                               <button type="button" class="btn btn-outline-primary btn-sm py-0 lead-edit" data-bs-toggle="modal" data-bs-target="#leadModal" title="Edit lead">
-                                âœŽ
+                                ✎
                               </button>
                               <button type="button" class="btn btn-outline-danger btn-sm py-0 lead-delete" data-lead-id="{{ lead.id }}" title="Delete lead">
-                                âœ•
+                                ✕
                               </button>
                             </div>
                           </div>
@@ -4377,7 +4407,7 @@ HTML_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing â€” URL Contact Crawler</title>
+  <title>Putzelf Marketing — URL Contact Crawler</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     :root {
@@ -4473,14 +4503,14 @@ HTML_TEMPLATE = """
           <div class="topbar-title">Dashboard</div>
           <div class="d-flex align-items-center gap-2">
             <h1 class="topbar-heading mb-0">URL Contact Crawler</h1>
-            <span class="topbar-chip">Live â€¢ Internal tool</span>
+            <span class="topbar-chip">Live • Internal tool</span>
           </div>
           <p class="topbar-subtitle mb-0">
-            Crawl websites for verified emails and phone numbers, then let GPT draft tailored outreach â€” all in one place.
+            Crawl websites for verified emails and phone numbers, then let GPT draft tailored outreach — all in one place.
           </p>
         </div>
         <div class="topbar-user">
-          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-secondary">â˜°</button>
+          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-secondary">☰</button>
           <div class="text-end user-meta">
             <span>Prospecting workspace</span>
             <span>{{ 'GPT connected' if gpt_enabled else 'GPT not configured' }}</span>
@@ -4608,13 +4638,13 @@ HTML_TEMPLATE = """
         const status = document.getElementById('status');
         btn.disabled = true;
         spinner.classList.remove('d-none');
-        status.textContent = 'Crawlingâ€¦ this may take a while';
+        status.textContent = 'Crawling… this may take a while';
         try {
           const formData = new FormData(form);
           const resp = await fetch('/crawler', { method: 'POST', body: formData });
           if (!resp.ok) {
             const errText = await resp.text();
-            throw new Error('Server returned ' + resp.status + (errText ? ' â€“ ' + errText : ''));
+            throw new Error('Server returned ' + resp.status + (errText ? ' – ' + errText : ''));
           }
           const blob = await resp.blob();
           let filename = 'contacts.pdf';
@@ -4677,7 +4707,7 @@ HTML_TEMPLATE = """
           });
           if (!resp.ok) {
             const errText = await resp.text();
-            throw new Error('Server returned ' + resp.status + ' â€“ ' + errText);
+            throw new Error('Server returned ' + resp.status + ' – ' + errText);
           }
           const data = await resp.json();
           outputEl.textContent = data.reply || '(No response text returned)';
@@ -4705,7 +4735,7 @@ SCHEDULE_TEMPLATE = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Putzelf Marketing â€” Mitarbeiterplan</title>
+  <title>Putzelf Marketing — Mitarbeiterplan</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
@@ -4852,14 +4882,14 @@ SCHEDULE_TEMPLATE = """
           <div class="topbar-title">Personal</div>
           <h1 class="topbar-heading mb-0">Mitarbeiterplan</h1>
           <p class="topbar-subtitle mb-0">
-            Sehen Sie, wer diese Woche an welchem Standort arbeitet, wann Mitarbeitende frei sind und weisen Sie neue EinsÃ¤tze zu.
+            Sehen Sie, wer diese Woche an welchem Standort arbeitet, wann Mitarbeitende frei sind und weisen Sie neue Einsätze zu.
           </p>
           <p class="small-note mb-0">
-            Zeigt {{ week_days[0].strftime('%d.%m.%Y') }} â€“ {{ week_days[-1].strftime('%d.%m.%Y') }} ({{ weeks }} Woche{% if weeks > 1 %}n{% endif %})
+            Zeigt {{ week_days[0].strftime('%d.%m.%Y') }} – {{ week_days[-1].strftime('%d.%m.%Y') }} ({{ weeks }} Woche{% if weeks > 1 %}n{% endif %})
           </p>
         </div>
         <div class="page-header-actions">
-          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-secondary btn-icon" title="Navigation umschalten">â˜°</button>
+          <button id="sidebar-toggle" type="button" class="btn btn-sm btn-outline-secondary btn-icon" title="Navigation umschalten">☰</button>
           <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Admin-Bereich</a>
           <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Abmelden</a>
         </div>
@@ -4881,9 +4911,9 @@ SCHEDULE_TEMPLATE = """
           <div class="section-header">
             <div>
               <div class="section-kicker">Teamplanung</div>
-              <h2 class="section-title">EinsatzÃ¼bersicht</h2>
+              <h2 class="section-title">Einsatzübersicht</h2>
               <p class="section-subtitle">
-                Verwalten Sie die Wochenabdeckung und erkennen Sie freie KapazitÃ¤ten aller Mitarbeitenden auf einen Blick.
+                Verwalten Sie die Wochenabdeckung und erkennen Sie freie Kapazitäten aller Mitarbeitenden auf einen Blick.
               </p>
             </div>
             <div class="section-actions">
@@ -4891,13 +4921,13 @@ SCHEDULE_TEMPLATE = """
                 <a href="{{ pdf_url }}" class="btn btn-sm btn-primary">Plan als PDF</a>
                 <a href="{{ hours_pdf_url }}" class="btn btn-sm btn-outline-secondary">Stundenbericht</a>
               {% else %}
-                <span class="tag-muted">Installieren Sie reportlab fÃ¼r den PDF-Export</span>
+                <span class="tag-muted">Installieren Sie reportlab für den PDF-Export</span>
               {% endif %}
-              <button type="button" class="btn btn-sm btn-outline-primary" id="import-previous-month-btn">EinsÃ¤tze importieren</button>
+              <button type="button" class="btn btn-sm btn-outline-primary" id="import-previous-month-btn">Einsätze importieren</button>
             </div>
           </div>
           <div class="insight-badges">
-            <span class="insight-badge">Woche {{ week_days[0].strftime('%d.%m') }} â€“ {{ week_days[-1].strftime('%d.%m') }}</span>
+            <span class="insight-badge">Woche {{ week_days[0].strftime('%d.%m') }} – {{ week_days[-1].strftime('%d.%m') }}</span>
             <span class="insight-badge">Zeitraum {{ weeks }} Woche{% if weeks > 1 %}n{% endif %}</span>
             {% if selected_employee %}
               <span class="insight-badge">Fokus: {{ selected_employee.name }}</span>
@@ -4920,7 +4950,7 @@ SCHEDULE_TEMPLATE = """
               <select class="form-select form-select-sm" id="filter_employee_id" name="employee_id" onchange="this.form.submit()">
                 <option value="">Alle Mitarbeitenden</option>
                 {% for emp in employees %}
-                  <option value="{{ emp.id }}" {% if selected_employee_id == emp.id %}selected{% endif %}>{{ emp.name }}{% if emp.role %} â€” {{ emp.role }}{% endif %}</option>
+                  <option value="{{ emp.id }}" {% if selected_employee_id == emp.id %}selected{% endif %}>{{ emp.name }}{% if emp.role %} — {{ emp.role }}{% endif %}</option>
                 {% endfor %}
               </select>
             </div>
@@ -4935,7 +4965,7 @@ SCHEDULE_TEMPLATE = """
             </div>
             <div>
               <div class="collapse-panel" style="padding-top:0.25rem;">
-                <button type="button" id="free-filter-toggle" class="btn btn-sm btn-outline-secondary" style="width:100%; text-align:left; font-weight:600;" onclick="toggleFreeFilterPanel()">Nur freie Mitarbeitende â–¾</button>
+                <button type="button" id="free-filter-toggle" class="btn btn-sm btn-outline-secondary" style="width:100%; text-align:left; font-weight:600;" onclick="toggleFreeFilterPanel()">Nur freie Mitarbeitende ▾</button>
                 <div id="free-filter-content" style="display:none; margin-top:0.6rem;">
                   <div style="display:grid; grid-template-columns:repeat(1,1fr); gap:0.5rem;">
                     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
@@ -4972,27 +5002,27 @@ SCHEDULE_TEMPLATE = """
             <div>
               <label class="form-label" for="filter-zeitraum">Zeitraum</label>
               <select class="form-select form-select-sm" id="filter-zeitraum" onchange="handleZeitraumChange(event, '{{ url_for('schedule_dashboard') }}')">
-                <option value="">â€” WÃ¤hlen â€”</option>
+                <option value="">— Wählen —</option>
                 {% for n in [1,2,4,8,12] %}
                   <option value="weeks={{ n }}" {% if weeks == n and not request.args.get('days') %}selected{% endif %}>{{ n }} Woche{% if n>1 %}n{% endif %}</option>
                 {% endfor %}
-                <option value="day-picker" {% if request.args.get('days') %}selected{% endif %}>Tag auswÃ¤hlen</option>
+                <option value="day-picker" {% if request.args.get('days') %}selected{% endif %}>Tag auswählen</option>
               </select>
-              <input type="hidden" id="filter-day-picker" class="form-control form-control-sm" placeholder="Tag wÃ¤hlen">
+              <input type="hidden" id="filter-day-picker" class="form-control form-control-sm" placeholder="Tag wählen">
             </div>
           </form>
           <form id="batch-delete-form" method="post" action="{{ url_for('batch_delete_shifts') }}">
             <div class="batch-actions">
               <button type="button" class="btn btn-sm btn-outline-primary" id="edit-selected-btn" disabled>
-                <i class="bi bi-pencil-square"></i> AusgewÃ¤hlte bearbeiten (<span id="edit-selected-count">0</span>)
+                <i class="bi bi-pencil-square"></i> Ausgewählte bearbeiten (<span id="edit-selected-count">0</span>)
               </button>
               <button type="submit" class="btn btn-sm btn-batch-delete" id="delete-selected-btn" disabled>
-                <i class="bi bi-trash"></i> AusgewÃ¤hlte lÃ¶schen (<span id="selected-count">0</span>)
+                <i class="bi bi-trash"></i> Ausgewählte löschen (<span id="selected-count">0</span>)
               </button>
             </div>
             {% if not has_any_shifts and not free_filter %}
               <div class="alert alert-warning mb-3" role="alert" style="border-radius:0.85rem;">
-                Keine EinsÃ¤tze im ausgewÃ¤hlten Zeitraum ({{ week_days[0].strftime('%d.%m.%Y') }} â€“ {{ week_days[-1].strftime('%d.%m.%Y') }}){% if selected_site %} fÃ¼r {{ selected_site.name }}{% endif %}{% if selected_employee %} ({{ selected_employee.name }}){% endif %}. Bitte Startwoche/Filter anpassen oder unten einen neuen Einsatz anlegen.
+                Keine Einsätze im ausgewählten Zeitraum ({{ week_days[0].strftime('%d.%m.%Y') }} – {{ week_days[-1].strftime('%d.%m.%Y') }}){% if selected_site %} für {{ selected_site.name }}{% endif %}{% if selected_employee %} ({{ selected_employee.name }}){% endif %}. Bitte Startwoche/Filter anpassen oder unten einen neuen Einsatz anlegen.
               </div>
             {% endif %}
             <div class="table-wrapper">
@@ -5022,15 +5052,15 @@ SCHEDULE_TEMPLATE = """
                             {% if cell %}
                               {% for shift in cell %}
                                 <div class="shift-pill" draggable="true" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions | e }}">
-                                  <input type="checkbox" class="shift-checkbox" name="shift_ids[]" value="{{ shift.id }}" title="Zum LÃ¶schen auswÃ¤hlen">
+                                  <input type="checkbox" class="shift-checkbox" name="shift_ids[]" value="{{ shift.id }}" title="Zum Löschen auswählen">
                                   <div class="shift-pill-text">
                                     <div class="shift-pill-title">{{ shift.site_name }}</div>
                                     <div class="shift-pill-sub">{{ shift.site_address }}</div>
                                     <div class="shift-pill-time">{{ shift.time_window }}</div>
                                   </div>
                                   <div class="shift-pill-actions">
-                                    <button type="button" class="shift-edit btn-icon-tiny" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions | e }}" title="Einsatz bearbeiten" style="background:none; border:none; padding:0; cursor:pointer; color:#0f766e; font-size:0.9rem; margin:0 2px;">âœŽ</button>
-                                    <a href="{{ url_for('delete_shift', shift_id=shift.id) }}" class="shift-delete" onclick="return confirm('Diesen Einsatz lÃ¶schen?')" title="Einsatz lÃ¶schen">Ã—</a>
+                                    <button type="button" class="shift-edit btn-icon-tiny" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions | e }}" title="Einsatz bearbeiten" style="background:none; border:none; padding:0; cursor:pointer; color:#0f766e; font-size:0.9rem; margin:0 2px;">✎</button>
+                                    <a href="{{ url_for('delete_shift', shift_id=shift.id) }}" class="shift-delete" onclick="return confirm('Diesen Einsatz löschen?')" title="Einsatz löschen">×</a>
                                   </div>
                                 </div>
                               {% endfor %}
@@ -5052,7 +5082,7 @@ SCHEDULE_TEMPLATE = """
               <div class="section-kicker">Einsatz erstellen</div>
               <h2 class="section-title">Neuen Einsatz zuweisen</h2>
               <p class="section-subtitle">
-                WÃ¤hlen Sie einen Mitarbeiter, ordnen Sie ihn einem Standort zu und hinterlegen Sie anschlieÃŸend Zeitfenster und Tage.
+                Wählen Sie einen Mitarbeiter, ordnen Sie ihn einem Standort zu und hinterlegen Sie anschließend Zeitfenster und Tage.
               </p>
             </div>
           </div>
@@ -5061,22 +5091,22 @@ SCHEDULE_TEMPLATE = """
               <div class="form-field">
                 <label class="form-label small-note text-uppercase">Mitarbeiter</label>
                 <details class="collapse-panel">
-                  <summary class="form-select form-select-sm" style="cursor:pointer; padding:0.65rem 0.75rem; border:1px solid #cbd5e1; border-radius:0.5rem; background:#f8fafc;">Mitarbeiter auswÃ¤hlen</summary>
+                  <summary class="form-select form-select-sm" style="cursor:pointer; padding:0.65rem 0.75rem; border:1px solid #cbd5e1; border-radius:0.5rem; background:#f8fafc;">Mitarbeiter auswählen</summary>
                   <div style="margin-top:0.75rem; display:flex; flex-direction:column; gap:0.35rem; max-height:16rem; overflow:auto; padding-right:0.25rem;">
                     {% for emp in employees %}
                       <label style="display:flex; align-items:center; gap:0.6rem;">
                         <input type="checkbox" name="employee_id" value="{{ emp.id }}">
-                        <span>{{ emp.name }}{% if emp.role %} â€” {{ emp.role }}{% endif %}</span>
+                        <span>{{ emp.name }}{% if emp.role %} — {{ emp.role }}{% endif %}</span>
                       </label>
                     {% endfor %}
                   </div>
                 </details>
-                <div class="small-note mt-1">Ã–ffnen Sie das Feld und wÃ¤hlen Sie mehrere Mitarbeiter.</div>
+                <div class="small-note mt-1">Öffnen Sie das Feld und wählen Sie mehrere Mitarbeiter.</div>
               </div>
               <div class="form-field">
                 <label class="form-label small-note text-uppercase" for="site_id">Standort</label>
                 <select class="form-select form-select-sm" id="site_id" name="site_id" required>
-                  <option value="">Standort wÃ¤hlenâ€¦</option>
+                  <option value="">Standort wählen…</option>
                   {% for site in sites %}
                     <option value="{{ site.id }}">{{ site.name }}</option>
                   {% endfor %}
@@ -5084,7 +5114,7 @@ SCHEDULE_TEMPLATE = """
               </div>
               <div class="form-field form-field-span">
                 <label class="form-label small-note text-uppercase" for="day-picker">Tag(e)</label>
-                <input type="text" class="form-control form-control-sm" id="day-picker" name="day_display" placeholder="Einen oder mehrere Tage wÃ¤hlen" required autocomplete="off">
+                <input type="text" class="form-control form-control-sm" id="day-picker" name="day_display" placeholder="Einen oder mehrere Tage wählen" required autocomplete="off">
                 <div id="selected-days" class="selected-days mt-2"></div>
                 <div id="day-hidden-inputs" hidden></div>
               </div>
@@ -5098,16 +5128,16 @@ SCHEDULE_TEMPLATE = """
               </div>
               <div class="form-field form-field-span">
                 <label class="form-label small-note text-uppercase" for="instructions">Besondere Hinweise</label>
-                <textarea class="form-control form-control-sm" id="instructions" name="instructions" rows="3" placeholder="Optionale Hinweise fÃ¼r diesen Einsatz"></textarea>
+                <textarea class="form-control form-control-sm" id="instructions" name="instructions" rows="3" placeholder="Optionale Hinweise für diesen Einsatz"></textarea>
               </div>
             </div>
             <div class="form-actions">
               <button type="submit" class="btn btn-primary btn-sm">Einsatz speichern</button>
-              <span class="small-note">KalendereintrÃ¤ge werden fÃ¼r jeden ausgewÃ¤hlten Tag Ã¼bernommen.</span>
+              <span class="small-note">Kalendereinträge werden für jeden ausgewählten Tag übernommen.</span>
             </div>
           </form>
           <div class="tip-callout mt-3">
-            Tipp: Eine leere Zelle im Raster bedeutet, dass der Mitarbeiter an diesem Tag vollstÃ¤ndig frei ist.
+            Tipp: Eine leere Zelle im Raster bedeutet, dass der Mitarbeiter an diesem Tag vollständig frei ist.
           </div>
         </section>
       </main>
@@ -5119,23 +5149,23 @@ SCHEDULE_TEMPLATE = """
     <div style="background:#ffffff; border-radius:1rem; padding:1.5rem; width:100%; max-width:900px; max-height:90vh; overflow-y:auto; box-shadow:0 24px 60px rgba(15,23,42,0.25);">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1rem;">
         <div>
-          <h3 style="margin:0; font-size:1.3rem; color:#0f172a;">EinsÃ¤tze importieren</h3>
-          <p style="margin:0.5rem 0 0; color:#475569;">WÃ¤hlen Sie die Quellwoche (relative zur aktuellen Woche) und wie viele Wochen vorwÃ¤rts kopiert werden sollen.</p>
+          <h3 style="margin:0; font-size:1.3rem; color:#0f172a;">Einsätze importieren</h3>
+          <p style="margin:0.5rem 0 0; color:#475569;">Wählen Sie die Quellwoche (relative zur aktuellen Woche) und wie viele Wochen vorwärts kopiert werden sollen.</p>
         </div>
-        <button type="button" id="previous-month-import-close" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#64748b;">Ã—</button>
+        <button type="button" id="previous-month-import-close" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#64748b;">×</button>
       </div>
       <div style="display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
         <div style="flex:1; min-width:220px;">
-          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Quellwoche (zurÃ¼ck)</label>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Quellwoche (zurück)</label>
           <select id="previous-month-import-source-offset" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
             <option value="0" selected>Aktuelle Woche</option>
-            <option value="1">1 Woche zurÃ¼ck</option>
-            <option value="2">2 Wochen zurÃ¼ck</option>
-            <option value="3">3 Wochen zurÃ¼ck</option>
+            <option value="1">1 Woche zurück</option>
+            <option value="2">2 Wochen zurück</option>
+            <option value="3">3 Wochen zurück</option>
           </select>
         </div>
         <div style="flex:1; min-width:220px;">
-          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Ziel (Wochen vorwÃ¤rts)</label>
+          <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Ziel (Wochen vorwärts)</label>
           <select id="previous-month-import-target-offset" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;">
             <option value="1" selected>+1 Woche</option>
             <option value="2">+2 Wochen</option>
@@ -5145,7 +5175,7 @@ SCHEDULE_TEMPLATE = """
         </div>
       </div>
       <div id="previous-month-import-content">
-        <div class="alert alert-info" role="alert">Lade EinsÃ¤tze aus dem ausgewÃ¤hlten Monat...</div>
+        <div class="alert alert-info" role="alert">Lade Einsätze aus dem ausgewählten Monat...</div>
       </div>
       <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1rem;">
         <button type="button" class="btn btn-sm btn-outline-secondary" id="previous-month-import-cancel">Abbrechen</button>
@@ -5159,7 +5189,7 @@ SCHEDULE_TEMPLATE = """
     <div style="background:white; border-radius:1rem; padding:1.5rem; max-width:500px; width:90%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
         <h3 style="margin:0; font-size:1.3rem; color:#0f172a;">Einsatz bearbeiten</h3>
-        <button type="button" onclick="document.getElementById('edit-shift-modal').style.display='none'" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#94a3b8;">Ã—</button>
+        <button type="button" onclick="document.getElementById('edit-shift-modal').style.display='none'" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#94a3b8;">×</button>
       </div>
       <form id="edit-shift-form" method="post" action="" style="display:flex; flex-direction:column; gap:1rem;">
         <input type="hidden" id="edit-shift-id" name="shift_id" value="">
@@ -5167,7 +5197,7 @@ SCHEDULE_TEMPLATE = """
           <label style="display:block; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:0.35rem;">Mitarbeiter</label>
           <select id="edit-shift-employee" name="employee_id" style="width:100%; padding:0.5rem; border:1px solid #cbd5f5; border-radius:0.6rem; font-size:0.9rem;" required>
             {% for emp in employees %}
-              <option value="{{ emp.id }}">{{ emp.name }}{% if emp.role %} â€” {{ emp.role }}{% endif %}</option>
+              <option value="{{ emp.id }}">{{ emp.name }}{% if emp.role %} — {{ emp.role }}{% endif %}</option>
             {% endfor %}
           </select>
         </div>
@@ -5189,7 +5219,7 @@ SCHEDULE_TEMPLATE = """
         </div>
         <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1rem;">
           <button type="button" onclick="document.getElementById('edit-shift-modal').style.display='none'" style="padding:0.65rem 1.15rem; border:1px solid #cbd5f5; border-radius:0.75rem; background:#f8fafc; color:#0f172a; cursor:pointer; font-size:0.95rem;">Abbrechen</button>
-          <button type="submit" style="padding:0.65rem 1.15rem; border:none; border-radius:0.75rem; background:#0f766e; color:white; cursor:pointer; font-size:0.95rem; font-weight:500;">Ã„nderungen speichern</button>
+          <button type="submit" style="padding:0.65rem 1.15rem; border:none; border-radius:0.75rem; background:#0f766e; color:white; cursor:pointer; font-size:0.95rem; font-weight:500;">Änderungen speichern</button>
         </div>
       </form>
     </div>
@@ -5200,13 +5230,13 @@ SCHEDULE_TEMPLATE = """
     <div style="background:white; border-radius:1rem; padding:1rem; max-width:680px; width:94%; max-height:80vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
         <h3 style="margin:0; font-size:1.1rem; color:#0f172a;">Freie Mitarbeitende</h3>
-        <button type="button" onclick="document.getElementById('free-employees-modal').style.display='none'" style="background:none; border:none; font-size:1.25rem; cursor:pointer; color:#94a3b8;">Ã—</button>
+        <button type="button" onclick="document.getElementById('free-employees-modal').style.display='none'" style="background:none; border:none; font-size:1.25rem; cursor:pointer; color:#94a3b8;">×</button>
       </div>
       <div id="free-employees-content" style="min-height:3rem;">
-        <div class="small-note">Suche lÃ¤uft...</div>
+        <div class="small-note">Suche läuft...</div>
       </div>
       <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.75rem;">
-        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('free-employees-modal').style.display='none'">SchlieÃŸen</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('free-employees-modal').style.display='none'">Schließen</button>
       </div>
     </div>
   </div>
@@ -5220,7 +5250,7 @@ SCHEDULE_TEMPLATE = """
       const siteIdElem = document.getElementById('filter_site_id');
       const siteId = siteIdElem ? siteIdElem.value : '';
       if(!startDate){
-        alert('Bitte ein Startdatum wÃ¤hlen.');
+        alert('Bitte ein Startdatum wählen.');
         return;
       }
       const params = new URLSearchParams({free_start_date: startDate, free_end_date: endDate});
@@ -5229,7 +5259,7 @@ SCHEDULE_TEMPLATE = """
       if(siteId) params.set('site_id', siteId);
       const url = `/schedule/free-available?${params.toString()}`;
       const container = document.getElementById('free-employees-content');
-      container.innerHTML = '<div class="small-note">Suche lÃ¤uft...</div>';
+      container.innerHTML = '<div class="small-note">Suche läuft...</div>';
       document.getElementById('free-employees-modal').style.display = 'flex';
       try{
         const resp = await fetch(url, {credentials: 'same-origin'});
@@ -5241,7 +5271,7 @@ SCHEDULE_TEMPLATE = """
         const data = await resp.json();
         const items = data.items || [];
         if(items.length === 0){
-          container.innerHTML = '<div class="small-note">Keine freien Mitarbeitenden im gewÃ¤hlten Zeitraum gefunden.</div>';
+          container.innerHTML = '<div class="small-note">Keine freien Mitarbeitenden im gewählten Zeitraum gefunden.</div>';
           return;
         }
         const list = document.createElement('div');
@@ -5253,7 +5283,7 @@ SCHEDULE_TEMPLATE = """
           card.style.padding = '0.6rem';
           card.style.border = '1px solid #e6eef3';
           card.style.borderRadius = '0.5rem';
-          card.innerHTML = `<strong>${it.name}</strong>${it.role ? ' â€” ' + it.role : ''}`;
+          card.innerHTML = `<strong>${it.name}</strong>${it.role ? ' — ' + it.role : ''}`;
           list.appendChild(card);
         });
         container.innerHTML = '';
@@ -5269,18 +5299,18 @@ SCHEDULE_TEMPLATE = """
       if(!content || !toggle) return;
       const isHidden = content.style.display === 'none' || content.style.display === '';
       content.style.display = isHidden ? 'block' : 'none';
-      toggle.textContent = isHidden ? 'Nur freie Mitarbeitende â–´' : 'Nur freie Mitarbeitende â–¾';
+      toggle.textContent = isHidden ? 'Nur freie Mitarbeitende ▴' : 'Nur freie Mitarbeitende ▾';
     }
   </script>
 
-  <!-- Sammelbearbeitung EinsÃ¤tze Modal -->
+  <!-- Sammelbearbeitung Einsätze Modal -->
   <div id="batch-edit-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
     <div style="background:white; border-radius:1rem; padding:1.5rem; max-width:520px; width:90%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-        <h3 style="margin:0; font-size:1.2rem; color:#0f172a;">Mehrere EinsÃ¤tze bearbeiten</h3>
-        <button type="button" id="batch-edit-close" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#94a3b8;">Ã—</button>
+        <h3 style="margin:0; font-size:1.2rem; color:#0f172a;">Mehrere Einsätze bearbeiten</h3>
+        <button type="button" id="batch-edit-close" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#94a3b8;">×</button>
       </div>
-      <p class="small-note" style="margin-bottom:1rem;">Bearbeite <strong id="batch-edit-count">0</strong> ausgewÃ¤hlte EinsÃ¤tze.</p>
+      <p class="small-note" style="margin-bottom:1rem;">Bearbeite <strong id="batch-edit-count">0</strong> ausgewählte Einsätze.</p>
       <form id="batch-edit-form" method="post" action="{{ url_for('batch_edit_shifts') }}" style="display:flex; flex-direction:column; gap:0.9rem;">
         <div id="batch-edit-hidden-inputs" hidden></div>
         <div>
@@ -5303,7 +5333,7 @@ SCHEDULE_TEMPLATE = """
         </div>
         <div style="display:flex; gap:0.75rem; justify-content:flex-end; margin-top:0.5rem;">
           <button type="button" id="batch-edit-cancel" style="padding:0.65rem 1.15rem; border:1px solid #cbd5f5; border-radius:0.75rem; background:#f8fafc; color:#0f172a; cursor:pointer; font-size:0.95rem;">Abbrechen</button>
-          <button type="submit" style="padding:0.65rem 1.15rem; border:none; border-radius:0.75rem; background:#0f766e; color:white; cursor:pointer; font-size:0.95rem; font-weight:500;">Ã„nderungen anwenden</button>
+          <button type="submit" style="padding:0.65rem 1.15rem; border:none; border-radius:0.75rem; background:#0f766e; color:white; cursor:pointer; font-size:0.95rem; font-weight:500;">Änderungen anwenden</button>
         </div>
       </form>
     </div>
@@ -5375,7 +5405,7 @@ SCHEDULE_TEMPLATE = """
         const targetOffset = Number(document.getElementById('previous-month-import-target-offset')?.value || 1);
         console.log('Setting modal display to flex');
         importModal.style.display = 'flex';
-        importContent.innerHTML = '<div class="alert alert-info" role="alert">Lade EinsÃ¤tze aus der ausgewÃ¤hlten Woche...</div>';
+        importContent.innerHTML = '<div class="alert alert-info" role="alert">Lade Einsätze aus der ausgewählten Woche...</div>';
         importSubmitBtn.disabled = true;
         try {
           const params = new URLSearchParams({
@@ -5389,7 +5419,7 @@ SCHEDULE_TEMPLATE = """
           const data = await resp.json();
           const items = Array.isArray(data.items) ? data.items : [];
           if (!items.length) {
-            importContent.innerHTML = '<div class="alert alert-warning" role="alert">Keine aktiven EinsÃ¤tze im vorherigen Monat gefunden.</div>';
+            importContent.innerHTML = '<div class="alert alert-warning" role="alert">Keine aktiven Einsätze im vorherigen Monat gefunden.</div>';
             return;
           }
 
@@ -5398,7 +5428,7 @@ SCHEDULE_TEMPLATE = """
           table.innerHTML = `
             <thead>
               <tr>
-                <th style="width:1%;"><input type="checkbox" id="previous-month-import-select-all" aria-label="Alle auswÃ¤hlen"></th>
+                <th style="width:1%;"><input type="checkbox" id="previous-month-import-select-all" aria-label="Alle auswählen"></th>
                 <th>Mitarbeiter</th>
                 <th>Aktiv</th>
                 <th>Standort</th>
@@ -5417,12 +5447,12 @@ SCHEDULE_TEMPLATE = """
             row.innerHTML = `
               <td><input type="checkbox" class="previous-month-import-checkbox" value="${item.id}"></td>
               <td>${item.employee}</td>
-              <td>${item.active ? '<span class="badge bg-success" title="Der Mitarbeiter ist aktiv und kann importiert werden">Aktiv</span>' : '<span class="badge bg-secondary" title="Der Mitarbeiter ist inaktiv und wird standardmÃ¤ÃŸig ausgeblendet">Inaktiv</span>'}</td>
+              <td>${item.active ? '<span class="badge bg-success" title="Der Mitarbeiter ist aktiv und kann importiert werden">Aktiv</span>' : '<span class="badge bg-secondary" title="Der Mitarbeiter ist inaktiv und wird standardmäßig ausgeblendet">Inaktiv</span>'}</td>
               <td>${item.site}</td>
               <td>${item.from_day}</td>
               <td>${item.to_day}</td>
               <td>${item.time}</td>
-              <td>${item.conflict ? '<span class="text-warning" title="Diese Schicht verursacht einen Konflikt mit vorhandenen Planungen">Warnung</span>' : 'â€”'}</td>
+              <td>${item.conflict ? '<span class="text-warning" title="Diese Schicht verursacht einen Konflikt mit vorhandenen Planungen">Warnung</span>' : '—'}</td>
             `;
             tbody.appendChild(row);
           });
@@ -5473,7 +5503,7 @@ SCHEDULE_TEMPLATE = """
             });
           }
         } catch (err) {
-          importContent.innerHTML = `<div class="alert alert-danger" role="alert">Fehler beim Laden der EinsÃ¤tze. Bitte Seite neu laden.</div>`;
+          importContent.innerHTML = `<div class="alert alert-danger" role="alert">Fehler beim Laden der Einsätze. Bitte Seite neu laden.</div>`;
           console.error(err);
         }
       };
@@ -5522,10 +5552,10 @@ SCHEDULE_TEMPLATE = """
             }
             const result = await resp.json();
             const summary = [];
-            if (result.created) summary.push(`${result.created} EinsÃ¤tze importiert`);
-            if (result.skipped_existing) summary.push(`${result.skipped_existing} doppelt Ã¼bersprungen`);
-            if (result.skipped_conflict) summary.push(`${result.skipped_conflict} wegen Konflikten Ã¼bersprungen`);
-            if (result.skipped_inactive) summary.push(`${result.skipped_inactive} inaktive Mitarbeiter Ã¼bersprungen`);
+            if (result.created) summary.push(`${result.created} Einsätze importiert`);
+            if (result.skipped_existing) summary.push(`${result.skipped_existing} doppelt übersprungen`);
+            if (result.skipped_conflict) summary.push(`${result.skipped_conflict} wegen Konflikten übersprungen`);
+            if (result.skipped_inactive) summary.push(`${result.skipped_inactive} inaktive Mitarbeiter übersprungen`);
             alert(summary.join(String.fromCharCode(10)) || 'Import abgeschlossen.');
             window.location.reload();
           } catch (err) {
@@ -5596,7 +5626,7 @@ SCHEDULE_TEMPLATE = """
         });
         dayPicker.required = dates.length === 0;
         if (dates.length === 0) {
-          dayPicker.setCustomValidity('Bitte mindestens einen Tag auswÃ¤hlen.');
+          dayPicker.setCustomValidity('Bitte mindestens einen Tag auswählen.');
         } else {
           dayPicker.setCustomValidity('');
         }
@@ -5661,7 +5691,7 @@ SCHEDULE_TEMPLATE = """
           e.preventDefault();
           return false;
         }
-        if (!confirm(`${checkedCount} ausgewÃ¤hlte EinsÃ¤tze lÃ¶schen?`)) {
+        if (!confirm(`${checkedCount} ausgewählte Einsätze löschen?`)) {
           e.preventDefault();
           return false;
         }
@@ -5926,17 +5956,17 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   "System access": "Systemzugriff",
   "Staff type / department": "Personaltyp / Abteilung",
   "Role / job title": "Rolle / Berufsbezeichnung",
-  "The employeeâ€™s specific job title.": "Die konkrete Berufsbezeichnung des Mitarbeiters.",
-  "The employeeâ€™s company function or department.": "Der Unternehmensbereich oder die Abteilung des Mitarbeiters.",
-  "System access controls which parts of Elfâ€™s Plan this employee can use.": "Der Systemzugriff legt fest, welche Bereiche von Elfâ€™s Plan dieser Mitarbeiter nutzen kann.",
-  "Choose the accountâ€™s permissions.": "WÃ¤hlen Sie die Berechtigungen des Kontos.",
+  "The employee’s specific job title.": "Die konkrete Berufsbezeichnung des Mitarbeiters.",
+  "The employee’s company function or department.": "Der Unternehmensbereich oder die Abteilung des Mitarbeiters.",
+  "System access controls which parts of Elf’s Plan this employee can use.": "Der Systemzugriff legt fest, welche Bereiche von Elf’s Plan dieser Mitarbeiter nutzen kann.",
+  "Choose the account’s permissions.": "Wählen Sie die Berechtigungen des Kontos.",
   "Employee email": "E-Mail-Adresse des Mitarbeiters",
-  "Used for sign-in and credential delivery.": "Wird fÃ¼r die Anmeldung und den Versand der Zugangsdaten verwendet.",
+  "Used for sign-in and credential delivery.": "Wird für die Anmeldung und den Versand der Zugangsdaten verwendet.",
   "Send sign-in details by email": "Zugangsdaten per E-Mail senden",
-  "Enable platform access, set a valid email, and set the employee to Active before sending sign-in details.": "Aktivieren Sie den Plattformzugang, geben Sie eine gÃ¼ltige E-Mail-Adresse ein und setzen Sie den Mitarbeiter vor dem Versand der Zugangsdaten auf Aktiv.",
+  "Enable platform access, set a valid email, and set the employee to Active before sending sign-in details.": "Aktivieren Sie den Plattformzugang, geben Sie eine gültige E-Mail-Adresse ein und setzen Sie den Mitarbeiter vor dem Versand der Zugangsdaten auf Aktiv.",
   "Email is not configured. Set the SMTP sender and password first.": "E-Mail ist nicht konfiguriert. Bitte richten Sie zuerst SMTP-Absender und Passwort ein.",
-  "Enter a valid employee email address first.": "Geben Sie zuerst eine gÃ¼ltige Mitarbeiter-E-Mail-Adresse ein.",
-  "Could not send the email. Check SMTP settings and try again.": "Die E-Mail konnte nicht gesendet werden. PrÃ¼fen Sie die SMTP-Einstellungen und versuchen Sie es erneut.",
+  "Enter a valid employee email address first.": "Geben Sie zuerst eine gültige Mitarbeiter-E-Mail-Adresse ein.",
+  "Could not send the email. Check SMTP settings and try again.": "Die E-Mail konnte nicht gesendet werden. Prüfen Sie die SMTP-Einstellungen und versuchen Sie es erneut.",
   "All staff types": "Alle Funktionen",
   "All branches": "Alle Niederlassungen",
   "More filters": "Weitere Filter",
@@ -5949,15 +5979,15 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   "Employee status updated.": "Mitarbeiterstatus aktualisiert.",
   "Upload profile photo": "Profilbild hochladen",
   "Profile photo updated.": "Profilbild aktualisiert.",
-  "Choose a profile photo to upload.": "Bitte ein Profilbild zum Hochladen auswÃ¤hlen.",
-  "Choose a valid image file (PNG, JPG, GIF, or WebP).": "Bitte eine gÃ¼ltige Bilddatei auswÃ¤hlen (PNG, JPG, GIF oder WebP).",
+  "Choose a profile photo to upload.": "Bitte ein Profilbild zum Hochladen auswählen.",
+  "Choose a valid image file (PNG, JPG, GIF, or WebP).": "Bitte eine gültige Bilddatei auswählen (PNG, JPG, GIF oder WebP).",
   "Employee profile could not be found.": "Das Mitarbeiterprofil wurde nicht gefunden.",
   "Could not update your profile photo. Please try again.": "Das Profilbild konnte nicht aktualisiert werden. Bitte erneut versuchen.",
-  "Cleaners without shifts this week": "ReinigungskrÃ¤fte ohne EinsÃ¤tze diese Woche",
+  "Cleaners without shifts this week": "Reinigungskräfte ohne Einsätze diese Woche",
   "Search name, role, email, phone, or city": "Nach Name, Rolle, E-Mail, Telefon oder Stadt suchen",
   "Cleaner": "Reinigungskraft",
   "Branch office": "Niederlassung",
-  "Office administrator": "BÃ¼roadministration",
+  "Office administrator": "Büroadministration",
   "IT": "IT",
   "Reception": "Empfang",
   "Intern": "Praktikant/in",
@@ -5966,10 +5996,27 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   "Wien": "Wien",
   "Graz": "Graz",
   "Enable platform access and create sign-in details": "Plattformzugang und Anmeldedaten erstellen",
-  "Turn this on only for employees who need an app account.": "Nur fÃ¼r Mitarbeitende aktivieren, die ein App-Konto benÃ¶tigen.",
-  "Overview": "Ãœbersicht",
+  "Turn this on only for employees who need an app account.": "Nur für Mitarbeitende aktivieren, die ein App-Konto benötigen.",
+  "Overview": "Übersicht",
   "Manage employees": "Mitarbeiter verwalten",
   "Manage sites": "Standorte verwalten",
+  "Site directory": "Standortverzeichnis",
+  "Site database": "Standortdatenbank",
+  "Manage client sites and service locations": "Kundenstandorte und Einsatzorte verwalten",
+  "Add site": "Standort hinzuf\u00fcgen",
+  "On this page": "Auf dieser Seite",
+  "Scheduled this week": "Diese Woche eingeplant",
+  "Delete site": "Standort löschen",
+  "Close site": "Standort schließen",
+  "This site has invoices and cannot be deleted. Set it to inactive instead.": "Dieser Standort hat Rechnungen und kann nicht gelöscht werden. Setzen Sie ihn stattdessen auf inaktiv.",
+  "Site deleted. Its shifts and inspection reports were also deleted.": "Standort gelöscht. Zugehörige Einsätze und Kontrollberichte wurden ebenfalls gelöscht.",
+  "Search sites": "Standorte suchen",
+  "Search site, company, contact, email, phone or address": "Standort, Firma, Kontakt, E-Mail, Telefon oder Adresse suchen",
+  "All site managers": "Alle Objektleiter",
+  "Unassigned manager": "Kein Objektleiter zugewiesen",
+  "All clients": "Alle Kunden",
+  "+ Add filter": "+ Filter hinzufügen",
+  "Scheduled this week": "Diese Woche eingeplant",
   "Profiles": "Profile",
   "Invoices": "Rechnungen",
   "Log out": "Abmelden",
@@ -5987,7 +6034,7 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   "Upload logo": "Logo hochladen",
   "Save profile": "Profil speichern",
   "Create New Invoice": "Neue Rechnung erstellen",
-  "Generate an invoice for work completed": "Rechnung fÃ¼r erbrachte Arbeit erstellen",
+  "Generate an invoice for work completed": "Rechnung für erbrachte Arbeit erstellen",
   "Company Name": "Firmenname",
   "Contact Name": "Kontaktname",
   "Contact Email": "Kontakt-E-Mail",
@@ -5995,7 +6042,7 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   "Billing Address": "Rechnungsadresse",
   "Invoice Month": "Rechnungsmonat",
   "Total Hours": "Gesamtstunden",
-  "Days Until Due": "Tage bis FÃ¤lligkeit",
+  "Days Until Due": "Tage bis Fälligkeit",
   "Tax Rate (%)": "Steuersatz (%)",
   "Create Invoice": "Rechnung erstellen",
   "Edit Invoice": "Rechnung bearbeiten",
@@ -6004,16 +6051,16 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   "Billing Contact Person:": "Rechnungs-Kontaktperson:",
   "Address:": "Adresse:",
   "Hourly Rate": "Stundensatz",
-  "Due Date": "FÃ¤lligkeitsdatum",
+  "Due Date": "Fälligkeitsdatum",
   "Paid Date": "Bezahlt am",
   "Subtotal": "Zwischensumme",
   "TOTAL": "GESAMT",
   "Draft": "Entwurf",
   "Sent": "Gesendet",
   "Paid": "Bezahlt",
-  "Overdue": "ÃœberfÃ¤llig",
-  "Delete": "LÃ¶schen",
-  "Back": "ZurÃ¼ck",
+  "Overdue": "Überfällig",
+  "Delete": "Löschen",
+  "Back": "Zurück",
   "Send Email": "E-Mail senden",
   "Mark as Paid": "Als bezahlt markieren",
   "Mark as Unpaid": "Als unbezahlt markieren",
@@ -6022,27 +6069,27 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   "Created From": "Erstellt von",
   "Created To": "Erstellt bis",
   "Apply Filters": "Filter anwenden",
-  "Clear": "ZurÃ¼cksetzen",
+  "Clear": "Zurücksetzen",
   "Lead-Center": "Lead-Center",
-  "Assign coverage": "EinsÃ¤tze zuweisen",
+  "Assign coverage": "Einsätze zuweisen",
   "Crawler": "Crawler",
   "No sites found.": "Keine Standorte gefunden.",
   "No employees found.": "Keine Mitarbeiter gefunden.",
   "No invoices found.": "Keine Rechnungen gefunden.",
   "Client Contract": "Kundenvertrag",
-  "Operations overview": "BetriebsÃ¼bersicht",
-  "This week at a glance": "Diese Woche im Ãœberblick",
+  "Operations overview": "Betriebsübersicht",
+  "This week at a glance": "Diese Woche im Überblick",
   "Employees": "Mitarbeiter",
   "Sites": "Standorte",
   "Unassigned sites": "Unzugewiesene Standorte",
   "Newest sites": "Neueste Standorte",
   "Sites without coverage": "Standorte ohne Abdeckung",
-  "All sites are covered for the current week.": "Alle Standorte sind fÃ¼r die aktuelle Woche abgedeckt.",
+  "All sites are covered for the current week.": "Alle Standorte sind für die aktuelle Woche abgedeckt.",
   "Manage": "Verwalten",
   "Team directory": "Teamverzeichnis",
-  "Location library": "StandortÃ¼bersicht",
+  "Location library": "Standortübersicht",
   "Billing & Invoicing": "Abrechnung & Rechnungen",
-  "Financial Overview": "FinanzÃ¼bersicht",
+  "Financial Overview": "Finanzübersicht",
   "Invoice": "Rechnung",
   "Invoice #": "Rechnungsnr.",
   "Date:": "Datum:",
@@ -6056,25 +6103,25 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   "Work at": "Arbeit bei",
   "Upon receipt": "Bei Erhalt",
   "Status": "Status",
-  "Save Changes": "Ã„nderungen speichern",
+  "Save Changes": "Änderungen speichern",
   "Cancel": "Abbrechen",
   "Paid": "Bezahlt",
   "DRAFT": "ENTWURF",
   "SENT": "GESENDET",
   "PAID": "BEZAHLT",
   "Generate contract PDF": "Vertrags-PDF erstellen",
-  "Please fill all contract fields.": "Bitte alle Vertragsfelder ausfÃ¼llen.",
-  "Please upload a valid PDF contract file.": "Bitte eine gÃ¼ltige PDF-Vertragsdatei hochladen.",
+  "Please fill all contract fields.": "Bitte alle Vertragsfelder ausfüllen.",
+  "Please upload a valid PDF contract file.": "Bitte eine gültige PDF-Vertragsdatei hochladen.",
   "Uploaded PDF is empty.": "Hochgeladene PDF ist leer.",
   "Upload a contract PDF or place a template at uploads/contract_template.pdf or static/uploads/contract_template.pdf.": "Laden Sie eine Vertrags-PDF hoch oder legen Sie eine Vorlage unter uploads/contract_template.pdf oder static/uploads/contract_template.pdf ab.",
-  "Please fill Name des partners, Firma, and Tel./ Fax / E-Mail before generating contract.": "Bitte fÃ¼llen Sie Name des Partners, Firma und Tel./ Fax / E-Mail aus, bevor Sie den Vertrag erstellen.",
+  "Please fill Name des partners, Firma, and Tel./ Fax / E-Mail before generating contract.": "Bitte füllen Sie Name des Partners, Firma und Tel./ Fax / E-Mail aus, bevor Sie den Vertrag erstellen.",
   "Name des partners": "Name des Partners",
   "Firma": "Firma",
   "Tel./ Fax / E-Mail": "Tel./ Fax / E-Mail",
   "Upload contract PDF": "Vertrags-PDF hochladen",
   "Optional if a server template exists at uploads/contract_template.pdf or static/uploads/contract_template.pdf (or set CONTRACT_TEMPLATE_PATH). If uploaded, this file is used.": "Optional, wenn eine Servervorlage unter uploads/contract_template.pdf oder static/uploads/contract_template.pdf existiert (oder CONTRACT_TEMPLATE_PATH gesetzt ist). Bei Upload wird diese Datei verwendet.",
   "Download PDF": "PDF herunterladen",
-  "Back to manage sites": "ZurÃ¼ck zu Standorte verwalten",
+  "Back to manage sites": "Zurück zu Standorte verwalten",
   "No address": "Keine Adresse",
   "No role": "Keine Rolle",
   "Phone": "Telefon",
@@ -6082,7 +6129,7 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   "Emergency contact phone": "Telefon Notfallkontakt",
   "Address": "Adresse",
   "Page": "Seite",
-  "Prev": "ZurÃ¼ck",
+  "Prev": "Zurück",
   "Next": "Weiter",
   "clients": "Kunden",
   "Lead-Center": "Lead-Center",
@@ -6093,28 +6140,28 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   "Closed": "Abgeschlossen",
   "Source": "Quelle",
   "Stage": "Phase",
-  "Add lead": "Lead hinzufÃ¼gen",
-  "Delete selected": "AusgewÃ¤hlte lÃ¶schen",
-  "Send selected emails": "AusgewÃ¤hlte E-Mails senden",
+  "Add lead": "Lead hinzufügen",
+  "Delete selected": "Ausgewählte löschen",
+  "Send selected emails": "Ausgewählte E-Mails senden",
   "total invoices": "Rechnungen gesamt",
   "Create": "Erstellen",
   "Create New": "Neu erstellen",
-  "Select a site": "Standort auswÃ¤hlen",
+  "Select a site": "Standort auswählen",
   "Site": "Standort",
   "Site *": "Standort *",
-  "Please select a valid site.": "Bitte einen gÃ¼ltigen Standort auswÃ¤hlen.",
-  "Please choose a valid invoice month.": "Bitte einen gÃ¼ltigen Rechnungsmonat auswÃ¤hlen.",
+  "Please select a valid site.": "Bitte einen gültigen Standort auswählen.",
+  "Please choose a valid invoice month.": "Bitte einen gültigen Rechnungsmonat auswählen.",
   "created successfully!": "erfolgreich erstellt!",
   "updated successfully.": "erfolgreich aktualisiert.",
-  "deleted": "gelÃ¶scht",
-  "Invalid status selected.": "UngÃ¼ltiger Status ausgewÃ¤hlt.",
-  "Invalid due date format.": "UngÃ¼ltiges FÃ¤lligkeitsdatum.",
-  "Invalid paid date format.": "UngÃ¼ltiges Bezahldatum.",
+  "deleted": "gelöscht",
+  "Invalid status selected.": "Ungültiger Status ausgewählt.",
+  "Invalid due date format.": "Ungültiges Fälligkeitsdatum.",
+  "Invalid paid date format.": "Ungültiges Bezahldatum.",
   "Hourly rate and total hours are required.": "Stundensatz und Gesamtstunden sind erforderlich.",
-  "No recipient email set for invoice": "Keine EmpfÃ¤nger-E-Mail fÃ¼r Rechnung gesetzt",
+  "No recipient email set for invoice": "Keine Empfänger-E-Mail für Rechnung gesetzt",
   "Email configuration missing. Set sender email and SMTP password.": "E-Mail-Konfiguration fehlt. Bitte Absender-E-Mail und SMTP-Passwort setzen.",
-  "Thank you for your business!": "Vielen Dank fÃ¼r Ihr Vertrauen!",
-  "Best regards,": "Mit freundlichen GrÃ¼ÃŸen,",
+  "Thank you for your business!": "Vielen Dank für Ihr Vertrauen!",
+  "Best regards,": "Mit freundlichen Grüßen,",
   "Your Company": "Ihr Unternehmen",
   'Client database': 'Kundendatenbank',
   'Manage clients': 'Kunden verwalten',
@@ -6122,15 +6169,15 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   'Clients': 'Kunden',
   'All clients': 'Alle Kunden',
   'Active clients': 'Aktive Kunden',
-  'With shifts this week': 'Mit Eins?tzen diese Woche',
-  'Without shifts this week': 'Ohne Eins?tze diese Woche',
+  'With shifts this week': 'Mit Einsätzen diese Woche',
+  'Without shifts this week': 'Ohne Einsätze diese Woche',
   'Search company, contact, email, phone, address or tax ID': 'Firma, Kontakt, E-Mail, Telefon, Adresse oder Steuer-ID suchen',
   'Search': 'Suchen',
-  'Clear search': 'Suche zur?cksetzen',
+  'Clear search': 'Suche zurücksetzen',
   'Contact': 'Kontakt',
   'Service address': 'Einsatzadresse',
   'Rate': 'Stundensatz',
-  'Shifts': 'Eins?tze',
+  'Shifts': 'Einsätze',
   'Status': 'Status',
   'Actions': 'Aktionen',
   'No email': 'Keine E-Mail',
@@ -6138,14 +6185,14 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   'Inactive': 'Inaktiv',
   'Edit client': 'Kunden bearbeiten',
   'No clients found': 'Keine Kunden gefunden',
-  'Adjust your search or add a client to the database.': 'Passen Sie die Suche an oder f?gen Sie einen Kunden hinzu.',
+  'Adjust your search or add a client to the database.': 'Passen Sie die Suche an oder fügen Sie einen Kunden hinzu.',
   'Page': 'Seite',
-  'Previous': 'Zur?ck',
+  'Previous': 'Zurück',
   'Next': 'Weiter',
-  'Add client': 'Kunden hinzuf?gen',
+  'Add client': 'Kunden hinzufügen',
   'Company / client name': 'Firmen- / Kundenname',
   'Service location name': 'Name des Einsatzstandorts',
-  'Defaults to company name': 'Standardm??ig der Firmenname',
+  'Defaults to company name': 'Standardmäßig der Firmenname',
   'Logo / attachment': 'Logo / Anhang',
   'Upload a client logo or image.': 'Laden Sie ein Kundenlogo oder Bild hoch.',
   'Current logo': 'Aktuelles Logo',
@@ -6156,31 +6203,31 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
   'Billing address': 'Rechnungsadresse',
   'VAT ID': 'USt-IdNr.',
   'Customer / tax ID': 'Kunden- / Steuer-ID',
-  'Hourly rate (?)': 'Stundensatz (?)',
+  'Hourly rate (?)': 'Stundensatz (€)',
   'Contract start': 'Vertragsbeginn',
   'Contract end': 'Vertragsende',
   'Notes': 'Notizen',
   'Client notes': 'Kundennotizen',
-  'Add client details, access notes, or preferences': 'Kundendetails, Zugangshinweise oder Pr?ferenzen eintragen',
-  'Open full client profile': 'Vollst?ndiges Kundenprofil ?ffnen',
+  'Add client details, access notes, or preferences': 'Kundendetails, Zugangshinweise oder Präferenzen eintragen',
+  'Open full client profile': 'Vollständiges Kundenprofil öffnen',
   'Cancel': 'Abbrechen',
   'Create client': 'Kunden anlegen',
-  'Save changes': '?nderungen speichern',
+  'Save changes': 'Änderungen speichern',
   'Collapse navigation': 'Navigation einklappen',
   'Expand navigation': 'Navigation ausklappen',
   'Navigation': 'Navigation',
   'Manage employees': 'Mitarbeiter verwalten',
   'Profiles': 'Profile',
-  'Plan schedule': 'Planung ?ffnen',
+  'Plan schedule': 'Planung öffnen',
   'Crawler': 'Crawler',
   'Invoices': 'Rechnungen',
   'Sign out': 'Abmelden',
-  'Menu': 'Men?',
+  'Menu': 'Menü',
   'A client with the same name and service address already exists.': 'Ein Kunde mit demselben Namen und derselben Einsatzadresse ist bereits vorhanden.',
   'Another client already uses that name and service address.': 'Ein anderer Kunde verwendet bereits diesen Namen und diese Einsatzadresse.',
-  'Enter contract dates in a valid format.': 'Geben Sie g?ltige Vertragsdaten ein.',
-  'Invalid client image. Use PNG, JPG, GIF, WEBP, or HEIC.': 'Ung?ltiges Kundenbild. Erlaubte Formate: PNG, JPG, GIF, WEBP oder HEIC.',
-  'Client added.': 'Kunde hinzugef?gt.',
+  'Enter contract dates in a valid format.': 'Geben Sie gültige Vertragsdaten ein.',
+  'Invalid client image. Use PNG, JPG, GIF, WEBP, or HEIC.': 'Ungültiges Kundenbild. Erlaubte Formate: PNG, JPG, GIF, WEBP oder HEIC.',
+  'Client added.': 'Kunde hinzugefügt.',
   'Client name is required.': 'Der Kundenname ist erforderlich.',
   'Client updated.': 'Kunde aktualisiert.',
   "Language switcher": "Sprachauswahl",
@@ -6189,26 +6236,26 @@ DE_HTML_REPLACEMENTS: dict[str, str] = {
 # Override client-page phrases using Unicode escapes so labels remain UTF-8 safe.
 DE_HTML_REPLACEMENTS.update({
   "Lead Center": "Lead-Center",
-  "Lead pipeline totals": "Lead-Pipeline-Ãœbersicht",
-  "Website bookings arrive as new leads. Move each lead through Contacted to Converted.": "Website-Buchungen werden als neue Leads Ã¼bernommen. Verschieben Sie jeden Lead Ã¼ber Kontaktiert zu Gewonnen.",
+  "Lead pipeline totals": "Lead-Pipeline-Übersicht",
+  "Website bookings arrive as new leads. Move each lead through Contacted to Converted.": "Website-Buchungen werden als neue Leads übernommen. Verschieben Sie jeden Lead über Kontaktiert zu Gewonnen.",
   "New Leads": "Neue Leads",
   "Contacted": "Kontaktiert",
   "Converted": "Gewonnen",
-  "Add lead": "Lead hinzufÃ¼gen",
+  "Add lead": "Lead hinzufügen",
   "Save lead": "Lead speichern",
   "All stages": "Alle Phasen",
   "Newest first": "Neueste zuerst",
-  "Oldest first": "Ã„lteste zuerst",
+  "Oldest first": "Älteste zuerst",
   "Apply": "Anwenden",
-  "Clear": "ZurÃ¼cksetzen",
+  "Clear": "Zurücksetzen",
   "Copy page emails": "E-Mail-Adressen kopieren",
   "No leads": "Keine Leads",
   "Edit lead": "Lead bearbeiten",
-  "shift(s) were saved despite scheduling conflicts. Review:": "Einsatz/EinsÃ¤tze wurden trotz Planungskonflikten gespeichert. Bitte prÃ¼fen:",
-  "Shift was saved despite scheduling conflicts. Review:": "Der Einsatz wurde trotz Planungskonflikten gespeichert. Bitte prÃ¼fen:",
-  "Employees were assigned despite scheduling conflicts. Review:": "Mitarbeitende wurden trotz Planungskonflikten zugewiesen. Bitte prÃ¼fen:",
-  "shift(s) were assigned despite scheduling conflicts. Review the schedule.": "Einsatz/EinsÃ¤tze wurden trotz Planungskonflikten zugewiesen. Bitte prÃ¼fen Sie den Dienstplan.",
-  "duplicate shift(s) were saved despite scheduling conflicts. Review the schedule.": "Doppelte EinsÃ¤tze wurden trotz Planungskonflikten gespeichert. Bitte prÃ¼fen Sie den Dienstplan.",
+  "shift(s) were saved despite scheduling conflicts. Review:": "Einsatz/Einsätze wurden trotz Planungskonflikten gespeichert. Bitte prüfen:",
+  "Shift was saved despite scheduling conflicts. Review:": "Der Einsatz wurde trotz Planungskonflikten gespeichert. Bitte prüfen:",
+  "Employees were assigned despite scheduling conflicts. Review:": "Mitarbeitende wurden trotz Planungskonflikten zugewiesen. Bitte prüfen:",
+  "shift(s) were assigned despite scheduling conflicts. Review the schedule.": "Einsatz/Einsätze wurden trotz Planungskonflikten zugewiesen. Bitte prüfen Sie den Dienstplan.",
+  "duplicate shift(s) were saved despite scheduling conflicts. Review the schedule.": "Doppelte Einsätze wurden trotz Planungskonflikten gespeichert. Bitte prüfen Sie den Dienstplan.",
   "Lead created": "Lead erstellt",
   "Putzelf Marketing - Employee database": "Putzelf Marketing - Mitarbeiterdatenbank",
   "Login code": "Anmeldecode",
@@ -6218,9 +6265,9 @@ DE_HTML_REPLACEMENTS.update({
   "Employee name is required.": "Der Mitarbeitername ist erforderlich.",
   "Invalid employee image. Use PNG, JPG, GIF, WEBP, or HEIC.": "Ung\u00fcltiges Mitarbeiterbild. Erlaubte Formate: PNG, JPG, GIF, WEBP oder HEIC.",
   "Client database": "Kundendatenbank",
-  "Client summary": "Kunden?bersicht",
+  "Client summary": "Kundenübersicht",
   "Search clients": "Kunden suchen",
-  "Close": "Schlie?en",
+  "Close": "Schließen",
   "Client logo": "Kundenlogo",
   "Putzelf Marketing \u2014 Client Database": "Putzelf Marketing \u2014 Kundendatenbank",
   "Manage clients": "Kunden verwalten",
@@ -6262,7 +6309,7 @@ DE_HTML_REPLACEMENTS.update({
   "Billing address": "Rechnungsadresse",
   "VAT ID": "USt-IdNr.",
   "Customer / tax ID": "Kunden- / Steuer-ID",
-  "Hourly rate (â‚¬)": "Stundensatz (â‚¬)",
+  "Hourly rate (€)": "Stundensatz (€)",
   "Contract start": "Vertragsbeginn",
   "Contract end": "Vertragsende",
   "Notes": "Notizen",
@@ -6297,14 +6344,14 @@ DE_HTML_REPLACEMENTS.update({
   "All sites": "Alle Standorte",
   "Active": "Aktiv",
   "Inactive": "Inaktiv",
-  "Site identity, service address, status, and assigned manager.": "Standortdaten, Einsatzadresse, Status und zustÃ¤ndige Standortleitung.",
-  "Edit fields here, then save your changes below.": "Bearbeiten Sie die Felder direkt und speichern Sie Ihre Ã„nderungen unten.",
+  "Site identity, service address, status, and assigned manager.": "Standortdaten, Einsatzadresse, Status und zuständige Standortleitung.",
+  "Edit fields here, then save your changes below.": "Bearbeiten Sie die Felder direkt und speichern Sie Ihre Änderungen unten.",
   "Primary site contact and billing information.": "Hauptkontakt und Rechnungsinformationen des Standorts.",
   "Update the contract period and download the employee contract.": "Bearbeiten Sie die Vertragslaufzeit und laden Sie den Vertrag herunter.",
   "Keep access instructions and internal site notes up to date.": "Halten Sie Zugangshinweise und interne Standortnotizen aktuell.",
   "Save site": "Standort speichern",
   "Save & download contract": "Speichern und Vertrag herunterladen",
-  "Assigned site manager": "ZustÃ¤ndige Standortleitung",
+  "Assigned site manager": "Zuständige Standortleitung",
   "Site logo": "Standortlogo",
   "Site record": "Standortdatensatz",
   "Update site logo": "Standortlogo aktualisieren",
@@ -6312,7 +6359,7 @@ DE_HTML_REPLACEMENTS.update({
   "Site profile saved.": "Standortprofil gespeichert.",
   "Another site already uses that name and service address.": "Ein anderer Standort verwendet bereits diesen Namen und diese Einsatzadresse.",
   "Company and service location names are required.": "Firmenname und Einsatzstandort sind erforderlich.",
-  "Invalid site image. Use PNG, JPG, GIF, WEBP, or HEIC.": "UngÃ¼ltiges Standortbild. Erlaubte Formate: PNG, JPG, GIF, WEBP oder HEIC.",
+  "Invalid site image. Use PNG, JPG, GIF, WEBP, or HEIC.": "Ungültiges Standortbild. Erlaubte Formate: PNG, JPG, GIF, WEBP oder HEIC.",
   "Client pages": "Kundenseiten",
   "Client information sections": "Kundeninformationsbereiche",
   "Information": "Informationen",
@@ -6324,22 +6371,22 @@ DE_HTML_REPLACEMENTS.update({
   "Contract": "Vertrag",
   "Other": "Sonstiges",
   "Client and service location information.": "Informationen zum Kunden und Einsatzstandort.",
-  "Primary client contact and billing recipient information.": "PrimÃ¤rer Kundenkontakt und Informationen zum RechnungsempfÃ¤nger.",
+  "Primary client contact and billing recipient information.": "Primärer Kundenkontakt und Informationen zum Rechnungsempfänger.",
   "Contract partner, contact, and term details.": "Vertragspartner, Kontakt und Vertragslaufzeit.",
   "Client notes and account details.": "Kundennotizen und Kontodetails.",
-  "Recent shifts scheduled for this client location.": "Die letzten fÃ¼r diesen Kundenstandort geplanten EinsÃ¤tze.",
-  "Recent invoices linked to this client.": "Die letzten Rechnungen fÃ¼r diesen Kunden.",
+  "Recent shifts scheduled for this client location.": "Die letzten für diesen Kundenstandort geplanten Einsätze.",
+  "Recent invoices linked to this client.": "Die letzten Rechnungen für diesen Kunden.",
   "Client image and contract tools.": "Kundenbild und Vertragswerkzeuge.",
   "Company / client name": "Firmen- / Kundenname",
   "Service location name": "Name des Einsatzstandorts",
   "Service address": "Einsatzadresse",
   "Status": "Status",
   "Hourly rate": "Stundensatz",
-  "Shifts on record": "Erfasste EinsÃ¤tze",
+  "Shifts on record": "Erfasste Einsätze",
   "Contact person": "Kontaktperson",
   "Email": "E-Mail",
   "Phone": "Telefon",
-  "Invoice recipient": "RechnungsempfÃ¤nger",
+  "Invoice recipient": "Rechnungsempfänger",
   "Billing address": "Rechnungsadresse",
   "VAT ID": "USt-IdNr.",
   "Customer / tax ID": "Kunden- / Steuer-ID",
@@ -6355,15 +6402,15 @@ DE_HTML_REPLACEMENTS.update({
   "Employee": "Mitarbeiter",
   "Notes": "Notizen",
   "Open shift": "Offener Einsatz",
-  "No shifts have been scheduled for this client yet.": "FÃ¼r diesen Kunden wurden noch keine EinsÃ¤tze geplant.",
+  "No shifts have been scheduled for this client yet.": "Für diesen Kunden wurden noch keine Einsätze geplant.",
   "Invoice": "Rechnung",
   "Issued": "Ausgestellt",
-  "Due": "FÃ¤llig",
+  "Due": "Fällig",
   "Amount": "Betrag",
-  "No invoices have been created for this client yet.": "FÃ¼r diesen Kunden wurden noch keine Rechnungen erstellt.",
+  "No invoices have been created for this client yet.": "Für diesen Kunden wurden noch keine Rechnungen erstellt.",
   "Client logo": "Kundenlogo",
-  "No client logo or document has been added.": "Es wurde noch kein Kundenlogo oder Dokument hinzugefÃ¼gt.",
-  "Open contract tools": "Vertragswerkzeuge ?ffnen",
+  "No client logo or document has been added.": "Es wurde noch kein Kundenlogo oder Dokument hinzugefügt.",
+  "Open contract tools": "Vertragswerkzeuge öffnen",
 })
 
 
@@ -6389,7 +6436,7 @@ DE_HTML_REPLACEMENTS.update({
   "Search name, role, email, phone, or city": "Name, Rolle, E-Mail, Telefon oder Stadt suchen",
   "All work types": "Alle Arbeitszeitmodelle",
   "Filter by role": "Nach Rolle filtern",
-  "Marginal employment": "GeringfÃ¼gige BeschÃ¤ftigung",
+  "Marginal employment": "Geringfügige Beschäftigung",
   "Clear search": "Suche zur\u00fccksetzen",
   "Search": "Suchen",
   "Contact": "Kontakt",
@@ -6414,23 +6461,23 @@ DE_HTML_REPLACEMENTS.update({
   "Send sign-in details": "Zugangsdaten senden",
   "Fix": "Beheben",
   "Delete employee": "Mitarbeiter l\u00f6schen",
-  "Weekly shifts in a calendar view.": "WocheneinsÃ¤tze in der Kalenderansicht.",
-  "All day": "GanztÃ¤gig",
+  "Weekly shifts in a calendar view.": "Wocheneinsätze in der Kalenderansicht.",
+  "All day": "Ganztägig",
   "Today": "Heute",
-  "No shifts scheduled this week.": "FÃ¼r diese Woche sind keine EinsÃ¤tze geplant.",
+  "No shifts scheduled this week.": "Für diese Woche sind keine Einsätze geplant.",
   "Documents": "Dokumente",
   "Upload and keep employee-related documents in one place.": "Laden Sie mitarbeiterbezogene Dokumente hoch und verwalten Sie diese zentral.",
-  "Choose a document": "Dokument auswÃ¤hlen",
+  "Choose a document": "Dokument auswählen",
   "Upload document": "Dokument hochladen",
   "Uploaded": "Hochgeladen",
   "Employee document uploaded.": "Mitarbeiterdokument wurde hochgeladen.",
-  "Employee document deleted.": "Mitarbeiterdokument wurde gelÃ¶scht.",
-  "Delete this employee document?": "Dieses Mitarbeiterdokument lÃ¶schen?",
-  "Delete document": "Dokument lÃ¶schen",
-  "Delete": "LÃ¶schen",
+  "Employee document deleted.": "Mitarbeiterdokument wurde gelöscht.",
+  "Delete this employee document?": "Dieses Mitarbeiterdokument löschen?",
+  "Delete document": "Dokument löschen",
+  "Delete": "Löschen",
   "Enable platform access to send sign-in details.": "Aktivieren Sie den Plattformzugang, um die Zugangsdaten zu senden.",
   "Set the employee to Active to send sign-in details.": "Setzen Sie den Mitarbeiterstatus auf Aktiv, um die Zugangsdaten zu senden.",
-  "Add a valid login email to send sign-in details.": "FÃ¼gen Sie eine gÃ¼ltige Login-E-Mail-Adresse hinzu, um die Zugangsdaten zu senden.",
+  "Add a valid login email to send sign-in details.": "Fügen Sie eine gültige Login-E-Mail-Adresse hinzu, um die Zugangsdaten zu senden.",
   "Upload a PDF, Word document, or image file.": "Laden Sie eine PDF-, Word- oder Bilddatei hoch.",
   "No employee documents have been uploaded yet.": "Es wurden noch keine Mitarbeiterdokumente hochgeladen.",
   "Save changes": "\u00c4nderungen speichern",
@@ -6509,7 +6556,7 @@ DE_HTML_REPLACEMENTS.update({
   "Contract partner": "Vertragspartner",
   "Contract contact details": "Vertragskontaktdaten",
   "Phone, fax, or email": "Telefon, Fax oder E-Mail",
-  "Fill in the contract partner, company, and phone, fax, or email before generating the contract.": "Bitte Vertragspartner, Firma sowie Telefon, Fax oder E-Mail ausfÃ¼llen, bevor Sie den Vertrag erstellen.",
+  "Fill in the contract partner, company, and phone, fax, or email before generating the contract.": "Bitte Vertragspartner, Firma sowie Telefon, Fax oder E-Mail ausfüllen, bevor Sie den Vertrag erstellen.",
   "Delete employee": "Mitarbeiter l\u00f6schen",
   "Delete this employee?": "Diesen Mitarbeiter l\u00f6schen?",
   "Employee added.": "Mitarbeiter hinzugef\u00fcgt.",
@@ -6523,7 +6570,7 @@ DE_HTML_REPLACEMENTS.update({
   "PINs must be exactly 4 digits.": "PINs m\u00fcssen genau 4 Ziffern haben.",
   "Employee not found.": "Mitarbeiter nicht gefunden.",
   "Employee template not found. Place employee_template.docx in uploads/ or static/uploads/.": "Mitarbeitervorlage nicht gefunden. Legen Sie employee_template.docx in uploads/ oder static/uploads/ ab.",
-  "DOCX generation is unavailable. Install python-docx.": "Die DOCX-Erstellung ist nicht verf\u00fcgbar. Installieren Sie python-docx.",
+  "DOCX generation is unavailable. Check the application log for the python-docx import error.": "Die DOCX-Erstellung ist nicht verf\u00fcgbar. Pr\u00fcfen Sie das Anwendungsprotokoll auf den python-docx-Importfehler.",
 })
 
 
@@ -6568,23 +6615,23 @@ DE_HTML_REPLACEMENTS.update({
   "Download QR code PNG": "QR-Code-PNG herunterladen",
   "Download PNG": "PNG herunterladen",
   "Download PDF": "PDF herunterladen",
-  "Scan to open the public document library": "Scannen, um die ?ffentliche Dokumentenbibliothek zu ?ffnen",
+  "Scan to open the public document library": "Scannen, um die öffentliche Dokumentenbibliothek zu öffnen",
   "Site inspection": "Standortkontrolle",
   "All inspections": "Alle Kontrollen",
   "Inspection areas by site": "Kontrollbereiche je Standort",
   "Inspection setup": "Kontrollbereich einrichten",
-  "Each site has its own checklist. Set up only the areas that apply to that location.": "Jeder Standort hat eine eigene Kontrollliste. Richten Sie nur die Bereiche ein, die fÃ¼r diesen Standort gelten.",
+  "Each site has its own checklist. Set up only the areas that apply to that location.": "Jeder Standort hat eine eigene Kontrollliste. Richten Sie nur die Bereiche ein, die für diesen Standort gelten.",
   "Inspection report": "Kontrollbericht",
-  "Inspection overview": "KontrollÃ¼bersicht",
+  "Inspection overview": "Kontrollübersicht",
   "Use the quick actions or check areas one by one.": "Nutzen Sie die Schnellaktionen oder markieren Sie einzelne Bereiche.",
   "Mark all checked": "Alle als kontrolliert markieren",
   "Clear all checks": "Alle Markierungen entfernen",
   "areas checked": "Bereiche kontrolliert",
   "Edit note and photo": "Notiz und Foto bearbeiten",
-  "Add note or photo": "Notiz oder Foto hinzufÃ¼gen",
-  "Add a note about this area": "Notiz zu diesem Bereich hinzufÃ¼gen",
+  "Add note or photo": "Notiz oder Foto hinzufügen",
+  "Add a note about this area": "Notiz zu diesem Bereich hinzufügen",
   "View saved photo": "Gespeichertes Foto ansehen",
-  "Inspection changes save to the selected month.": "Die KontrollÃ¤nderungen werden fÃ¼r den ausgewÃ¤hlten Monat gespeichert.",
+  "Inspection changes save to the selected month.": "Die Kontrolländerungen werden für den ausgewählten Monat gespeichert.",
   "Track completion by site and see which areas still need attention.": "Verfolgen Sie den Fortschritt je Standort und sehen Sie, wo noch Kontrollen ausstehen.",
   "Edit checklists": "Kontrolllisten bearbeiten",
   "Report month": "Berichtsmonat",
@@ -6595,40 +6642,40 @@ DE_HTML_REPLACEMENTS.update({
   "Areas checked": "Kontrollierte Bereiche",
   "areas": "Bereiche",
   "Resource center": "Ressourcenzentrale",
-  "Putzelf Public resources": "Putzelf Ã¶ffentliche Ressourcen",
+  "Putzelf Public resources": "Putzelf öffentliche Ressourcen",
   "All documents": "Alle Dokumente",
   "in": "in",
   "No documents match this search.": "Keine Dokumente entsprechen dieser Suche.",
   "Find and download the latest safety rules and work instructions.": "Finden Sie aktuelle Sicherheitsregeln und Arbeitsanweisungen und laden Sie diese herunter.",
   "documents": "Dokumente",
   "categories": "Kategorien",
-  "These resources are available without signing in.": "Diese Dokumente sind ohne Anmeldung verfÃ¼gbar.",
+  "These resources are available without signing in.": "Diese Dokumente sind ohne Anmeldung verfügbar.",
   "Try another title or category.": "Suchen Sie nach einem anderen Titel oder einer anderen Kategorie.",
-  "Please check back later for safety and work resources.": "Schauen Sie spÃ¤ter wieder vorbei, um Sicherheits- und Arbeitsdokumente zu finden.",
-  "Publish and organize documents that anyone can open from your QR landing page.": "VerÃ¶ffentlichen und organisieren Sie Dokumente, die Ã¼ber den QR-Code Ã¶ffentlich zugÃ¤nglich sind.",
-  "Public QR code": "Ã–ffentlicher QR-Code",
-  "View public library": "Ã–ffentliche Bibliothek ansehen",
-  "Published documents": "VerÃ¶ffentlichte Dokumente",
+  "Please check back later for safety and work resources.": "Schauen Sie später wieder vorbei, um Sicherheits- und Arbeitsdokumente zu finden.",
+  "Publish and organize documents that anyone can open from your QR landing page.": "Veröffentlichen und organisieren Sie Dokumente, die über den QR-Code öffentlich zugänglich sind.",
+  "Public QR code": "Öffentlicher QR-Code",
+  "View public library": "Öffentliche Bibliothek ansehen",
+  "Published documents": "Veröffentlichte Dokumente",
   "PDF files": "PDF-Dateien",
   "DOCX files": "DOCX-Dateien",
-  "Add a resource to the public library.": "FÃ¼gen Sie ein Dokument zur Ã¶ffentlichen Bibliothek hinzu.",
+  "Add a resource to the public library.": "Fügen Sie ein Dokument zur öffentlichen Bibliothek hinzu.",
   "Document title": "Dokumenttitel",
-  "e.g. Safety rules for cleaning staff": "z. B. Sicherheitsregeln fÃ¼r ReinigungskrÃ¤fte",
-  "Choose or enter a category": "Kategorie auswÃ¤hlen oder eingeben",
-  "Choose a PDF or DOCX file": "PDF- oder DOCX-Datei auswÃ¤hlen",
-  "PDF and Word documents are supported": "PDF- und Word-Dokumente werden unterstÃ¼tzt",
-  "No file selected": "Keine Datei ausgewÃ¤hlt",
-  "Publish document": "Dokument verÃ¶ffentlichen",
-  "Published files are accessible without signing in.": "VerÃ¶ffentlichte Dateien sind ohne Anmeldung zugÃ¤nglich.",
-  "Organized resources available in the public library.": "Sortierte Dokumente in der Ã¶ffentlichen Bibliothek.",
+  "e.g. Safety rules for cleaning staff": "z. B. Sicherheitsregeln für Reinigungskräfte",
+  "Choose or enter a category": "Kategorie auswählen oder eingeben",
+  "Choose a PDF or DOCX file": "PDF- oder DOCX-Datei auswählen",
+  "PDF and Word documents are supported": "PDF- und Word-Dokumente werden unterstützt",
+  "No file selected": "Keine Datei ausgewählt",
+  "Publish document": "Dokument veröffentlichen",
+  "Published files are accessible without signing in.": "Veröffentlichte Dateien sind ohne Anmeldung zugänglich.",
+  "Organized resources available in the public library.": "Sortierte Dokumente in der öffentlichen Bibliothek.",
   "Search documents": "Dokumente suchen",
   "Filter documents by category": "Dokumente nach Kategorie filtern",
   "Download": "Herunterladen",
   "Remove": "Entfernen",
   "No documents match these filters.": "Keine Dokumente entsprechen diesen Filtern.",
-  "Try another search or choose a different category.": "Ã„ndern Sie die Suche oder wÃ¤hlen Sie eine andere Kategorie.",
-  "No documents published yet": "Noch keine Dokumente verÃ¶ffentlicht",
-  "Upload a PDF or DOCX file to make it available in the public library.": "Laden Sie eine PDF- oder DOCX-Datei hoch, um sie in der Ã¶ffentlichen Bibliothek bereitzustellen.",
+  "Try another search or choose a different category.": "Ändern Sie die Suche oder wählen Sie eine andere Kategorie.",
+  "No documents published yet": "Noch keine Dokumente veröffentlicht",
+  "Upload a PDF or DOCX file to make it available in the public library.": "Laden Sie eine PDF- oder DOCX-Datei hoch, um sie in der öffentlichen Bibliothek bereitzustellen.",
   "Search sites or areas": "Standorte oder Bereiche suchen",
   "Filter sites by inspection status": "Standorte nach Kontrollstatus filtern",
   "Needs attention": "Offene Kontrollen",
@@ -6636,32 +6683,32 @@ DE_HTML_REPLACEMENTS.update({
   "areas": "Bereiche",
   "No inspection submitted this month": "Diesen Monat wurde keine Kontrolle eingereicht.",
   "No sites match this search or filter.": "Keine Standorte entsprechen dieser Suche oder diesem Filter.",
-  "Try a different search or select all sites.": "Ã„ndern Sie die Suche oder wÃ¤hlen Sie alle Standorte aus.",
+  "Try a different search or select all sites.": "Ändern Sie die Suche oder wählen Sie alle Standorte aus.",
   "No sites are in the database.": "Es sind keine Standorte in der Datenbank vorhanden.",
   "Add a site to start tracking inspections.": "Legen Sie einen Standort an, um Kontrollen zu verfolgen.",
   "Site details": "Standortdetails",
   "Save": "Speichern",
   "Archive": "Archivieren",
   "Restore": "Reaktivieren",
-  "Choose the areas that apply to this site. Active areas appear in each new monthly inspection.": "WÃ¤hlen Sie die passenden Bereiche fÃ¼r diesen Standort aus. Aktive Bereiche erscheinen in jeder neuen Monatskontrolle.",
+  "Choose the areas that apply to this site. Active areas appear in each new monthly inspection.": "Wählen Sie die passenden Bereiche für diesen Standort aus. Aktive Bereiche erscheinen in jeder neuen Monatskontrolle.",
   "Archived": "Archiviert",
-  "Suggestions available": "VerfÃ¼gbare VorschlÃ¤ge",
-  "Add an inspection area": "Kontrollbereich hinzufÃ¼gen",
-  "Create a custom area for this site.": "Erstellen Sie einen eigenen Bereich fÃ¼r diesen Standort.",
+  "Suggestions available": "Verfügbare Vorschläge",
+  "Add an inspection area": "Kontrollbereich hinzufügen",
+  "Create a custom area for this site.": "Erstellen Sie einen eigenen Bereich für diesen Standort.",
   "Area name": "Bereichsname",
   "e.g. Loading bay, stairwell, or patient rooms": "z. B. Ladebereich, Treppenhaus oder Patientenzimmer",
-  "Add area": "Bereich hinzufÃ¼gen",
-  "Add only what applies. You can rename areas below at any time.": "FÃ¼gen Sie nur passende Bereiche hinzu. Sie kÃ¶nnen diese unten jederzeit umbenennen.",
-  "All suggestions are already on this checklist.": "Alle VorschlÃ¤ge sind bereits in dieser Kontrollliste enthalten.",
+  "Add area": "Bereich hinzufügen",
+  "Add only what applies. You can rename areas below at any time.": "Fügen Sie nur passende Bereiche hinzu. Sie können diese unten jederzeit umbenennen.",
+  "All suggestions are already on this checklist.": "Alle Vorschläge sind bereits in dieser Kontrollliste enthalten.",
   "Checklist areas": "Kontrolllistenbereiche",
   "Rename, archive, or restore areas for this site.": "Benennen Sie Bereiche um, archivieren oder reaktivieren Sie sie.",
   "Search areas": "Bereiche suchen",
   "Filter checklist areas": "Kontrolllistenbereiche filtern",
   "All": "Alle",
   "No inspection areas yet": "Noch keine Kontrollbereiche",
-  "Add a custom area or choose from the suggestions above.": "FÃ¼gen Sie einen eigenen Bereich hinzu oder wÃ¤hlen Sie einen der obigen VorschlÃ¤ge.",
+  "Add a custom area or choose from the suggestions above.": "Fügen Sie einen eigenen Bereich hinzu oder wählen Sie einen der obigen Vorschläge.",
   "No checklist areas match this search.": "Keine Kontrolllistenbereiche entsprechen dieser Suche.",
-  "Ready for inspections": "Bereit fÃ¼r Kontrollen",
+  "Ready for inspections": "Bereit für Kontrollen",
   "Needs areas": "Bereiche erforderlich",
   "Active areas": "Aktive Bereiche",
   "Search by site name or address": "Standortname oder Adresse suchen",
@@ -6672,30 +6719,30 @@ DE_HTML_REPLACEMENTS.update({
   "active area": "aktiver Bereich",
   "Set up checklist": "Kontrollliste einrichten",
   "No sites match these filters.": "Keine Standorte entsprechen diesen Filtern.",
-  "Try a different search or show all sites.": "Ã„ndern Sie die Suche oder zeigen Sie alle Standorte an.",
+  "Try a different search or show all sites.": "Ändern Sie die Suche oder zeigen Sie alle Standorte an.",
   "No sites to configure yet": "Noch keine Standorte vorhanden",
   "Add a site first, then build its inspection checklist.": "Legen Sie zuerst einen Standort an und erstellen Sie danach die Kontrollliste.",
   "Inspection areas": "Kontrollbereiche",
-  "Site checklist": "Standort-PrÃ¼fliste",
-  "These areas belong only to this site. New monthly inspections use its active areas; saved inspection records keep their original area names.": "Diese Bereiche gehÃ¶ren nur zu diesem Standort. Neue Monatskontrollen verwenden die aktiven Bereiche; gespeicherte Kontrollen behalten ihre ursprÃ¼nglichen Bereichsnamen.",
-  "Each site has its own checklist. Add only the areas that apply to that location.": "Jeder Standort hat eine eigene PrÃ¼fliste. FÃ¼gen Sie nur Bereiche hinzu, die fÃ¼r diesen Standort gelten.",
-  "Add an area for this site": "Bereich fÃ¼r diesen Standort hinzufÃ¼gen",
-  "Areas for this site": "Bereiche fÃ¼r diesen Standort",
-  "No inspection areas have been added to this site yet.": "Diesem Standort wurden noch keine Kontrollbereiche hinzugefÃ¼gt.",
-  "No inspection areas are configured for this site yet. Add the areas that apply to this location before beginning its monthly inspection.": "FÃ¼r diesen Standort sind noch keine Kontrollbereiche eingerichtet. FÃ¼gen Sie die passenden Bereiche hinzu, bevor Sie mit der Monatskontrolle beginnen.",
+  "Site checklist": "Standort-Prüfliste",
+  "These areas belong only to this site. New monthly inspections use its active areas; saved inspection records keep their original area names.": "Diese Bereiche gehören nur zu diesem Standort. Neue Monatskontrollen verwenden die aktiven Bereiche; gespeicherte Kontrollen behalten ihre ursprünglichen Bereichsnamen.",
+  "Each site has its own checklist. Add only the areas that apply to that location.": "Jeder Standort hat eine eigene Prüfliste. Fügen Sie nur Bereiche hinzu, die für diesen Standort gelten.",
+  "Add an area for this site": "Bereich für diesen Standort hinzufügen",
+  "Areas for this site": "Bereiche für diesen Standort",
+  "No inspection areas have been added to this site yet.": "Diesem Standort wurden noch keine Kontrollbereiche hinzugefügt.",
+  "No inspection areas are configured for this site yet. Add the areas that apply to this location before beginning its monthly inspection.": "Für diesen Standort sind noch keine Kontrollbereiche eingerichtet. Fügen Sie die passenden Bereiche hinzu, bevor Sie mit der Monatskontrolle beginnen.",
   "Manage this site's areas": "Bereiche dieses Standorts verwalten",
   "Set up areas": "Bereiche einrichten",
   "Manage areas": "Bereiche verwalten",
   "active areas": "aktive Bereiche",
-  "sites need their own areas set up": "Standorte benÃ¶tigen eigene Kontrollbereiche",
-  "Common suggestions": "HÃ¤ufige VorschlÃ¤ge",
+  "sites need their own areas set up": "Standorte benötigen eigene Kontrollbereiche",
+  "Common suggestions": "Häufige Vorschläge",
   "Add all missing suggestions": "Alle fehlenden Vorschl\u00e4ge hinzuf\u00fcgen",
   "Archive all active": "Alle aktiven archivieren",
   "All missing suggested areas have been added.": "Alle fehlenden vorgeschlagenen Bereiche wurden hinzugef\u00fcgt.",
   "All active areas for this site were archived.": "Alle aktiven Bereiche dieses Standorts wurden archiviert.",
   "There are no active areas to archive.": "Es gibt keine aktiven Bereiche zum Archivieren.",
   "Archive all active inspection areas for this site? You can restore them later.": "Alle aktiven Pr\u00fcfbereiche dieses Standorts archivieren? Sie k\u00f6nnen sie sp\u00e4ter wiederherstellen.",
-  "Add only the areas that apply to this site.": "FÃ¼gen Sie nur Bereiche hinzu, die fÃ¼r diesen Standort gelten.",
+  "Add only the areas that apply to this site.": "Fügen Sie nur Bereiche hinzu, die für diesen Standort gelten.",
   "Inspections complete": "Kontrollen abgeschlossen",
   "Checklist not configured": "Kontrollliste nicht eingerichtet",
   "No checklist areas configured.": "Keine Kontrollbereiche eingerichtet.",
@@ -6774,14 +6821,14 @@ SCHEDULE_DE_REPLACEMENTS = {
   "Enter both a start and end time.": "Geben Sie sowohl eine Start- als auch eine Endzeit ein.", "Keep at least one employee assigned to this shift.": "Lassen Sie mindestens eine Person diesem Einsatz zugewiesen.",
   "Select at least one employee.": "W\u00e4hlen Sie mindestens eine mitarbeitende Person aus.", "Could not move the shift. Please try again.": "Der Einsatz konnte nicht verschoben werden. Bitte versuchen Sie es erneut.",
   "Custom range": "Benutzerdefinierter Zeitraum", "Could not update notifications.": "Benachrichtigungen konnten nicht aktualisiert werden.",
-  "Pause": "Pausieren", "Resume": "Fortsetzen", "Checking connection...": "Verbindung wird geprÃ¼ft...", "Unassigned": "Unbesetzt",
+  "Pause": "Pausieren", "Resume": "Fortsetzen", "Checking connection...": "Verbindung wird geprüft...", "Unassigned": "Unbesetzt",
   "Repeat every": "Wiederholen alle", "week(s)": "Woche(n)", "Repeat on": "Wiederholen am", "End date": "Enddatum", "hrs": "Std.",
   "Mon": "Mo", "Tue": "Di", "Wed": "Mi", "Thu": "Do", "Fri": "Fr", "Sat": "Sa", "Sun": "So",
   "Source": "Quelle", "Target": "Ziel", "Time": "Uhrzeit", "Conflict": "Konflikt", "Import": "Importieren",
-  "Show active shifts only": "Nur aktive EinsÃ¤tze anzeigen", "Available employees only": "Nur verfÃ¼gbare Mitarbeitende",
-  "Remove this employee from the shift?": "Diese Person aus dem Einsatz entfernen?", "Create": "Erstellen", "Select": "AuswÃ¤hlen",
-  "Unassign selected employee(s); keep the shift open for reassignment": "AusgewÃ¤hlte Mitarbeiterzuweisungen lÃ¶sen; EinsÃ¤tze zur Neuzuweisung offen lassen",
-  "Add employee": "Mitarbeiter hinzufÃ¼gen", "Notifications": "Benachrichtigungen", "Notifications: checking status": "Benachrichtigungen: Status wird geprÃ¼ft",
+  "Show active shifts only": "Nur aktive Einsätze anzeigen", "Available employees only": "Nur verfügbare Mitarbeitende",
+  "Remove this employee from the shift?": "Diese Person aus dem Einsatz entfernen?", "Create": "Erstellen", "Select": "Auswählen",
+  "Unassign selected employee(s); keep the shift open for reassignment": "Ausgewählte Mitarbeiterzuweisungen lösen; Einsätze zur Neuzuweisung offen lassen",
+  "Add employee": "Mitarbeiter hinzufügen", "Notifications": "Benachrichtigungen", "Notifications: checking status": "Benachrichtigungen: Status wird geprüft",
 }
 SCHEDULE_HTML_REPLACEMENTS = {**DE_HTML_REPLACEMENTS, **SCHEDULE_DE_REPLACEMENTS}
 
@@ -6847,13 +6894,18 @@ def _build_language_switcher_markup() -> str:
   de_active = "active" if current == "de" else ""
   en_current = 'aria-current="true"' if current == "en" else ""
   de_current = 'aria-current="true"' if current == "de" else ""
+  pwa_install_button = ""
+  if session.get("role") == "site_manager":
+    pwa_install_button = '<button type="button" id="manager-pwa-install" class="ep-pwa-install-button" aria-label="Install site manager app" title="Install site manager app"><i class="bi bi-download" aria-hidden="true"></i><span>Install app</span></button>'
   return f'''
   <div id="global-page-navbar" class="ep-global-topbar">
     <span class="ep-global-brand"><img class="ep-global-brand-mark" src="/static/employee-icon-192.png" alt=""><span class="ep-global-brand-name">Elf's <strong>Plan</strong></span></span>
+    <div class="ep-global-topbar-actions">{pwa_install_button}
     <nav id="global-language-switcher" class="lang-switcher" aria-label="Language selector">
     <a href="{href_en}" class="{en_active}" title="Switch to English" aria-label="Switch to English" {en_current}><span>EN</span></a>
     <a href="{href_de}" class="{de_active}" title="Auf Deutsch (&Ouml;sterreich) wechseln" aria-label="Auf Deutsch (&Ouml;sterreich) wechseln" {de_current}><span aria-hidden="true">&#x1F1E6;&#x1F1F9;</span><span>DE</span></a>
     </nav>
+    </div>
   </div>
   '''
 
@@ -6909,7 +6961,11 @@ def _language_after_request(response):
     html = response.get_data(as_text=True)
   except Exception:
     return response
-  html = html.replace("Putzelf Marketing", "Elf's Plan").replace("Putzelf", "Elf's Plan")
+  if request.endpoint in {"ops.admin_public_documents", "ops.public_resources"}:
+    html = html.replace("Putzelf Marketing", "Putzelf")
+  else:
+    html = html.replace("Putzelf Marketing", "Elf's Plan").replace("Putzelf", "Elf's Plan")
+  is_site_manager = session.get("role") == "site_manager"
   def _set_theme_color(match):
     tag = match.group(0)
     if re.search(r"\bcontent\s*=", tag, flags=re.IGNORECASE):
@@ -6917,9 +6973,17 @@ def _language_after_request(response):
     return tag[:-1] + ' content="#014D4E">'
   html = re.sub(r"<meta\b(?=[^>]*\bname\s*=\s*[\"']theme-color[\"'])[^>]*>", _set_theme_color, html, flags=re.IGNORECASE)
   if "</head>" in html:
+    if is_site_manager and "/static/site-manager-manifest.json" not in html:
+      manager_pwa_head = (
+        '<link rel="manifest" href="/static/site-manager-manifest.json?v=2">'
+        '<link rel="apple-touch-icon" href="/static/employee-icon-192.png">'
+        '<meta name="mobile-web-app-capable" content="yes">'
+        '<meta name="apple-mobile-web-app-capable" content="yes">'
+      )
+      html = html.replace("</head>", manager_pwa_head + "</head>", 1)
     shared_assets = (
       '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">'
-      '<link rel="stylesheet" href="/static/elfs-plan.css">'
+      '<link rel="stylesheet" href="/static/elfs-plan.css?v=mobile-1">'
     )
     html = html.replace("</head>", shared_assets + "</head>", 1)
   if "</body>" in html:
@@ -6927,6 +6991,16 @@ def _language_after_request(response):
     if body_open and request.endpoint != "login":
       language_nav = _build_language_switcher_markup()
       html = html[:body_open.end()] + language_nav + html[body_open.end():]
+    if is_site_manager:
+      manager_pwa_runtime = (
+        '<dialog class="ep-pwa-help" id="manager-pwa-help" aria-labelledby="manager-pwa-help-title">'
+        '<div class="ep-pwa-help-card"><span class="ep-pwa-help-icon"><i class="bi bi-phone"></i></span>'
+        '<h2 id="manager-pwa-help-title">Install Putzelf Manager</h2>'
+        '<p id="manager-pwa-help-copy" class="mb-3"></p>'
+        '<button type="button" class="btn btn-primary" id="manager-pwa-help-close">Close</button></div></dialog>'
+        '<script src="/static/site-manager-pwa.js?v=1" defer></script>'
+      )
+      html = html.replace("</body>", manager_pwa_runtime + "</body>", 1)
     shared_script = '<script src="/static/elfs-plan.js" defer></script>'
     html = html.replace("</body>", shared_script + "</body>", 1)
   html = _translate_html_content(html)
@@ -7457,12 +7531,15 @@ except Exception:  # pragma: no cover - optional dependency / version difference
     BooleanObject = None
     NameObject = None
 
+PYTHON_DOCX_IMPORT_ERROR: str | None = None
 try:
   from docx import Document
   PYTHON_DOCX_AVAILABLE = True
-except Exception:  # pragma: no cover - optional dependency
+except Exception as exc:  # pragma: no cover - optional dependency
   Document = None
   PYTHON_DOCX_AVAILABLE = False
+  PYTHON_DOCX_IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
+  logging.exception("Could not import python-docx in the Flask application")
 
 try:
   from openai import OpenAI
@@ -7968,7 +8045,7 @@ def _shift_notification_description(shift, overrides=None):
   day_label = day_value.strftime("%d.%m.%Y") if day_value else "Date to be confirmed"
   start_label = start_value.strftime("%H:%M") if start_value else "--:--"
   end_label = end_value.strftime("%H:%M") if end_value else "--:--"
-  return f"{site_name} Â· {day_label}, {start_label}â€“{end_label}"
+  return f"{site_name} · {day_label}, {start_label}–{end_label}"
 
 
 @event.listens_for(SQLAlchemySession, "before_flush")
@@ -8383,10 +8460,10 @@ def _build_admin_shift_photo_items(db, limit: int = 24) -> list[dict[str, Any]]:
       items.append({
         "kind": kind,
         "url": url_for("static", filename=path),
-        "employee_name": shift.employee.name if shift.employee else "â€”",
-        "site_name": shift.site.name if shift.site else "â€”",
-        "day": shift.day.strftime("%d.%m.%Y") if shift.day else "â€”",
-        "time_window": f"{shift.start_time.strftime('%H:%M')} â€“ {shift.end_time.strftime('%H:%M')}",
+        "employee_name": shift.employee.name if shift.employee else "—",
+        "site_name": shift.site.name if shift.site else "—",
+        "day": shift.day.strftime("%d.%m.%Y") if shift.day else "—",
+        "time_window": f"{shift.start_time.strftime('%H:%M')} – {shift.end_time.strftime('%H:%M')}",
         "age_days": age_days,
       })
   return items[:limit]
@@ -8643,7 +8720,7 @@ def employee_notifications_api():
       "pending_count": state["pending_count"],
       "today_shifts": [{
         "site_name": (shift.site.profile_company_name or shift.site.name) if shift.site else "Scheduled shift",
-        "time_window": f"{shift.start_time.strftime('%H:%M')}â€“{shift.end_time.strftime('%H:%M')}",
+        "time_window": f"{shift.start_time.strftime('%H:%M')}–{shift.end_time.strftime('%H:%M')}",
       } for shift in shifts],
       "items": [{
         "id": item.id, "kind": item.kind, "title": item.title, "body": item.body,
@@ -8851,7 +8928,7 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
       if title_tag:
         title_text = _normalize_name(title_tag.get_text(" ", strip=True))
         if title_text:
-          for sep in ("|", " - ", " â€“ ", " :: "):
+          for sep in ("|", " - ", " – ", " :: "):
             parts = [p.strip() for p in title_text.split(sep) if p.strip()]
             for part in parts:
               normalized_part = _normalize_name(part)
@@ -8978,7 +9055,7 @@ def crawl(start_url: str, max_pages: int = 100, render_js: bool = False):
                     emails.add(addr)
 
         if not emails and is_probable_detail_path(parsed.path) and render_js:
-            app.logger.debug("No emails via requests on probable detail %s â€” retrying with Playwright", url)
+            app.logger.debug("No emails via requests on probable detail %s — retrying with Playwright", url)
             html_js, status_js = fetch_html(url, render_js=True)
             app.logger.debug("Fetched %s status=%s len=%d (playwright)", url, status_js, len(html_js or ""))
             if html_js:
@@ -9247,11 +9324,11 @@ def _load_schedule_context(db, week_days):
         key = (s.employee_id, s.day)
         site_name = s.site.name if s.site and s.site.name else "Site"
         site_address = s.site.address if s.site and s.site.address else "Adresse unbekannt"
-        time_window = f"{s.start_time.strftime('%H:%M')}â€“{s.end_time.strftime('%H:%M')}"
+        time_window = f"{s.start_time.strftime('%H:%M')} - {s.end_time.strftime('%H:%M')}"
         shift_info = {
             'id': s.id,
             'site_id': s.site_id,
-            'label': f"{site_name} â€” {site_address} ({time_window})",
+            'label': f"{site_name} - {site_address} ({time_window})",
             'site_name': site_name,
             'site_address': site_address,
             'time_window': time_window,
@@ -9321,7 +9398,7 @@ def _find_employee_schedule_conflict(
       existing_site_name = (existing_site.name if existing_site and existing_site.name else "Site")
       return (
         "Scheduling conflict: this employee is already assigned "
-        f"({existing.day.strftime('%d.%m.%Y')} {existing.start_time.strftime('%H:%M')}â€“{existing.end_time.strftime('%H:%M')} Â· {existing_site_name})."
+        f"({existing.day.strftime('%d.%m.%Y')} {existing.start_time.strftime('%H:%M')}–{existing.end_time.strftime('%H:%M')} · {existing_site_name})."
       )
 
     gap = None
@@ -9334,8 +9411,8 @@ def _find_employee_schedule_conflict(
       existing_site = db.get(Site, existing.site_id)
       existing_site_name = (existing_site.name if existing_site and existing_site.name else "Site")
       return (
-        "Warnung: Zwischen EinsÃ¤tzen an unterschiedlichen Standorten mÃ¼ssen mindestens 30 Minuten liegen "
-        f"({existing_site_name} â†” {candidate_site_name})."
+        "Warnung: Zwischen Einsätzen an unterschiedlichen Standorten müssen mindestens 30 Minuten liegen "
+        f"({existing_site_name} ↔ {candidate_site_name})."
       )
 
   return None
@@ -9343,7 +9420,7 @@ def _find_employee_schedule_conflict(
 
 def _format_hours(delta: timedelta | None, *, signed: bool = False) -> str:
   if delta is None:
-    return "â€”"
+    return "—"
   hours = delta.total_seconds() / 3600
   hours = round(hours + 0.0000001, 2)
   if signed:
@@ -9353,7 +9430,7 @@ def _format_hours(delta: timedelta | None, *, signed: bool = False) -> str:
 
 def _format_clock(dt_val: datetime | None, *, reference_day: date | None = None) -> str:
   if not dt_val:
-    return "â€”"
+    return "—"
   if reference_day and dt_val.date() != reference_day:
     return dt_val.strftime("%d.%m %H:%M")
   return dt_val.strftime("%H:%M")
@@ -9647,7 +9724,7 @@ def _generate_hours_pdf(
       f"Recorded vs scheduled: {_format_hours(total_diff, signed=True)}"
     )
   else:
-    summary_parts.append("Recorded hours: â€”")
+    summary_parts.append("Recorded hours: —")
   elements.append(Paragraph(" | ".join(summary_parts), styles["Normal"]))
   elements.append(Spacer(1, 12))
 
@@ -9827,7 +9904,7 @@ def _generate_schedule_pdf(week_days, employees, matrix):
                         time_window = html.escape(str(shift.get("time_window") or ""))
                         address = html.escape(str(shift.get("site_address") or ""))
                         notes = html.escape(str(shift.get("instructions") or ""))
-                        detail = " Â· ".join(part for part in (time_window, address, notes) if part)
+                        detail = " · ".join(part for part in (time_window, address, notes) if part)
                         descriptions.append(f"<b>{site}</b>" + (f"<br/><font color='#475569'>{detail}</font>" if detail else ""))
                     else:
                         descriptions.append(html.escape(str(shift or "")))
@@ -10052,7 +10129,7 @@ ADMIN_I18N = {
   },
   "de": {
     "language_label": "Sprache",
-    "overview": "Ãœbersicht",
+    "overview": "Übersicht",
     "manage_employees": "Mitarbeiter verwalten",
     "manage_sites": "Standorte verwalten",
     "profile": "Profile",
@@ -10061,35 +10138,35 @@ ADMIN_I18N = {
     "invoices": "Rechnungen",
     "account": "Konto",
     "log_out": "Abmelden",
-    "financial_dashboard": "FinanzÃ¼bersicht",
+    "financial_dashboard": "Finanzübersicht",
     "revenue_invoice_analytics": "Umsatz- & Rechnungsanalyse",
     "total_invoices": "Rechnungen gesamt",
     "total_billed": "Gesamtbetrag",
     "collected": "Eingegangen",
     "outstanding": "Ausstehend",
-    "overdue_invoices": "ÃœberfÃ¤llige Rechnungen",
+    "overdue_invoices": "Überfällige Rechnungen",
     "live_revenue_charts": "Live-Umsatzdiagramme",
     "track_hint": "Verfolge die letzten 6 Abrechnungsmonate und exportiere die Daten jederzeit.",
-    "open_invoices": "Rechnungen Ã¶ffnen",
+    "open_invoices": "Rechnungen öffnen",
     "paid_invoices": "Bezahlte Rechnungen",
     "needs_attention": "Nachverfolgung erforderlich",
     "hours": "Stunden",
     "download_csv": "CSV herunterladen",
     "revenue_hours_performance": "Umsatz- & Stundenentwicklung",
-    "revenue_hours_hint": "Interaktive Trends fÃ¼r Rechnungsanzahl, Umsatz und gebuchte Stunden.",
+    "revenue_hours_hint": "Interaktive Trends für Rechnungsanzahl, Umsatz und gebuchte Stunden.",
     "average_invoice": "Durchschnittliche Rechnung",
     "this_month": "Diesen Monat",
     "outstanding_label": "Ausstehend",
-    "monthly_breakdown": "Monatliche Ãœbersicht",
+    "monthly_breakdown": "Monatliche Übersicht",
     "team_directory": "Teamverzeichnis",
     "employee_search_label": "Mitarbeiter suchen",
-    "open_employee_profiles": "Mitarbeiterprofile Ã¶ffnen",
+    "open_employee_profiles": "Mitarbeiterprofile öffnen",
     "total_employees": "Mitarbeiter gesamt",
     "currently_shown": "Aktuell angezeigt",
     "scheduled_today": "Heute eingeplant",
     "unassigned_this_week": "Diese Woche ohne Einsatz",
     "search_placeholder": "Nach Name oder Rolle suchen",
-    "reset_filters": "Filter zurÃ¼cksetzen",
+    "reset_filters": "Filter zurücksetzen",
     "of": "von",
     "no_matching_employees": "Keine passenden Mitarbeiter",
   },
@@ -10245,14 +10322,14 @@ def _build_admin_dashboard_context(db):
     "de": {
       "live_revenue_charts": "Live-Umsatzdiagramme",
       "track_hint": "Verfolge die letzten 6 Abrechnungsmonate und exportiere die Daten jederzeit.",
-      "open_invoices": "Rechnungen Ã¶ffnen",
+      "open_invoices": "Rechnungen öffnen",
       "download_csv": "CSV herunterladen",
       "revenue_hours_performance": "Umsatz- & Stundenentwicklung",
-      "revenue_hours_hint": "Interaktive Trends fÃ¼r Rechnungsanzahl, Umsatz und gebuchte Stunden.",
+      "revenue_hours_hint": "Interaktive Trends für Rechnungsanzahl, Umsatz und gebuchte Stunden.",
       "average_invoice": "Durchschnittliche Rechnung",
       "this_month": "Diesen Monat",
       "outstanding": "Ausstehend",
-      "monthly_breakdown": "Monatliche Ãœbersicht",
+      "monthly_breakdown": "Monatliche Übersicht",
     },
   }
 
@@ -10387,7 +10464,7 @@ EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
     "actual": "Actual",
     "checkpoints": "Checkpoints",
     "clock_in": "Clock in",
-    "clocked_in": "Clocked in âœ”",
+    "clocked_in": "Clocked in ✔",
     "clock_out": "Clock-out",
     "open_maps": "Open in Maps",
     "mark_complete": "Mark complete",
@@ -10398,7 +10475,7 @@ EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
     "replace_after": "Replace after photo",
     "before": "Before",
     "after": "After",
-    "today_empty_title": "Youâ€™re all clear âœ¨",
+    "today_empty_title": "You’re all clear ✨",
     "today_empty_message": "No shifts scheduled for today. Check back later or reach out to your manager if you were expecting a mission.",
     "upcoming_empty": "No upcoming jobs yet.",
     "history_empty": "No missions logged yet.",
@@ -10431,7 +10508,7 @@ EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
     "login_secure_access": "Sicherer Zugang",
     "login_workspace_label": "UNTERNEHMENSBEREICH",
     "login_tagline": "Willkommen bei Elf's Plan.",
-    "login_brand_message": "Melden Sie sich an, um EinsatzplÃ¤ne, Standorte und Teamdaten aufzurufen.",
+    "login_brand_message": "Melden Sie sich an, um Einsatzpläne, Standorte und Teamdaten aufzurufen.",
     "login_form_intro": "Melden Sie sich mit Ihren Unternehmensdaten an.",
     "login_show_password": "Passwort anzeigen",
     "login_hide_password": "Passwort ausblenden",
@@ -10440,18 +10517,18 @@ EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
     "login_password": "Passwort / PIN",
     "login_button": "Login",
     "login_hint": "Admins nutzen Benutzername und Passwort. Mitarbeitende nutzen E-Mail oder Login-Code plus PIN.",
-    "login_invalid": "UngÃ¼ltige Anmeldedaten",
+    "login_invalid": "Ungültige Anmeldedaten",
     "login_required": "Benutzername und Passwort sind erforderlich",
     "language": "Sprache",
     "dashboard_title": "Mitarbeiter-Dashboard",
     "sign_out": "Abmelden",
     "welcome": "Hallo {name}!",
     "today": "Heute",
-    "next": "NÃ¤chste",
+    "next": "Nächste",
     "history": "Verlauf",
-    "your_missions": "Deine EinsÃ¤tze",
-    "upcoming_jobs": "Bevorstehende EinsÃ¤tze",
-    "recent_missions": "Letzte EinsÃ¤tze",
+    "your_missions": "Deine Einsätze",
+    "upcoming_jobs": "Bevorstehende Einsätze",
+    "recent_missions": "Letzte Einsätze",
     "location": "Ort",
     "instructions": "Anweisungen",
     "duration": "Dauer",
@@ -10459,9 +10536,9 @@ EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
     "actual": "Ist",
     "checkpoints": "Zeitstempel",
     "clock_in": "Einstempeln",
-    "clocked_in": "Eingestempelt âœ”",
+    "clocked_in": "Eingestempelt ✔",
     "clock_out": "Ausstempeln",
-    "open_maps": "In Maps Ã¶ffnen",
+    "open_maps": "In Maps öffnen",
     "mark_complete": "Als erledigt markieren",
     "completed": "Erledigt ðŸŽ‰",
     "upload_before": "Vorher-Foto hochladen",
@@ -10470,15 +10547,15 @@ EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
     "replace_after": "Nachher-Foto ersetzen",
     "before": "Vorher",
     "after": "Nachher",
-    "today_empty_title": "FÃ¼r heute alles erledigt âœ¨",
-    "today_empty_message": "FÃ¼r heute sind keine Schichten geplant. Schau spÃ¤ter nochmal vorbei oder kontaktiere deine Leitung.",
-    "upcoming_empty": "Noch keine kommenden EinsÃ¤tze.",
-    "history_empty": "Noch keine EinsÃ¤tze im Verlauf.",
-    "friendly_none": "Aktuell sind keine EinsÃ¤tze geplant.",
+    "today_empty_title": "Für heute alles erledigt ✨",
+    "today_empty_message": "Für heute sind keine Schichten geplant. Schau später nochmal vorbei oder kontaktiere deine Leitung.",
+    "upcoming_empty": "Noch keine kommenden Einsätze.",
+    "history_empty": "Noch keine Einsätze im Verlauf.",
+    "friendly_none": "Aktuell sind keine Einsätze geplant.",
     "friendly_one": "Du hast 1 Einsatz heute.",
-    "friendly_many": "{count} EinsÃ¤tze fÃ¼r heute geplant.",
+    "friendly_many": "{count} Einsätze für heute geplant.",
     "status_scheduled": "Geplant",
-    "status_in_progress": "LÃ¤uft",
+    "status_in_progress": "Läuft",
     "status_completed": "Erledigt",
     "scheduled_job": "Geplanter Einsatz",
     "address_soon": "Adresse folgt",
@@ -10488,15 +10565,15 @@ EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
     "time_tbd": "Zeit wird geplant",
     "starts": "Start {time}",
     "ends": "Ende {time}",
-    "shift_not_found": "Diese Schicht wurde fÃ¼r dein Profil nicht gefunden.",
-    "shift_not_today": "Diese Schicht ist nicht fÃ¼r heute geplant.",
+    "shift_not_found": "Diese Schicht wurde für dein Profil nicht gefunden.",
+    "shift_not_today": "Diese Schicht ist nicht für heute geplant.",
     "clocked_in_success": "Eingestempelt. Viel Erfolg!",
-    "photo_type_required": "Bitte auswÃ¤hlen, ob es ein Vorher- oder Nachher-Foto ist.",
-    "photo_select_first": "Bitte zuerst ein Foto auswÃ¤hlen.",
-    "photo_type_invalid": "Dateityp nicht unterstÃ¼tzt. Bitte PNG, JPG oder JPEG nutzen.",
+    "photo_type_required": "Bitte auswählen, ob es ein Vorher- oder Nachher-Foto ist.",
+    "photo_select_first": "Bitte zuerst ein Foto auswählen.",
+    "photo_type_invalid": "Dateityp nicht unterstützt. Bitte PNG, JPG oder JPEG nutzen.",
     "photo_save_error": "Foto konnte nicht gespeichert werden. Bitte erneut versuchen.",
     "photo_saved": "{label}-Foto gespeichert. Super!",
-    "complete_success": "Schicht abgeschlossen. Danke fÃ¼r deinen Einsatz.",
+    "complete_success": "Schicht abgeschlossen. Danke für deinen Einsatz.",
     "confetti_complete": "Einsatz erledigt! ðŸŽ‰",
   },
   "uk": {
@@ -10511,7 +10588,7 @@ EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
     "login_username": "Ð†Ð¼'Ñ ÐºÐ¾Ñ€Ð¸ÑÑ‚ÑƒÐ²Ð°Ñ‡Ð°, Ñ€Ð¾Ð±Ð¾Ñ‡Ð° Ð¿Ð¾ÑˆÑ‚Ð° Ð°Ð±Ð¾ ÐºÐ¾Ð´ Ð²Ñ…Ð¾Ð´Ñƒ",
     "login_password": "ÐŸÐ°Ñ€Ð¾Ð»ÑŒ / PIN",
     "login_button": "Ð£Ð²Ñ–Ð¹Ñ‚Ð¸",
-    "login_hint": "ÐÐ´Ð¼Ñ–Ð½Ð¸ Ð²Ñ…Ð¾Ð´ÑÑ‚ÑŒ Ð·Ð° Ð»Ð¾Ð³Ñ–Ð½Ð¾Ð¼ Ñ– Ð¿Ð°Ñ€Ð¾Ð»ÐµÐ¼. Ð¡Ð¿Ñ–Ð²Ñ€Ð¾Ð±Ñ–Ñ‚Ð½Ð¸ÐºÐ¸ â€” Ð·Ð° Ñ€Ð¾Ð±Ð¾Ñ‡Ð¸Ð¼ email Ð°Ð±Ð¾ ÐºÐ¾Ð´Ð¾Ð¼ Ð²Ñ…Ð¾Ð´Ñƒ Ñ‚Ð° PIN.",
+    "login_hint": "ÐÐ´Ð¼Ñ–Ð½Ð¸ Ð²Ñ…Ð¾Ð´Ñть за логіном і паролем. Співробітники — за робочим email або кодом входу та PIN.",
     "login_invalid": "ÐÐµÐ²Ñ–Ñ€Ð½Ñ– Ð¾Ð±Ð»Ñ–ÐºÐ¾Ð²Ñ– Ð´Ð°Ð½Ñ–",
     "login_required": "ÐŸÐ¾Ñ‚Ñ€Ñ–Ð±Ð½Ñ– Ñ–Ð¼'Ñ ÐºÐ¾Ñ€Ð¸ÑÑ‚ÑƒÐ²Ð°Ñ‡Ð° Ñ‚Ð° Ð¿Ð°Ñ€Ð¾Ð»ÑŒ",
     "language": "ÐœÐ¾Ð²Ð°",
@@ -10531,18 +10608,18 @@ EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
     "actual": "Ð¤Ð°ÐºÑ‚Ð¸Ñ‡Ð½Ð¾",
     "checkpoints": "Ð’Ñ–Ð´Ð¼Ñ–Ñ‚ÐºÐ¸",
     "clock_in": "ÐŸÐ¾Ñ‡Ð°Ñ‚Ð¸ Ð·Ð¼Ñ–Ð½Ñƒ",
-    "clocked_in": "ÐŸÐ¾Ñ‡Ð°Ñ‚Ð¾ âœ”",
+    "clocked_in": "Почато ✔",
     "clock_out": "Ð—Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¾",
     "open_maps": "Ð’Ñ–Ð´ÐºÑ€Ð¸Ñ‚Ð¸ Ð² Maps",
     "mark_complete": "ÐŸÐ¾Ð·Ð½Ð°Ñ‡Ð¸Ñ‚Ð¸ Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¾",
     "completed": "Ð—Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¾ ðŸŽ‰",
-    "upload_before": "Ð—Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ Ñ„Ð¾Ñ‚Ð¾ Â«Ð´Ð¾Â»",
-    "replace_before": "Ð—Ð°Ð¼Ñ–Ð½Ð¸Ñ‚Ð¸ Ñ„Ð¾Ñ‚Ð¾ Â«Ð´Ð¾Â»",
-    "upload_after": "Ð—Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ Ñ„Ð¾Ñ‚Ð¾ Â«Ð¿Ñ–ÑÐ»ÑÂ»",
-    "replace_after": "Ð—Ð°Ð¼Ñ–Ð½Ð¸Ñ‚Ð¸ Ñ„Ð¾Ñ‚Ð¾ Â«Ð¿Ñ–ÑÐ»ÑÂ»",
+    "upload_before": "Завантажити фото «до»",
+    "replace_before": "Замінити фото «до»",
+    "upload_after": "Ð—Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ Ñ„Ð¾Ñ‚Ð¾ Â«Ð¿Ñ–ÑÐ»Ñ»",
+    "replace_after": "Ð—Ð°Ð¼Ñ–Ð½Ð¸Ñ‚Ð¸ Ñ„Ð¾Ñ‚Ð¾ Â«Ð¿Ñ–ÑÐ»Ñ»",
     "before": "Ð”Ð¾",
     "after": "ÐŸÑ–ÑÐ»Ñ",
-    "today_empty_title": "ÐÐ° ÑÑŒÐ¾Ð³Ð¾Ð´Ð½Ñ– Ð²ÑÐµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾ âœ¨",
+    "today_empty_title": "ÐÐ° ÑÑŒÐ¾Ð³Ð¾Ð´Ð½Ñ– Ð²Ñе виконано ✨",
     "today_empty_message": "ÐÐ° ÑÑŒÐ¾Ð³Ð¾Ð´Ð½Ñ– Ð·Ð¼Ñ–Ð½ Ð½ÐµÐ¼Ð°Ñ”. ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ Ð¿Ñ–Ð·Ð½Ñ–ÑˆÐµ Ð°Ð±Ð¾ Ð·Ð²ÐµÑ€Ð½Ñ–Ñ‚ÑŒÑÑ Ð´Ð¾ Ð¼ÐµÐ½ÐµÐ´Ð¶ÐµÑ€Ð°.",
     "upcoming_empty": "ÐŸÐ¾ÐºÐ¸ Ñ‰Ð¾ Ð½ÐµÐ¼Ð°Ñ” Ð¼Ð°Ð¹Ð±ÑƒÑ‚Ð½Ñ–Ñ… Ð·Ð¼Ñ–Ð½.",
     "history_empty": "Ð†ÑÑ‚Ð¾Ñ€Ñ–Ñ Ð·Ð¼Ñ–Ð½ Ð¿Ð¾Ñ€Ð¾Ð¶Ð½Ñ.",
@@ -10563,11 +10640,11 @@ EMPLOYEE_TEXTS: dict[str, dict[str, str]] = {
     "shift_not_found": "Ð—Ð¼Ñ–Ð½Ñƒ Ð´Ð»Ñ Ð²Ð°ÑˆÐ¾Ð³Ð¾ Ð¿Ñ€Ð¾Ñ„Ñ–Ð»ÑŽ Ð½Ðµ Ð·Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾.",
     "shift_not_today": "Ð¦Ñ Ð·Ð¼Ñ–Ð½Ð° Ð½Ðµ Ð·Ð°Ð¿Ð»Ð°Ð½Ð¾Ð²Ð°Ð½Ð° Ð½Ð° ÑÑŒÐ¾Ð³Ð¾Ð´Ð½Ñ–.",
     "clocked_in_success": "Ð’Ð¸ Ð²Ñ–Ð´Ð¼Ñ–Ñ‚Ð¸Ð»Ð¸ÑÑŒ. Ð“Ð°Ñ€Ð½Ð¾Ñ— Ñ€Ð¾Ð±Ð¾Ñ‚Ð¸!",
-    "photo_type_required": "Ð’ÐºÐ°Ð¶Ñ–Ñ‚ÑŒ, Ñ†Ðµ Ñ„Ð¾Ñ‚Ð¾ Â«Ð´Ð¾Â» Ñ‡Ð¸ Â«Ð¿Ñ–ÑÐ»ÑÂ».",
+    "photo_type_required": "Ð’ÐºÐ°Ð¶Ñ–Ñ‚ÑŒ, Ñ†Ðµ Ñ„Ð¾Ñ‚Ð¾ Â«Ð´Ð¾Â» Ñ‡Ð¸ Â«Ð¿Ñ–ÑÐ»Ñ».",
     "photo_select_first": "Ð¡Ð¿Ð¾Ñ‡Ð°Ñ‚ÐºÑƒ Ð¾Ð±ÐµÑ€Ñ–Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾ Ð´Ð»Ñ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð½Ñ.",
     "photo_type_invalid": "ÐÐµÐ¿Ñ–Ð´Ñ‚Ñ€Ð¸Ð¼ÑƒÐ²Ð°Ð½Ð¸Ð¹ Ñ‚Ð¸Ð¿ Ñ„Ð°Ð¹Ð»Ñƒ. Ð’Ð¸ÐºÐ¾Ñ€Ð¸ÑÑ‚Ð°Ð¹Ñ‚Ðµ PNG, JPG Ð°Ð±Ð¾ JPEG.",
     "photo_save_error": "ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ Ñ„Ð¾Ñ‚Ð¾. Ð¡Ð¿Ñ€Ð¾Ð±ÑƒÐ¹Ñ‚Ðµ Ñ‰Ðµ Ñ€Ð°Ð·.",
-    "photo_saved": "Ð¤Ð¾Ñ‚Ð¾ Â«{label}Â» Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾. Ð§ÑƒÐ´Ð¾Ð²Ð¾!",
+    "photo_saved": "Фото «{label}» збережено. Чудово!",
     "complete_success": "Ð—Ð¼Ñ–Ð½Ñƒ Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¾. Ð”ÑÐºÑƒÑ”Ð¼Ð¾!",
     "confetti_complete": "Ð—Ð¼Ñ–Ð½Ñƒ Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¾! ðŸŽ‰",
   },
@@ -10713,7 +10790,7 @@ def employee_dashboard():
 
   def _format_minutes(total_minutes: int | None) -> str:
     if total_minutes is None or total_minutes <= 0:
-      return "â€”"
+      return "—"
     hours, minutes = divmod(int(total_minutes), 60)
     parts = []
     if hours:
@@ -10734,7 +10811,7 @@ def employee_dashboard():
     if start and end:
       start_label = start.strftime("%H:%M")
       end_label = end.strftime("%H:%M")
-      return f"{start_label} â€“ {end_label}"
+      return f"{start_label} – {end_label}"
     if start:
       start_label = start.strftime("%H:%M")
       return _employee_text(lang, "starts", time=start_label)
@@ -10779,8 +10856,8 @@ def employee_dashboard():
         status_label = _employee_text(lang, "status_scheduled")
         status_key = "scheduled"
 
-      clock_in_display = shift.clock_in_at.strftime("%H:%M") if shift.clock_in_at else "â€”"
-      clock_out_display = shift.clock_out_at.strftime("%H:%M") if shift.clock_out_at else "â€”"
+      clock_in_display = shift.clock_in_at.strftime("%H:%M") if shift.clock_in_at else "—"
+      clock_out_display = shift.clock_out_at.strftime("%H:%M") if shift.clock_out_at else "—"
 
       scheduled_minutes = _scheduled_minutes(shift)
       actual_minutes = None
@@ -10804,7 +10881,7 @@ def employee_dashboard():
           "address": address,
           "map_url": map_url,
           "instructions": (shift.instructions or _employee_text(lang, "no_special_instructions")),
-          "time_window": f"{start_label} â€“ {end_label}",
+          "time_window": f"{start_label} – {end_label}",
           "status_label": status_label,
           "status_key": status_key,
           "clock_in_display": clock_in_display,
@@ -11314,7 +11391,7 @@ def batch_edit_shifts():
         shift_ids.append(value)
 
     if not shift_ids:
-      flash("Keine EinsÃ¤tze fÃ¼r Sammelbearbeitung ausgewÃ¤hlt.", "warning")
+      flash("Keine Einsätze für Sammelbearbeitung ausgewählt.", "warning")
       return redirect(request.referrer or url_for("schedule_dashboard"))
 
     day_str = (request.form.get("day") or "").strip()
@@ -11323,7 +11400,7 @@ def batch_edit_shifts():
     instructions_str = (request.form.get("instructions") or "").strip()
 
     if not day_str and not start_str and not end_str and not instructions_str:
-      flash("Bitte mindestens ein Feld fÃ¼r die Sammelbearbeitung setzen.", "warning")
+      flash("Bitte mindestens ein Feld für die Sammelbearbeitung setzen.", "warning")
       return redirect(request.referrer or url_for("schedule_dashboard"))
 
     new_day = None
@@ -11331,20 +11408,20 @@ def batch_edit_shifts():
       try:
         new_day = datetime.strptime(day_str, "%Y-%m-%d").date()
       except (ValueError, TypeError):
-        flash("UngÃ¼ltiges Datumsformat.", "warning")
+        flash("Ungültiges Datumsformat.", "warning")
         return redirect(request.referrer or url_for("schedule_dashboard"))
 
     new_start = None
     new_end = None
     if start_str or end_str:
       if not (start_str and end_str):
-        flash("FÃ¼r Sammelzeit-Updates bitte Start- und Endzeit angeben.", "warning")
+        flash("Für Sammelzeit-Updates bitte Start- und Endzeit angeben.", "warning")
         return redirect(request.referrer or url_for("schedule_dashboard"))
       try:
         new_start = datetime.strptime(start_str, "%H:%M").time()
         new_end = datetime.strptime(end_str, "%H:%M").time()
       except (ValueError, TypeError):
-        flash("UngÃ¼ltiges Zeitformat.", "warning")
+        flash("Ungültiges Zeitformat.", "warning")
         return redirect(request.referrer or url_for("schedule_dashboard"))
 
       if new_end <= new_start:
@@ -11353,7 +11430,7 @@ def batch_edit_shifts():
 
     shifts = db.query(Shift).filter(Shift.id.in_(shift_ids)).all()
     if not shifts:
-      flash("Keine gÃ¼ltigen EinsÃ¤tze gefunden.", "warning")
+      flash("Keine gültigen Einsätze gefunden.", "warning")
       return redirect(request.referrer or url_for("schedule_dashboard"))
 
     updated_count = 0
@@ -11388,15 +11465,15 @@ def batch_edit_shifts():
       db.commit()
       if conflict_messages:
         flash(f"{len(conflict_messages)} shift(s) were saved despite scheduling conflicts. Review: {conflict_messages[0]}", "warning")
-      flash(f"{updated_count} Einsatz/EinsÃ¤tze erfolgreich aktualisiert.")
+      flash(f"{updated_count} Einsatz/Einsätze erfolgreich aktualisiert.")
     else:
-      flash("Es wurden keine EinsÃ¤tze aktualisiert.", "warning")
+      flash("Es wurden keine Einsätze aktualisiert.", "warning")
 
     return redirect(request.referrer or url_for("schedule_dashboard"))
   except Exception as exc:
     db.rollback()
     app.logger.error("Error during batch shift edit: %s", exc)
-    flash("Fehler beim Aktualisieren der ausgewÃ¤hlten EinsÃ¤tze.", "warning")
+    flash("Fehler beim Aktualisieren der ausgewählten Einsätze.", "warning")
     return redirect(request.referrer or url_for("schedule_dashboard"))
   finally:
     db.close()
@@ -11765,7 +11842,7 @@ def schedule_dashboard():
                     created += 1
                 if created:
                   db.commit()
-                  flash(f"{created} Einsatz/EinsÃ¤tze wurden eingeplant.")
+                  flash(f"{created} Einsatz/Einsätze wurden eingeplant.")
                 if blocked_messages:
                   flash(f"{len(blocked_messages)} shift(s) were saved despite scheduling conflicts. Review: {blocked_messages[0]}", "warning")
                 if not created and not blocked_messages:
@@ -12025,7 +12102,7 @@ def schedule_preview_import_previous_month():
                 "from_day": s.day.strftime("%Y-%m-%d"),
                 "to_day": f"next {target_offset} week(s)",
                 "to_days": target_days,
-                "time": f"{s.start_time.strftime('%H:%M')}â€“{s.end_time.strftime('%H:%M')}",
+                "time": f"{s.start_time.strftime('%H:%M')}–{s.end_time.strftime('%H:%M')}",
                 "conflict": len(conflict_msgs) > 0,
                 "conflict_message": "\n".join(conflict_msgs) if conflict_msgs else None,
             })
@@ -12240,7 +12317,7 @@ def admin_dashboard_download_report():
     context = _build_admin_dashboard_context(db)
     csv_buffer = io.StringIO()
     writer = csv.writer(csv_buffer)
-    writer.writerow(["Month", "Invoice Count", "Total Income (â‚¬)", "Total Hours"])
+    writer.writerow(["Month", "Invoice Count", "Total Income (€)", "Total Hours"])
     for summary in context["monthly_summaries"]:
       writer.writerow([
         summary["month_name"],
@@ -12271,7 +12348,7 @@ def admin_employees():
   try:
     search_q = (request.args.get("q") or "").strip()
     work_type_filter = (request.args.get("work_type") or "").strip()
-    if work_type_filter == "GeringfÃ¼gige":
+    if work_type_filter == "Geringfügige":
       work_type_filter = "Intern"
     role_filter = (request.args.get("role") or "").strip()
     staff_type_filter = (request.args.get("staff_type_filter") or "").strip()
@@ -12347,7 +12424,7 @@ def admin_employees():
             worker_status = "active"
           is_active_bool = worker_status == "active"
           work_type = (request.form.get("profile_work_type") or "Teilzeit").strip()
-          if work_type not in {"Teilzeit", "Vollzeit", "Intern", "GeringfÃ¼gige"}:
+          if work_type not in {"Teilzeit", "Vollzeit", "Intern", "Geringfügige"}:
             work_type = "Teilzeit"
           group_type = (request.form.get("profile_group_type") or "Lohngruppe").strip()
           if group_type not in {"Lohngruppe", "Verwendungsgruppe"}:
@@ -12417,7 +12494,7 @@ def admin_employees():
           profile_euros_per_hour = (request.form.get("profile_euros_per_hour") or "").strip()
           profile_working_hours = (request.form.get("profile_working_hours") or "").strip()
           profile_work_type = (request.form.get("profile_work_type") or "").strip()
-          if profile_work_type not in {"Teilzeit", "Vollzeit", "Intern", "GeringfÃ¼gige"}:
+          if profile_work_type not in {"Teilzeit", "Vollzeit", "Intern", "Geringfügige"}:
             profile_work_type = "Teilzeit"
           profile_group_type = (request.form.get("profile_group_type") or "").strip()
           profile_group_number = (request.form.get("profile_group_number") or "").strip()
@@ -12645,7 +12722,7 @@ def admin_employees():
       )
     if work_type_filter:
       if work_type_filter == "Intern":
-        base_query = base_query.filter(Employee.profile_work_type.in_(["Intern", "GeringfÃ¼gige"]))
+        base_query = base_query.filter(Employee.profile_work_type.in_(["Intern", "Geringfügige"]))
       else:
         base_query = base_query.filter(Employee.profile_work_type == work_type_filter)
     if role_filter:
@@ -12662,7 +12739,7 @@ def admin_employees():
       .filter(Employee.profile_work_type.isnot(None), Employee.profile_work_type != "")
       .distinct().order_by(Employee.profile_work_type.asc()).all()
     ]
-    employee_work_types = sorted({"Intern" if work_type == "GeringfÃ¼gige" else work_type for work_type in stored_work_types})
+    employee_work_types = sorted({"Intern" if work_type == "Geringfügige" else work_type for work_type in stored_work_types})
 
     free_filter = request.args.get('free', default='0') == '1'
     free_day_str = (request.args.get('free_day') or '').strip()
@@ -12741,7 +12818,7 @@ def admin_employees():
         "address": edit_employee.profile_address or "", "zip": edit_employee.profile_zip_code or "", "city": edit_employee.profile_city or "",
         "start": edit_employee.profile_contract_start_date or "" if is_main_admin else "", "end": edit_employee.profile_contract_end_date or "" if is_main_admin else "",
         "rate": edit_employee.profile_euros_per_hour or "" if is_main_admin else "",
-        "hours": edit_employee.profile_working_hours or "", "workType": "Intern" if edit_employee.profile_work_type == "GeringfÃ¼gige" else edit_employee.profile_work_type or "Teilzeit",
+        "hours": edit_employee.profile_working_hours or "", "workType": "Intern" if edit_employee.profile_work_type == "Geringfügige" else edit_employee.profile_work_type or "Teilzeit",
         "groupType": edit_employee.profile_group_type or "Lohngruppe" if is_main_admin else "", "groupNumber": edit_employee.profile_group_number or "" if is_main_admin else "",
         "accessRole": edit_employee.access_role or "employee", "staffType": edit_employee.staff_type or "Cleaner",
         "staffFunctions": _employee_staff_functions(edit_employee),
@@ -12788,7 +12865,7 @@ def admin_employees():
         if shift.start_time and shift.end_time:
           start_label = shift.start_time.strftime("%I:%M %p").lstrip("0")
           end_label = shift.end_time.strftime("%I:%M %p").lstrip("0")
-          time_window = f"{start_label} â€“ {end_label}"
+          time_window = f"{start_label} – {end_label}"
         elif shift.start_time:
           start_label = shift.start_time.strftime("%I:%M %p").lstrip("0")
           time_window = f"Starts {start_label}"
@@ -12949,7 +13026,7 @@ def admin_employee_detail(employee_id: int):
         branch = (request.form.get("branch") or employee.branch or "Wien").strip()
         employee.branch = branch if branch in {"Wien", "Graz"} else "Wien"
         work_type = (request.form.get("profile_work_type") or "Teilzeit").strip()
-        employee.profile_work_type = work_type if work_type in {"Teilzeit", "Vollzeit", "Intern", "GeringfÃ¼gige"} else "Teilzeit"
+        employee.profile_work_type = work_type if work_type in {"Teilzeit", "Vollzeit", "Intern", "Geringfügige"} else "Teilzeit"
         employee.profile_working_hours = (request.form.get("profile_working_hours") or "").strip() or None
         worker_status = (request.form.get("worker_status") or employee.worker_status or "active").strip().lower()
         if worker_status in {"active", "passive"}:
@@ -13057,7 +13134,7 @@ def admin_employee_detail(employee_id: int):
     schedule_hour_rows = list(range(5, 24))
     week_start_label = schedule_week_start.strftime("%d.%m.%Y")
     week_end_label = schedule_week_end.strftime("%d.%m.%Y")
-    schedule_week_range = f"{week_start_label} â†’ {week_end_label}"
+    schedule_week_range = f"{week_start_label} → {week_end_label}"
     previous_week_url = url_for("admin_employee_detail", employee_id=employee.id, week=(schedule_week_start - timedelta(days=7)).isoformat()) + "#schedule"
     next_week_url = url_for("admin_employee_detail", employee_id=employee.id, week=(schedule_week_start + timedelta(days=7)).isoformat()) + "#schedule"
     current_week_url = url_for("admin_employee_detail", employee_id=employee.id, week=(date.today() - timedelta(days=date.today().weekday())).isoformat()) + "#schedule"
@@ -13107,7 +13184,7 @@ def admin_employee_detail(employee_id: int):
           "top_px": round(top_px),
           "height_px": round(height_px),
           "all_day": all_day,
-          "time_window": f"{shift.start_time.strftime('%H:%M')}â€“{shift.end_time.strftime('%H:%M')}",
+          "time_window": f"{shift.start_time.strftime('%H:%M')}–{shift.end_time.strftime('%H:%M')}",
           "site_name": (shift.site.profile_company_name or shift.site.name) if shift.site else "Scheduled shift",
           "instructions": shift.instructions or "",
         })
@@ -13206,15 +13283,6 @@ def admin_employee_docx(employee_id: int):
       flash("Employee template not found. Place employee_template.docx in uploads/ or static/uploads/.", "warning")
       return redirect(url_for("admin_employees"))
 
-    if not PYTHON_DOCX_AVAILABLE:
-      app.logger.error(
-        "Employee DOCX download stopped: python-docx unavailable in web process (employee_id=%s template=%s)",
-        employee_id,
-        template_path,
-      )
-      flash("DOCX generation is unavailable. Install python-docx.", "warning")
-      return redirect(url_for("admin_employees"))
-
     if debug_mode:
       import json
       from importlib import metadata as importlib_metadata
@@ -13246,18 +13314,21 @@ def admin_employee_docx(employee_id: int):
         "employee_id": employee.id,
       }
 
-      try:
-        probe_doc = Document(template_path)
-        hit = None
-        for p in probe_doc.paragraphs:
-          if "arbeitnehmer" in (p.text or "").lower():
-            hit = p.text
-            break
-        template_probe["template_first_arbeitnehmer_paragraph"] = hit
-        template_probe["template_paragraph_count"] = len(probe_doc.paragraphs)
-        template_probe["template_table_count"] = len(probe_doc.tables)
-      except Exception as exc:
-        template_probe["template_probe_error"] = str(exc)
+      template_probe["docx_available"] = PYTHON_DOCX_AVAILABLE
+      template_probe["docx_import_error"] = PYTHON_DOCX_IMPORT_ERROR
+      if PYTHON_DOCX_AVAILABLE and Document is not None:
+        try:
+          probe_doc = Document(template_path)
+          hit = None
+          for p in probe_doc.paragraphs:
+            if "arbeitnehmer" in (p.text or "").lower():
+              hit = p.text
+              break
+          template_probe["template_first_arbeitnehmer_paragraph"] = hit
+          template_probe["template_paragraph_count"] = len(probe_doc.paragraphs)
+          template_probe["template_table_count"] = len(probe_doc.tables)
+        except Exception as exc:
+          template_probe["template_probe_error"] = str(exc)
 
       payload = {"template": stat_info, "probe": template_probe}
       return app.response_class(
@@ -13265,6 +13336,16 @@ def admin_employee_docx(employee_id: int):
         status=200,
         mimetype="application/json",
       )
+
+    if not PYTHON_DOCX_AVAILABLE:
+      app.logger.error(
+        "Employee DOCX download stopped: python-docx unavailable in web process (employee_id=%s template=%s import_error=%s)",
+        employee_id,
+        template_path,
+        PYTHON_DOCX_IMPORT_ERROR,
+      )
+      flash("DOCX generation is unavailable. Check the application log for the python-docx import error.", "warning")
+      return redirect(url_for("admin_employees"))
 
     try:
       docx_buffer = _build_employee_docx(employee, template_path)
@@ -13312,6 +13393,11 @@ def admin_sites():
   try:
     search_q = (request.args.get("q") or "").strip()
     status_filter = (request.args.get("status_filter") or "all").strip().lower()
+    manager_filter = (request.args.get("manager_id") or "").strip()
+    client_filter = (request.args.get("client") or "").strip()
+    coverage_filter = (request.args.get("coverage") or "").strip().lower()
+    if coverage_filter not in {"scheduled", "unscheduled"}:
+      coverage_filter = ""
     if status_filter not in {"all", "active", "inactive"}:
       status_filter = "all"
     if request.method == "POST":
@@ -13329,6 +13415,15 @@ def admin_sites():
       effective_q = redirect_q or search_q
       if effective_q:
         redirect_params["q"] = effective_q
+      effective_manager = (request.form.get("redirect_manager") or manager_filter).strip()
+      effective_client = (request.form.get("redirect_client") or client_filter).strip()
+      effective_coverage = (request.form.get("redirect_coverage") or coverage_filter).strip().lower()
+      if effective_manager:
+        redirect_params["manager_id"] = effective_manager
+      if effective_client:
+        redirect_params["client"] = effective_client
+      if effective_coverage in {"scheduled", "unscheduled"}:
+        redirect_params["coverage"] = effective_coverage
       if redirect_status in {"active", "inactive"}:
         redirect_params["status_filter"] = redirect_status
       if redirect_page_val and redirect_page_val > 1:
@@ -13458,8 +13553,37 @@ def admin_sites():
         elif action == "delete" and site_id:
           site = db.get(Site, int(site_id))
           if site:
+            linked_invoice = db.query(Invoice.id).filter(Invoice.site_id == site.id).first()
+            if linked_invoice:
+              flash("This site has invoices and cannot be deleted. Set it to inactive instead.", "warning")
+              return redirect(url_for("admin_site_detail", site_id=site.id))
+
+            inspection_rows = db.query(SiteInspection).filter(SiteInspection.site_id == site.id).all()
+            inspection_photo_paths = [
+              item.photo_path
+              for inspection in inspection_rows
+              for item in inspection.items
+              if item.photo_path
+            ]
+            site_area_rows = db.query(SiteInspectionArea).filter(SiteInspectionArea.site_id == site.id).all()
+            site_image_path = site.profile_image_path
+            for inspection in inspection_rows:
+              db.delete(inspection)
+            for site_area in site_area_rows:
+              db.delete(site_area)
             db.delete(site)
             db.commit()
+            for photo_path in inspection_photo_paths:
+              photo_name = os.path.basename(str(photo_path).replace("\\", "/"))
+              photo_file = os.path.join(INSPECTION_PHOTO_FOLDER, photo_name)
+              try:
+                if os.path.isfile(photo_file):
+                  os.remove(photo_file)
+              except OSError:
+                app.logger.warning("Could not remove inspection photo while deleting site %s: %s", site_id, photo_file)
+            _remove_photo(site_image_path)
+            flash("Site deleted. Its shifts and inspection reports were also deleted.", "success")
+            return redirect(redirect_url)
       elif entity == "site_bulk" and action == "bulk_update":
         ids = request.form.getlist("site_id")
         names = request.form.getlist("site_name")
@@ -13513,6 +13637,8 @@ def admin_sites():
       return redirect(redirect_url)
 
     query = db.query(Site)
+    week_start = date.today() - timedelta(days=date.today().weekday())
+    week_end = week_start + timedelta(days=7)
     if search_q:
       like = f"%{search_q}%"
       query = query.filter(or_(
@@ -13522,6 +13648,23 @@ def admin_sites():
         Site.profile_billing_address.ilike(like), Site.profile_vat_id.ilike(like),
         Site.profile_tax_id.ilike(like), Site.contact_name.ilike(like), Site.contact_email.ilike(like),
       ))
+    if manager_filter == "unassigned":
+      query = query.filter(Site.manager_employee_id.is_(None))
+    elif manager_filter.isdigit():
+      query = query.filter(Site.manager_employee_id == int(manager_filter))
+    client_name_expr = func.coalesce(func.nullif(func.trim(Site.profile_company_name), ""), Site.name)
+    if client_filter:
+      query = query.filter(client_name_expr == client_filter)
+    if coverage_filter == "scheduled":
+      scheduled_site_ids = db.query(Shift.site_id).filter(
+        Shift.day >= week_start, Shift.day < week_end, Shift.site_id.is_not(None)
+      ).distinct()
+      query = query.filter(Site.id.in_(scheduled_site_ids))
+    elif coverage_filter == "unscheduled":
+      scheduled_site_ids = db.query(Shift.site_id).filter(
+        Shift.day >= week_start, Shift.day < week_end, Shift.site_id.is_not(None)
+      ).distinct()
+      query = query.filter(~Site.id.in_(scheduled_site_ids))
     if status_filter == "active":
       query = query.filter(or_(Site.is_active.is_(True), Site.is_active.is_(None)))
     elif status_filter == "inactive":
@@ -13585,6 +13728,12 @@ def admin_sites():
         "contractContact": edit_client.contract_contact_details or "" if is_main_admin else "", "managerId": edit_client.manager_employee_id or "" if is_main_admin else "", "logo": edit_client.profile_image_path or "",
       }
     site_managers = db.query(Employee).filter(Employee.access_role == "site_manager", Employee.is_active.is_(True)).order_by(Employee.name.asc()).all()
+    site_manager_filter_options = db.query(Employee).filter(Employee.access_role == "site_manager").order_by(Employee.name.asc()).all()
+    client_filter_options = [
+      row[0] for row in db.query(client_name_expr)
+      .filter(func.trim(client_name_expr) != "")
+      .distinct().order_by(client_name_expr.asc()).all()
+    ]
     active_sites_total = (
       db.query(func.count(Site.id))
       .filter(or_(Site.is_active.is_(True), Site.is_active.is_(None)))
@@ -13604,8 +13753,6 @@ def admin_sites():
           .all()
         )
       }
-    week_start = date.today() - timedelta(days=date.today().weekday())
-    week_end = week_start + timedelta(days=7)
     covered_site_ids = {
       row[0]
       for row in db.query(Shift.site_id)
@@ -13630,10 +13777,15 @@ def admin_sites():
       sites=sites,
       search_q=search_q,
       status_filter=status_filter,
+      manager_filter=manager_filter,
+      client_filter=client_filter,
+      coverage_filter=coverage_filter,
       is_main_admin=is_main_admin,
       is_site_manager=is_site_manager or is_sales_manager,
       is_sales_manager=is_sales_manager,
       site_managers=site_managers,
+      site_manager_filter_options=site_manager_filter_options,
+      client_filter_options=client_filter_options,
       shift_counts=shift_counts,
       total_sites=total_sites,
       active_sites_total=active_sites_total,
@@ -14486,7 +14638,7 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     elements = []
 
     # Top section with sender info and invoice details
-    sender_text = "Staffconnecting â€¢ Simmeringer HauptstraÃŸe 24 - 1110 Wien"
+    sender_text = "Staffconnecting • Simmeringer Hauptstraße 24 - 1110 Wien"
     # Use current date for invoice and delivery date
     current_date = datetime.now().strftime("%d.%m.%Y")
     invoice_date = current_date
@@ -14531,13 +14683,13 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
       else:
         recipient_address_lines = [part.strip() for part in recipient_address_raw.split(",") if part.strip()]
 
-    # Ensure "Ã–sterreich" is shown as the last line (exactly once) under the address.
+    # Ensure "Österreich" is shown as the last line (exactly once) under the address.
     if recipient_address_lines:
       recipient_address_lines = [
         line for line in recipient_address_lines
-        if line.strip().lower().strip(".") != "Ã¶sterreich"
+        if line.strip().lower().strip(".") != "österreich"
       ]
-      recipient_address_lines.append("Ã–sterreich")
+      recipient_address_lines.append("Österreich")
 
     recipient_extra_lines: list[str] = []
 
@@ -14554,7 +14706,7 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
 
     leistungszeitraum_value = delivery_date
     if contract_start and contract_end:
-      leistungszeitraum_value = f"{contract_start} â€“ {contract_end}"
+      leistungszeitraum_value = f"{contract_start} – {contract_end}"
     elif contract_start:
       leistungszeitraum_value = contract_start
     elif contract_end:
@@ -14624,7 +14776,7 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     elements.append(Spacer(1, 0.1*inch))
 
     # Intro text
-    intro_text = "vielen Dank fÃ¼r Ihren Auftrag und das damit verbundene Vertrauen!<br/>Hiermit stelle ich Ihnen die folgenden Leistungen in Rechnung."
+    intro_text = "vielen Dank für Ihren Auftrag und das damit verbundene Vertrauen!<br/>Hiermit stelle ich Ihnen die folgenden Leistungen in Rechnung."
     elements.append(Paragraph(intro_text, greeting_style))
     elements.append(Spacer(1, 0.2*inch))
 
@@ -14649,8 +14801,8 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
             '1.',
             'Reinigungsservice',
             f'{quantity:.2f}',
-            f'{unit_price:.2f} â‚¬',
-            f'{original_total:.2f} â‚¬'
+            f'{unit_price:.2f} €',
+            f'{original_total:.2f} €'
         ]
     ]
 
@@ -14688,9 +14840,9 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     gross_total = invoice.total_amount if invoice.total_amount else (net_total + tax_amount)
 
     totals_data = [
-      ['', '', '', 'Gesamtbetrag netto', f'{net_total:.2f} â‚¬'],
-      ['', '', '', f'zzgl. Umsatzsteuer {tax_rate_percent:.0f}%', f'{tax_amount:.2f} â‚¬'],
-      ['', '', '', 'Gesamtbetrag brutto', f'{gross_total:.2f} â‚¬']
+      ['', '', '', 'Gesamtbetrag netto', f'{net_total:.2f} €'],
+      ['', '', '', f'zzgl. Umsatzsteuer {tax_rate_percent:.0f}%', f'{tax_amount:.2f} €'],
+      ['', '', '', 'Gesamtbetrag brutto', f'{gross_total:.2f} €']
     ]
 
     totals_table = Table(totals_data, colWidths=[0.5*inch, 2.5*inch, 0.8*inch, 1.2*inch, 1.5*inch])
@@ -14713,22 +14865,22 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
     if invoice.due_date:
         due_days = (invoice.due_date - invoice.issued_date).days if invoice.issued_date else 31
 
-    payment_text = f'Zahlungsbedingungen: Zahlung innerhalb von {due_days} Tagen ab Rechnungseingang ohne AbzÃ¼ge.'
+    payment_text = f'Zahlungsbedingungen: Zahlung innerhalb von {due_days} Tagen ab Rechnungseingang ohne Abzüge.'
     elements.append(Paragraph(payment_text, greeting_style))
     elements.append(Spacer(1, 0.1*inch))
 
-    bank_info_text = f'Bitte Ã¼berweisen Sie den Rechnungsbetrag unter Angabe der Rechnungsnummer auf das unten angegebene Konto.'
+    bank_info_text = f'Bitte überweisen Sie den Rechnungsbetrag unter Angabe der Rechnungsnummer auf das unten angegebene Konto.'
     elements.append(Paragraph(bank_info_text, greeting_style))
     elements.append(Spacer(1, 0.05*inch))
 
     # Due date
     due_date_str = invoice.due_date.strftime("%d.%m.%Y") if invoice.due_date else (datetime.now() + timedelta(days=31)).strftime("%d.%m.%Y")
-    due_date_text = f'Der Rechnungsbetrag ist bis zum {due_date_str} fÃ¤llig.'
+    due_date_text = f'Der Rechnungsbetrag ist bis zum {due_date_str} fällig.'
     elements.append(Paragraph(due_date_text, greeting_style))
     elements.append(Spacer(1, 0.15*inch))
 
     # Closing
-    elements.append(Paragraph('Mit freundlichen GrÃ¼ÃŸen<br/>Sebastijan Kerculj', greeting_style))
+    elements.append(Paragraph('Mit freundlichen Grüßen<br/>Sebastijan Kerculj', greeting_style))
     elements.append(Spacer(1, 0.5*inch))
 
     # Build PDF
@@ -14740,9 +14892,9 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
       col_1 = [
         "Sebastijan Aleksandar Kerculj",
         "Staffconnecting",
-        "Simmeringer HauptstraÃŸe 24",
+        "Simmeringer Hauptstraße 24",
         "1110 Wien",
-        "Ã–sterreich",
+        "Österreich",
       ]
 
       col_2 = [
@@ -14754,7 +14906,7 @@ def generate_invoice_pdf(invoice: Invoice) -> io.BytesIO:
         "Amtsgericht Wien",
         "USt.-ID ATU78448967",
         "Steuer-Nr. 04 544/9573",
-        "GeschÃ¤ftsfÃ¼hrung Sebastijan Aleksandar",
+        "Geschäftsführung Sebastijan Aleksandar",
         "Kerculj",
       ]
 
@@ -14857,8 +15009,8 @@ Invoice Details:
 - Site: {invoice.site.name}
 - Company: {invoice.site_company_name or invoice.site.name}
 - Hours Worked: {invoice.total_hours}
-- Hourly Rate: â‚¬{invoice.hourly_rate:.2f}
-- Total Amount: â‚¬{invoice.total_amount:.2f}
+- Hourly Rate: €{invoice.hourly_rate:.2f}
+- Total Amount: €{invoice.total_amount:.2f}
 - Due Date: {invoice.due_date.strftime("%d/%m/%Y") if invoice.due_date else "Upon receipt"}
 {f"- Customer ID: {invoice.site_tax_id}" if invoice.site_tax_id else ""}
 
@@ -15018,7 +15170,7 @@ def _build_employee_docx(employee: Employee, template_path: str) -> io.BytesIO:
   euros_per_hour = euros_per_hour_raw.replace(".", ",")
   working_hours = (employee.profile_working_hours or "").strip() or "3"
   work_type = (employee.profile_work_type or "").strip()
-  if work_type not in {"Teilzeit", "Vollzeit", "GeringfÃ¼gige"}:
+  if work_type not in {"Teilzeit", "Vollzeit", "Geringfügige"}:
     work_type = "Teilzeit"
   group_type = (employee.profile_group_type or "").strip()
   if group_type not in {"Lohngruppe", "Verwendungsgruppe"}:
@@ -15056,10 +15208,10 @@ def _build_employee_docx(employee: Employee, template_path: str) -> io.BytesIO:
     "09.06.2025": start_date_value or "09.06.2025",
     "30.09.2025": end_date_value or "30.09.2025",
     "Reinigungskraft": employment_type,
-    "Stundenlohn von brutto â‚¬ 12,37": f"Stundenlohn von brutto â‚¬ {euros_per_hour}",
-    "â‚¬ 12,37": f"â‚¬ {euros_per_hour}",
+    "Stundenlohn von brutto € 12,37": f"Stundenlohn von brutto € {euros_per_hour}",
+    "€ 12,37": f"€ {euros_per_hour}",
     "3 Stunden": f"{working_hours} Stunden",
-    "geringfÃ¼gige": work_type,
+    "geringfügige": work_type,
     "geringfugige": work_type,
     "Lohngruppe 6": group_label,
     "Verwendungsgruppe 6": group_label,
@@ -15079,7 +15231,7 @@ def _build_employee_docx(employee: Employee, template_path: str) -> io.BytesIO:
     end_date_value,
     employment_type,
     euros_per_hour,
-    f"â‚¬ {euros_per_hour}".strip(),
+    f"€ {euros_per_hour}".strip(),
     working_hours,
     f"{working_hours} Stunden".strip(),
     work_type,
@@ -15189,12 +15341,12 @@ def _build_employee_docx(employee: Employee, template_path: str) -> io.BytesIO:
 
     # 3) Broader (but still contract-related) normalization
     working_text = re.sub(
-      r"Stundenlohn\s+von\s+brutto\s+â‚¬\s*\d+[\.,]\d+",
-      f"Stundenlohn von brutto â‚¬ {euros_per_hour}",
+      r"Stundenlohn\s+von\s+brutto\s+€\s*\d+[\.,]\d+",
+      f"Stundenlohn von brutto € {euros_per_hour}",
       working_text,
     )
     working_text = re.sub(r"\b\d+\s*Stunden\b", f"{working_hours} Stunden", working_text)
-    working_text = re.sub(r"geringf[uÃ¼]gige", work_type, working_text, flags=re.IGNORECASE)
+    working_text = re.sub(r"geringf[uü]gige", work_type, working_text, flags=re.IGNORECASE)
     working_text = re.sub(
       r"(Lohngruppe|Verwendungsgruppe|Verwendungsgruupe)\s*\d+",
       group_label,
@@ -15918,7 +16070,7 @@ def admin_send_bulk_invoice_emails():
         session_obj.commit()
 
         flash(
-            f"Bulk email result â€” sent: {sent_count}, skipped (no email): {skipped_count}, failed: {failed_count}.",
+            f"Bulk email result — sent: {sent_count}, skipped (no email): {skipped_count}, failed: {failed_count}.",
             "success" if failed_count == 0 else "warning",
         )
         if failure_examples:

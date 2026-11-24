@@ -1,6 +1,6 @@
 {
-  "name": "Elf's Plan Site Manager",
-  "short_name": "Elf's Manager",
+  "name": "Putzelf Site Manager",
+  "short_name": "Putzelf Manager",
   "id": "/site-manager",
   "start_url": "/site-manager",
   "scope": "/",
@@ -8,7 +8,7 @@
   "orientation": "any",
   "background_color": "#f5f7fb",
   "theme_color": "#014D4E",
-  "description": "Manage assigned sites, teams, schedules, and monthly inspections with Elf's Plan.",
+  "description": "Manage sites, teams, schedules, and monthly inspections with Putzelf.",
   "icons": [
     {
       "src": "/static/employee-icon-192.png",

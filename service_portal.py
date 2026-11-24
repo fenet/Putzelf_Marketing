@@ -17,15 +17,14 @@ from werkzeug.utils import secure_filename
 SHELL = """
 <!doctype html><html lang="{{ 'de' if current_lang == 'de' else 'en' }}"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{{ page_title }} - Elf's Plan</title>
-{% if manager_pwa %}<link rel="manifest" href="/static/site-manager-manifest.json"><meta name="theme-color" content="#014D4E"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><link rel="apple-touch-icon" href="/static/employee-icon-192.png">{% endif %}
+<title>{{ page_title }} - Putzelf's</title>
+<meta name="theme-color" content="#014D4E">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 {% if show_admin_sidebar %}<link rel="stylesheet" href="{{ url_for('static', filename='admin-sidebar.css') }}">{% endif %}
 <style>body{background:#f5f7fb;color:#19233b}.wrap{width:min(1100px,100%);margin:2rem auto;padding:0 1rem}.ep-portal-shell{min-height:100vh;display:grid;grid-template-columns:248px minmax(0,1fr);background:#f5f7fb}.ep-portal-shell .wrap{width:100%;max-width:none;margin:0;padding:2rem clamp(1rem,3vw,2.5rem)}.card{border:1px solid #e2e8f0;border-radius:1rem;box-shadow:0 8px 24px #17213b0a}.top{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1.3rem}.muted{color:#64748b}.checked{color:#16804a;font-weight:700}.unchecked{color:#c24132;font-weight:700}.area-card{border:1px solid #e2e8f0;border-radius:.8rem;padding:1rem;background:#fff}.area-card+.area-card{margin-top:.7rem}nav a{margin-right:.6rem}.tag{border-radius:2rem;padding:.2rem .65rem;background:#edf2ff}</style></head><body>{% if show_admin_sidebar %}<div class="ep-portal-shell">{% include 'partials/admin_sidebar.html' %}{% endif %}<main class="wrap {{ 'inspection-page' if active_page|default('') in ['inspection', 'inspection_report', 'inspection_areas'] else '' }}">
 {% with messages = get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="alert alert-{{ 'warning' if category == 'warning' else 'success' if category == 'success' else 'info' }}">{{ message }}</div>{% endfor %}{% endwith %}
 {{ body|safe }}
-{% if manager_pwa %}<script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/manager-sw.js', {scope: '/'}).catch(() => {}); } let managerInstallPrompt; const installButton=document.getElementById('install-manager-app'); const installHelp=document.getElementById('manager-install-help'); if(installHelp && (/iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1))) installHelp.hidden=false; window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); managerInstallPrompt=event; if(installButton) installButton.hidden=false; }); installButton?.addEventListener('click', async () => { if(!managerInstallPrompt) return; managerInstallPrompt.prompt(); await managerInstallPrompt.userChoice; managerInstallPrompt=null; installButton.hidden=true; }); window.addEventListener('appinstalled', () => { if(installButton) installButton.hidden=true; });</script>{% endif %}
  </main>{% if show_admin_sidebar %}</div>{% endif %}</body></html>
 """
 
@@ -148,7 +147,7 @@ def create_service_portal_blueprint(
         finally:
             db.close()
         body = """
-<div class="top"><div><div class="muted">Operations portal</div><h1>Welcome, {{ manager_name }}</h1><div class="muted">Manage your team, sites, schedule, and monthly inspections.</div></div><div class="d-flex gap-2"><div class="text-end"><button class="btn btn-outline-primary" id="install-manager-app" type="button" hidden>Install app</button><small id="manager-install-help" class="muted d-block" hidden>On iPhone or iPad, tap Share, then Add to Home Screen.</small></div><a class="btn btn-outline-secondary" href="{{ url_for('logout') }}">Sign out</a></div></div>
+<div class="top"><div><div class="muted">Operations portal</div><h1>Welcome, {{ manager_name }}</h1><div class="muted">Manage your team, sites, schedule, and monthly inspections.</div></div><a class="btn btn-outline-secondary" href="{{ url_for('logout') }}">Sign out</a></div>
 <nav class="mb-3"><a href="{{ url_for('ops.manager_inspections') }}">Inspections</a><a href="{{ url_for('schedule_dashboard') }}">Schedule</a><a href="{{ url_for('admin_sites') }}">Sites</a><a href="{{ url_for('admin_employees') }}">Employees</a><a href="{{ url_for('ops.public_resources') }}" target="_blank">Public safety library</a></nav>
 <div class="row g-3 mb-4"><div class="col-md-4"><div class="card p-3"><div class="muted">Assigned sites</div><h2>{{ sites|length }}</h2></div></div><div class="col-md-4"><div class="card p-3"><div class="muted">Inspections complete · {{ month }}</div><h2>{{ completed }} / {{ configured_sites }}</h2>{% if unconfigured_sites %}<div class="small muted">{{ unconfigured_sites }} sites need their own areas set up</div>{% endif %}</div></div><div class="col-md-4"><div class="card p-3"><div class="muted">Employees</div><h2>{{ employees_count }}</h2></div></div></div>
 <div class="card p-4"><h2 class="h5">Assigned sites</h2>{% if sites %}<div class="list-group list-group-flush">{% for site in sites %}<div class="list-group-item d-flex justify-content-between align-items-center gap-3"><div><strong>{{ site.profile_company_name or site.name }}</strong><div class="muted">{{ site.address or '' }} · {{ area_counts[site.id] }} inspection areas</div></div><div class="d-flex flex-wrap gap-2"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('ops.admin_inspection_areas', site_id=site.id) }}">Manage areas</a>{% if area_counts[site.id] %}<a class="btn btn-sm btn-primary" href="{{ url_for('ops.manager_inspection_detail', site_id=site.id, month=month) }}">Inspect this month</a>{% endif %}</div></div>{% endfor %}</div>{% else %}<p class="muted mb-0">No sites are assigned to your account yet. Ask the main manager to assign sites.</p>{% endif %}</div>
@@ -935,7 +934,7 @@ def create_service_portal_blueprint(
                 if y < 90:
                     pdf.showPage(); y = height - 48
                 pdf.setFont("Helvetica-Bold", 11)
-                pdf.drawString(42, y, f"{row['site'].profile_company_name or row['site'].name} â€” {row['status']}")
+                pdf.drawString(42, y, f"{row['site'].profile_company_name or row['site'].name} — {row['status']}")
                 y -= 17
                 pdf.setFont("Helvetica", 9)
                 if not row["areas"]:
@@ -944,7 +943,7 @@ def create_service_portal_blueprint(
                 for area in row["areas"]:
                     line = f"[{'X' if area['checked'] else ' '}] {area['area']}"
                     if area["notes"]:
-                        line += f" â€” {area['notes'][:100]}"
+                        line += f" — {area['notes'][:100]}"
                     pdf.drawString(52, y, line[:125])
                     y -= 13
                     if y < 48:

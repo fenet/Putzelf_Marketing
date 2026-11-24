@@ -97,9 +97,9 @@
     .schedule-table[data-period="month"] .date-heading strong { font-size:.63rem; }
     .schedule-table[data-period="month"] .schedule-cell { padding:1px !important; }
     .schedule-table[data-period="month"] .shift-pill { padding:4px 2px 4px 5px; font-size:.59rem; }
-    .employee-heading { position:relative; padding-right:1rem !important; }
-    .employee-column-resizer { position:absolute; z-index:12; top:0; right:-3px; width:8px; height:100%; padding:0; border:0; background:transparent; cursor:col-resize; touch-action:none; }
-    .employee-column-resizer::after { content:""; position:absolute; top:20%; bottom:20%; left:3px; width:2px; border-radius:2px; background:#cbd5e1; }
+    .employee-heading { position:relative; box-sizing:border-box; padding-right:1.25rem !important; }
+    .employee-column-resizer { position:absolute; z-index:2; top:0; right:0; width:7px; height:100%; padding:0; border:0; background:transparent; cursor:col-resize; touch-action:none; }
+    .employee-column-resizer::after { content:""; position:absolute; top:20%; bottom:20%; left:3px; width:1px; border-radius:2px; background:#cbd5e1; }
     .employee-column-resizer:hover::after, .employee-column-resizer:focus-visible::after { background:#2563eb; width:3px; }
     .employee-column-resizing, .employee-column-resizing * { cursor:col-resize !important; user-select:none !important; }
     .add-employee-row th, .add-employee-row td { height:48px; vertical-align:middle !important; background:#f8fafc !important; }
@@ -240,6 +240,16 @@
     .shift-pill:hover .shift-pill-title,.shift-pill:focus-within .shift-pill-title { display:block; max-height:none; overflow:visible; text-overflow:clip; white-space:normal; overflow-wrap:anywhere; }
     .shift-pill:hover .shift-pill-sub,.shift-pill:focus-within .shift-pill-sub { display:block; overflow:visible; color:#66758a; opacity:1; text-overflow:clip; white-space:normal; overflow-wrap:anywhere; }
     .open-shift-pill:hover .shift-pill-sub,.open-shift-pill:focus-within .shift-pill-sub { color:#9a5b35; }
+    .shift-hover-preview { position:fixed; z-index:9500; display:grid; gap:.45rem; width:min(340px,calc(100vw - 24px)); padding:.8rem .9rem; border:1px solid #dce4ed; border-radius:12px; background:#fff; color:#34445a; box-shadow:0 14px 38px rgba(18,34,55,.2); pointer-events:none; }
+    .shift-hover-preview[hidden] { display:none!important; }
+    .shift-hover-preview-time { color:#014D4E; font-size:.76rem; font-weight:750; }
+    .shift-hover-preview-title { color:#1f2e43; font-size:.88rem; font-weight:750; line-height:1.3; overflow-wrap:anywhere; }
+    .shift-hover-preview-detail { color:#65748a; font-size:.74rem; line-height:1.4; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .shift-hover-preview-crew { display:flex; flex-wrap:wrap; gap:.3rem; padding-top:.35rem; border-top:1px solid #edf0f3; }
+    .shift-hover-preview-crew span,.shift-hover-preview-badge { padding:.2rem .45rem; border-radius:999px; background:#f1f5f9; color:#526176; font-size:.66rem; font-weight:650; }
+    .shift-hover-preview-badge.is-recurring { background:#f3edff; color:#6941a5; }
+    .shift-hover-preview-badge.is-open { background:#fff0e2; color:#9a4b19; }
+    @media(hover:none) { .shift-hover-preview { display:none!important; } }
     @media (hover:none) {
       .shift-pill-actions { height:21px; margin-top:5px; overflow:visible; opacity:1; pointer-events:auto; }
       .shift-pill .shift-pill-sub { display:block; overflow:visible; color:#66758a; opacity:1; text-overflow:ellipsis; white-space:nowrap; }
@@ -735,7 +745,7 @@
                         <td class="schedule-cell open-schedule-cell{% if d < schedule_period_start or d > schedule_period_end %} period-outside-cell{% endif %}" data-day="{{ d.isoformat() }}" data-employee-id="">
                           {% for shift in open_cell or [] %}
                             <article class="shift-pill open-shift-pill{% if shift.is_recurring %} is-recurring{% endif %}" data-assignment="open" data-shift-id="{{ shift.id }}" data-assigned-people="[]" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions | e }}" title="Click to edit shift">
-                              <div class="shift-pill-text"><div class="shift-pill-time-row"><div class="shift-pill-time">{{ shift.time_window }}</div>{% if shift.is_recurring %}<span class="recurring-shift-mark" title="Repeating schedule" aria-label="Repeating schedule">&#8635;</span>{% endif %}</div><div class="shift-pill-title">{{ shift.site_name }}</div><div class="shift-pill-sub">{{ shift.site_address }}</div></div>
+                              <div class="shift-pill-text"><div class="shift-pill-time-row"><span class="shift-pill-time"><time>{{ shift.start_time_str }}</time><i class="bi bi-arrow-right" aria-hidden="true"></i><time>{{ shift.end_time_str }}</time></span>{% if shift.is_recurring %}<span class="recurring-shift-mark" title="Repeating schedule" aria-label="Repeating schedule">&#8635;</span>{% endif %}</div><div class="shift-pill-title">{{ shift.site_name }}</div><div class="shift-pill-sub">{{ shift.site_address }}</div></div>
                               <div class="shift-pill-actions"><input type="checkbox" class="shift-checkbox" name="shift_ids[]" value="{{ shift.id }}" aria-label="Select open shift"><button type="button" class="shift-action shift-edit" data-shift-id="{{ shift.id }}" data-employee-id="" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions | e }}" title="Edit shift" aria-label="Edit shift"><i class="bi bi-pencil-fill" aria-hidden="true"></i></button><button type="button" class="shift-action shift-add-employee" data-shift-id="{{ shift.id }}" title="Add employees" aria-label="Add employees"><i class="bi bi-person-plus-fill" aria-hidden="true"></i></button></div>
                             </article>
                           {% endfor %}
@@ -757,7 +767,7 @@
                               {% for shift in cell %}
                                 <article class="shift-pill{% if shift.is_recurring %} is-recurring{% endif %}{% if shift.assigned_people|length > 1 %} shift-has-crew{% endif %}" data-assignment="assigned" draggable="true" data-shift-id="{{ shift.id }}" data-employee-id="{{ emp.id }}" data-assigned-people="{{ shift.assigned_people|tojson|forceescape }}" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions | e }}" title="Click to edit shift">
                                   <div class="shift-pill-text">
-                                    <div class="shift-pill-time-row"><div class="shift-pill-time">{{ shift.time_window }}</div>{% if shift.is_recurring %}<span class="recurring-shift-mark" title="Repeating schedule" aria-label="Repeating schedule">&#8635;</span>{% endif %}<span class="shift-people-indicator" title="{{ shift.assigned_people|length }} employee(s) assigned" aria-label="{{ shift.assigned_people|length }} employee(s) assigned"><i class="bi {% if shift.assigned_people|length > 1 %}bi-people-fill{% else %}bi-person-fill{% endif %}" aria-hidden="true"></i></span></div>
+                                    <div class="shift-pill-time-row"><span class="shift-pill-time"><time>{{ shift.start_time_str }}</time><i class="bi bi-arrow-right" aria-hidden="true"></i><time>{{ shift.end_time_str }}</time></span>{% if shift.is_recurring %}<span class="recurring-shift-mark" title="Repeating schedule" aria-label="Repeating schedule">&#8635;</span>{% endif %}<span class="shift-people-indicator" title="{{ shift.assigned_people|length }} employee(s) assigned" aria-label="{{ shift.assigned_people|length }} employee(s) assigned"><i class="bi {% if shift.assigned_people|length > 1 %}bi-people-fill{% else %}bi-person-fill{% endif %}" aria-hidden="true"></i></span></div>
                                     <div class="shift-pill-title" title="{{ shift.site_name }}">{{ shift.site_name }}</div>
                                     {% if shift.assigned_people|length > 1 %}<div class="shift-crew" aria-label="{{ shift.assigned_people|length }} employees assigned">
                                       {% for person in shift.assigned_people[:3] %}<span class="shift-crew-avatar" title="{{ person.name }}">{% if person.image %}<img src="{{ url_for('static', filename=person.image) }}" alt="">{% else %}<i class="bi bi-person-fill" aria-hidden="true"></i>{% endif %}</span>{% endfor %}
@@ -792,7 +802,7 @@
                             {% for shift in site_shifts %}
                               <article class="shift-pill site-shift-pill{% if shift.is_recurring %} is-recurring{% endif %}{% if shift.is_open %} open-shift-pill{% endif %}{% if shift.assigned_people|length > 1 %} shift-has-crew{% endif %}" data-assignment="{{ 'open' if shift.is_open else 'assigned' }}" data-shift-id="{{ shift.shift_ids[0] }}" data-shift-ids="{{ shift.shift_ids|tojson|forceescape }}" data-employee-id="" data-assigned-people="{{ shift.assigned_people|tojson|forceescape }}" data-day="{{ shift.day_iso }}" data-start="{{ shift.start_time_str }}" data-end="{{ shift.end_time_str }}" data-instructions="{{ shift.instructions|e }}" title="Click to edit shift">
                                 <div class="shift-pill-text">
-                                  <div class="shift-pill-time-row"><div class="shift-pill-time">{{ shift.time_window }}</div>{% if shift.is_recurring %}<span class="recurring-shift-mark" title="Repeating schedule" aria-label="Repeating schedule">&#8635;</span>{% endif %}
+                                  <div class="shift-pill-time-row"><span class="shift-pill-time"><time>{{ shift.start_time_str }}</time><i class="bi bi-arrow-right" aria-hidden="true"></i><time>{{ shift.end_time_str }}</time></span>{% if shift.is_recurring %}<span class="recurring-shift-mark" title="Repeating schedule" aria-label="Repeating schedule">&#8635;</span>{% endif %}
                                     {% if not shift.is_open %}<span class="shift-people-indicator" title="{{ shift.assigned_people|length }} employee(s) assigned" aria-label="{{ shift.assigned_people|length }} employee(s) assigned"><i class="bi {% if shift.assigned_people|length > 1 %}bi-people-fill{% else %}bi-person-fill{% endif %}" aria-hidden="true"></i></span>{% endif %}
                                   </div>
                                   <div class="shift-pill-title" title="{{ shift.site_name }}">{{ shift.site_name }}</div>
@@ -2121,6 +2131,82 @@
         });
       });
     }
+
+    // The grid scroll container clips expanded cards, so show a floating preview
+    // for the full shift details when a card is hovered or keyboard-focused.
+    (() => {
+      const pills = document.querySelectorAll('.schedule-table .shift-pill');
+      if (!pills.length || !window.matchMedia('(hover: hover)').matches) return;
+
+      const preview = document.createElement('aside');
+      preview.className = 'shift-hover-preview';
+      preview.setAttribute('role', 'tooltip');
+      preview.hidden = true;
+      document.body.appendChild(preview);
+
+      const addText = (className, text) => {
+        if (!text) return;
+        const line = document.createElement('div');
+        line.className = className;
+        line.textContent = text;
+        preview.appendChild(line);
+      };
+      const addBadge = (text, className = '') => {
+        const badge = document.createElement('span');
+        badge.className = `shift-hover-preview-badge ${className}`.trim();
+        badge.textContent = text;
+        preview.appendChild(badge);
+      };
+      const positionPreview = (pill) => {
+        const rect = pill.getBoundingClientRect();
+        const margin = 12;
+        const gap = 10;
+        const width = preview.getBoundingClientRect().width;
+        const placeRight = window.innerWidth - rect.right >= width + gap + margin;
+        const left = placeRight ? rect.right + gap : Math.max(margin, rect.left - width - gap);
+        const top = Math.min(Math.max(margin, rect.top), window.innerHeight - preview.offsetHeight - margin);
+        preview.style.left = `${left}px`;
+        preview.style.top = `${Math.max(margin, top)}px`;
+      };
+      const showPreview = (pill) => {
+        preview.replaceChildren();
+        const times = [...pill.querySelectorAll('.shift-pill-time time')].map((node) => node.textContent.trim()).filter(Boolean);
+        if (times.length === 2) addText('shift-hover-preview-time', `${times[0]} ${document.documentElement.lang === 'de' ? 'bis' : 'to'} ${times[1]}`);
+        addText('shift-hover-preview-title', pill.querySelector('.shift-pill-title')?.textContent.trim());
+        pill.querySelectorAll('.shift-pill-sub').forEach((node) => addText('shift-hover-preview-detail', node.textContent.trim()));
+        if (pill.classList.contains('is-recurring')) addBadge(document.documentElement.lang === 'de' ? 'Wiederholend' : 'Repeating', 'is-recurring');
+        if (pill.classList.contains('open-shift-pill')) addBadge(document.documentElement.lang === 'de' ? 'Nicht zugewiesen' : 'Unassigned', 'is-open');
+
+        let people = [];
+        try { people = JSON.parse(pill.dataset.assignedPeople || '[]'); } catch (_) { people = []; }
+        if (people.length) {
+          const crew = document.createElement('div');
+          crew.className = 'shift-hover-preview-crew';
+          people.forEach((person) => {
+            if (!person?.name) return;
+            const name = document.createElement('span');
+            name.textContent = person.name;
+            crew.appendChild(name);
+          });
+          if (crew.childElementCount) preview.appendChild(crew);
+        }
+        preview.hidden = false;
+        positionPreview(pill);
+      };
+      const hidePreview = () => { preview.hidden = true; };
+      pills.forEach((pill) => {
+        pill.addEventListener('mouseenter', () => showPreview(pill));
+        pill.addEventListener('mouseleave', () => {
+          if (!pill.contains(document.activeElement)) hidePreview();
+        });
+        pill.addEventListener('focusin', () => showPreview(pill));
+        pill.addEventListener('focusout', () => window.setTimeout(() => {
+          if (!pill.matches(':hover') && !pill.contains(document.activeElement)) hidePreview();
+        }, 0));
+      });
+      window.addEventListener('scroll', hidePreview, true);
+      window.addEventListener('resize', hidePreview);
+    })();
 
     // Drag and drop shifts between days
     let draggedShiftId = null;
